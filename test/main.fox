@@ -1,15 +1,23 @@
+import fox.gl.fg
+
 func main() -> void{
-    f = fib(26)
-    print(f)
+    a = fg.create_window("Hello FoxLang", 400, 400)
 
+    fg.clear_color(0.1, 0.2, 0.3, 1.0)
+
+    while (!fg.window_should_close(a)){
+        fg.clear_color(0.1, 0.2, 0.3, 1.0)
+        fg.clear()
+
+        fg.begin()
+        fg.draw_triangle(0.0, 0.5, 1.0, 0.0, 0.0, -0.5, -0.5, 0.0, 1.0, 0.0, 0.5, -0.5, 0.0, 0.0, 1.0); # 15 var
+        fg.end()
+
+        fg.update(a)
+
+
+    }
+
+    fg.close()
     exit(0)
-}
-
-func fib(a <- int) -> int{
-    # 基准条件
-    if (n <= 0) ret 0;
-    if (n == 1) ret 1;
-    
-    # 递归调用
-    ret fibonacci(n - 1) + fibonacci(n - 2);
-}
+} 

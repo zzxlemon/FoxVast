@@ -20,6 +20,39 @@
 #include <cmath>
 
 // ============================================================
+// Serialization helpers
+// ============================================================
+inline void writeUint32(std::vector<uint8_t>& data, uint32_t v) {
+    data.push_back(static_cast<uint8_t>(v & 0xFF));
+    data.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+    data.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+    data.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+}
+
+inline uint32_t readUint32(const uint8_t* data, size_t size, size_t& offset) {
+    if (offset + 4 > size) return 0;
+    uint32_t v = static_cast<uint32_t>(data[offset]) |
+                 (static_cast<uint32_t>(data[offset + 1]) << 8) |
+                 (static_cast<uint32_t>(data[offset + 2]) << 16) |
+                 (static_cast<uint32_t>(data[offset + 3]) << 24);
+    offset += 4;
+    return v;
+}
+
+inline void writeString(std::vector<uint8_t>& data, const std::string& s) {
+    writeUint32(data, static_cast<uint32_t>(s.size()));
+    for (char c : s) data.push_back(static_cast<uint8_t>(c));
+}
+
+inline std::string readString(const uint8_t* data, size_t size, size_t& offset) {
+    uint32_t len = readUint32(data, size, offset);
+    if (offset + len > size) return "";
+    std::string s(reinterpret_cast<const char*>(data + offset), len);
+    offset += len;
+    return s;
+}
+
+// ============================================================
 // Opcodes
 // ============================================================
 enum class OpCode : uint8_t {
@@ -95,6 +128,8 @@ struct Chunk {
 
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t>& data);
+    bool deserialize(const uint8_t* data, size_t size, size_t& offset);
+    size_t serializedSize() const;
 };
 
 // ============================================================

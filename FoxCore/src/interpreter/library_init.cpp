@@ -6,6 +6,7 @@
 #include "../../libs/system/math/SystemFunctionsMath.h"
 #include "../../libs/system/io/util/SystemFunctionUtil.h"
 #include "../../libs/system/api/socket/SystemFunctionsSocket.h"
+#include "../../libs/graphics/SystemFunctionsGraphics.h"
 
 void initSystemLibraries() {
     auto& libMgr = LibraryManager::getInstance();
@@ -89,6 +90,7 @@ void initSystemLibraries() {
         });
 
     libMgr.registerLibrary("socket");
+    libMgr.registerLibraryName("socket", "fox.std.socket");
     libMgr.registerSystemFunction("socket", "socket_create", [](const std::vector<Value>& args) -> Value {
         Socket sock;
         return sock.socket_create(args);
@@ -109,4 +111,51 @@ void initSystemLibraries() {
         Socket sock;
         return sock.socket_close(args);
         });
+
+    libMgr.registerLibrary("gl_fg");
+    libMgr.registerLibraryName("gl_fg", "fox.gl.fg");
+    libMgr.registerSystemFunction("gl_fg", "create_window", [](const std::vector<Value>& args)  -> Value {
+        FG fg;
+        return fg.create_window(args);
+    }); 
+    libMgr.registerSystemFunction("gl_fg", "close", [](const std::vector<Value>& args)  -> Value {
+        FG fg;
+        return fg.close(args);
+    }); 
+    libMgr.registerSystemFunction("gl_fg", "window_should_close", [](const std::vector<Value>& args)  -> Value {
+        FG fg;
+        return fg.window_should_close(args);
+    }); 
+    libMgr.registerSystemFunction("gl_fg", "swap_buffers", [](const std::vector<Value>& args)  -> Value {
+        FG fg;
+        return fg.swap_buffers(args);
+    }); 
+    libMgr.registerSystemFunction("gl_fg", "poll_events", [](const std::vector<Value>& args)  -> Value {
+        FG fg;
+        return fg.poll_events(args);
+    }); 
+    libMgr.registerSystemFunction("gl_fg", "update", [](const std::vector<Value>& args)  -> Value {
+        FG fg;
+        return fg.update(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "clear_color", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.clear_color(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "clear", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.clear(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "draw_triangle", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.draw_triangle(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "begin", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.begin(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "end", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.end(args);
+    });
 }

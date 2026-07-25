@@ -223,7 +223,9 @@ Token Lexer::nextToken() {
             return makeToken(TOKEN_NE, "!=", tokenLine, tokenCol);
         }
         else {
-            throw std::runtime_error("Syntax error: " + std::to_string(line) + ":" + std::to_string(col) + ": invalid character: ! (only != is supported)");
+            pos++;
+            col++;
+            return makeToken(TOKEN_NOT, "!", tokenLine, tokenCol);
         }
     }
     else if (c == '>') {

@@ -35,7 +35,7 @@ func calculate(val <- int, base <- double) -> double {
 
 // 主程序入口
 func main() -> void {
-    print("? 欢迎使用 Lemon Studio FoxLang!")
+    print("欢迎使用 Lemon Studio FoxLang!")
     end // 精准控制输出换行
     
     print("请输入您的验证基数: ")
@@ -137,4 +137,4 @@ FoxLang 是一个完全由开源极客驱动、社区共建的项目。如果您
 
  2026 **[Lemon Studio](https://lemdev.top)**. 保留所有权利。
 
-**(此信息在未来的版本变更是可能有变化)**
+**(此信息在未来的版本变更可能会有所变化)**

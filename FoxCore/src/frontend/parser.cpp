@@ -59,6 +59,7 @@ static const char* tokenTypeName(TokenT type) {
     case TOKEN_NE: return "'!='";
     case TOKEN_GE: return "'>='";
     case TOKEN_LE: return "'<='";
+    case TOKEN_NOT: return "'!'";
     default: return "token";
     }
 }
@@ -110,6 +111,18 @@ std::unique_ptr<Expr> Parser::parsePrimary(Lexer& lexer, Token& currentToken) {
         auto sizeExpr = parseExpr(lexer, currentToken);
         eat(lexer, currentToken, TOKEN_RPAREN);
         return std::unique_ptr<NewExpr>(new NewExpr(std::move(sizeExpr)));
+    }
+
+    if (token.type == TOKEN_NOT) {
+        eat(lexer, currentToken, TOKEN_NOT);
+        auto operand = parsePrimary(lexer, currentToken);
+        return std::unique_ptr<UnaryExpr>(new UnaryExpr(TOKEN_NOT, std::move(operand)));
+    }
+
+    if (token.type == TOKEN_MINUS) {
+        eat(lexer, currentToken, TOKEN_MINUS);
+        auto operand = parsePrimary(lexer, currentToken);
+        return std::unique_ptr<UnaryExpr>(new UnaryExpr(TOKEN_MINUS, std::move(operand)));
     }
 
     if (token.type == TOKEN_IDENTIFIER) {
@@ -272,13 +285,6 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
         int braceDepth = 0;
         bool insideBlock = false;
         while (currentToken.type != TOKEN_EOF) {
-            if (currentToken.type == TOKEN_STRING) {
-                stmt += "\"" + currentToken.value + "\"";
-            }
-            else {
-                stmt += currentToken.value;
-            }
-            stmt += " ";
             if (currentToken.type == TOKEN_LBRACE) {
                 insideBlock = true;
                 braceDepth++;
@@ -286,11 +292,26 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
             else if (currentToken.type == TOKEN_RBRACE && insideBlock) {
                 braceDepth--;
                 if (braceDepth == 0) {
+                    stmt += "} ";
                     currentToken = lexer.nextToken();
                     skipWhitespace(lexer, currentToken);
                     break;
                 }
             }
+            else if (!insideBlock && (currentToken.type == TOKEN_NEWLINE || currentToken.type == TOKEN_SEMICOLON)) {
+                if (currentToken.type == TOKEN_SEMICOLON) {
+                    stmt += "; ";
+                }
+                currentToken = lexer.nextToken();
+                break;
+            }
+            if (currentToken.type == TOKEN_STRING) {
+                stmt += "\"" + currentToken.value + "\"";
+            }
+            else {
+                stmt += currentToken.value;
+            }
+            stmt += " ";
             currentToken = lexer.nextToken();
             skipWhitespace(lexer, currentToken);
         }
@@ -410,9 +431,15 @@ void Parser::parseFunction() {
     skipWhitespace(funcLexer, funcCurrentToken);
 
     while (funcCurrentToken.type != TOKEN_RBRACE && funcCurrentToken.type != TOKEN_EOF) {
-        std::string stmt = parseSingleStatement(funcLexer, funcCurrentToken);
-        if (!stmt.empty()) {
-            func.body.push_back(stmt);
+        std::string line = parseSingleStatement(funcLexer, funcCurrentToken);
+        if (!line.empty()) {
+            func.body.push_back(line);
+            try {
+                func.compiledBody.push_back(std::move(parseLineToStmt(line)));
+            } catch (...) {
+                // Type declarations (int x = 5) don't compile to Stmts; store nullptr
+                func.compiledBody.push_back(nullptr);
+            }
         }
         skipWhitespace(funcLexer, funcCurrentToken);
     }
@@ -455,6 +482,10 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
     skipWhitespace(lineLexer, currentToken);
 
     if (currentToken.type == TOKEN_EOF) return;
+    if (currentToken.type == TOKEN_SEMICOLON) {
+        throw std::runtime_error(makeParseError(currentToken,
+            "FoxLang does not use semicolons. Remove the ';' and start a new line instead."));
+    }
 
     if (currentToken.type == TOKEN_IMPORT) {
         return;
@@ -699,6 +730,84 @@ namespace {
     };
 }
 
+// ============================================================
+// CompilingHandler — builds Stmt nodes without executing
+// ============================================================
+namespace {
+    class CompilingHandler : public StmtHandler {
+    public:
+        std::unique_ptr<Stmt> stmt;
+
+        void onPrint(std::unique_ptr<Expr> arg) override {
+            stmt = std::make_unique<PrintStmt>(std::move(arg));
+        }
+        void onPrintln(std::unique_ptr<Expr> arg) override {
+            stmt = std::make_unique<PrintlnStmt>(std::move(arg));
+        }
+        void onExit(std::unique_ptr<Expr> arg) override {
+            stmt = std::make_unique<ExitStmt>(std::move(arg));
+        }
+        Value onRet(std::unique_ptr<Expr> arg) override {
+            stmt = std::make_unique<RetStmt>(std::move(arg));
+            return Value();
+        }
+        void onEndl() override {
+            stmt = std::make_unique<EndlStmt>();
+        }
+        void onInput(const std::string& varName) override {
+            stmt = std::make_unique<InputStmt>(varName);
+        }
+        void onCall(const std::string& name, std::vector<std::unique_ptr<Expr>> args) override {
+            stmt = std::make_unique<CallStmt>(name, std::move(args));
+        }
+        void onAssign(const std::string& name, std::unique_ptr<Expr> expr) override {
+            stmt = std::make_unique<AssignStmt>(name, std::move(expr));
+        }
+        void onIndexAssign(const std::string& name, std::unique_ptr<Expr> index, std::unique_ptr<Expr> value) override {
+            stmt = std::make_unique<IndexAssignStmt>(name, std::move(index), std::move(value));
+        }
+        void onIf(IfStatement ifStmt) override {
+            stmt = std::make_unique<IfStmt>(ifStmt.condition, Parser::compileBody(ifStmt.body));
+        }
+        void onWhile(WhileStatement whileStmt) override {
+            stmt = std::make_unique<WhileStmt>(whileStmt.condition, Parser::compileBody(whileStmt.body));
+        }
+        void onFor(ForStatement forStmt) override {
+            stmt = std::make_unique<ForStmt>(forStmt.init, forStmt.condition, forStmt.iter, Parser::compileBody(forStmt.body));
+        }
+        void onFnLabel(const std::string& name) override {
+            stmt = std::make_unique<LabelStmt>(name);
+        }
+        void onGoto(const std::string& name) override {
+            stmt = std::make_unique<GotoStmt>(name);
+        }
+    };
+}
+
+std::unique_ptr<Stmt> Parser::parseLineToStmt(const std::string& line) {
+    if (line.empty()) return nullptr;
+    // Skip type declarations (int/double/string var = expr) — not expressible as Stmts
+    std::string trimmed = line;
+    size_t start = trimmed.find_first_not_of(" \t");
+    if (start != std::string::npos) trimmed = trimmed.substr(start);
+    if (trimmed.rfind("int ", 0) == 0 || trimmed.rfind("double ", 0) == 0 || trimmed.rfind("string ", 0) == 0) {
+        return nullptr;
+    }
+    CompilingHandler handler;
+    parseLine(line, handler);
+    return std::move(handler.stmt);
+}
+
+std::vector<std::unique_ptr<Stmt>> Parser::compileBody(const std::vector<std::string>& lines) {
+    std::vector<std::unique_ptr<Stmt>> compiled;
+    compiled.reserve(lines.size());
+    for (const auto& line : lines) {
+        auto stmt = parseLineToStmt(line);
+        if (stmt) compiled.push_back(std::move(stmt));
+    }
+    return compiled;
+}
+
 Value Parser::parseLine(const std::string& line,
     std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
@@ -764,7 +873,13 @@ IfStatement Parser::parseIfStatement(Lexer& lexer, Token& currentToken) {
     eat(lexer, currentToken, TOKEN_LPAREN);
 
     std::string condStr;
-    while (currentToken.type != TOKEN_RPAREN && currentToken.type != TOKEN_EOF) {
+    int parenDepth = 0;
+    while (currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_LPAREN) parenDepth++;
+        if (currentToken.type == TOKEN_RPAREN) {
+            if (parenDepth == 0) break;
+            parenDepth--;
+        }
         condStr += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
@@ -773,19 +888,27 @@ IfStatement Parser::parseIfStatement(Lexer& lexer, Token& currentToken) {
     size_t end = condStr.find_last_not_of(" ");
     ifStmt.condition = (start != std::string::npos) ? condStr.substr(start, end - start + 1) : "";
     eat(lexer, currentToken, TOKEN_RPAREN);
-    eat(lexer, currentToken, TOKEN_LBRACE);
-    while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
-        if (currentToken.type == TOKEN_NEWLINE) {
-            currentToken = lexer.nextToken();
-            continue;
+
+    if (currentToken.type == TOKEN_LBRACE) {
+        eat(lexer, currentToken, TOKEN_LBRACE);
+        while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+            if (currentToken.type == TOKEN_NEWLINE) {
+                currentToken = lexer.nextToken();
+                continue;
+            }
+            std::string stmt = parseSingleStatement(lexer, currentToken);
+            if (!stmt.empty()) {
+                ifStmt.body.push_back(stmt);
+            }
+            skipWhitespace(lexer, currentToken);
         }
+        eat(lexer, currentToken, TOKEN_RBRACE);
+    } else {
         std::string stmt = parseSingleStatement(lexer, currentToken);
         if (!stmt.empty()) {
             ifStmt.body.push_back(stmt);
         }
-        skipWhitespace(lexer, currentToken);
     }
-    eat(lexer, currentToken, TOKEN_RBRACE);
     return ifStmt;
 }
 
@@ -817,7 +940,13 @@ WhileStatement Parser::parseWhileStatement(Lexer& lexer, Token& currentToken) {
     eat(lexer, currentToken, TOKEN_LPAREN);
 
     std::string condStr;
-    while (currentToken.type != TOKEN_RPAREN && currentToken.type != TOKEN_EOF) {
+    int parenDepth = 0;
+    while (currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_LPAREN) parenDepth++;
+        if (currentToken.type == TOKEN_RPAREN) {
+            if (parenDepth == 0) break;
+            parenDepth--;
+        }
         condStr += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
@@ -826,19 +955,27 @@ WhileStatement Parser::parseWhileStatement(Lexer& lexer, Token& currentToken) {
     size_t end = condStr.find_last_not_of(" ");
     whileStmt.condition = (start != std::string::npos) ? condStr.substr(start, end - start + 1) : "";
     eat(lexer, currentToken, TOKEN_RPAREN);
-    eat(lexer, currentToken, TOKEN_LBRACE);
-    while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
-        if (currentToken.type == TOKEN_NEWLINE) {
-            currentToken = lexer.nextToken();
-            continue;
+
+    if (currentToken.type == TOKEN_LBRACE) {
+        eat(lexer, currentToken, TOKEN_LBRACE);
+        while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+            if (currentToken.type == TOKEN_NEWLINE) {
+                currentToken = lexer.nextToken();
+                continue;
+            }
+            std::string stmt = parseSingleStatement(lexer, currentToken);
+            if (!stmt.empty()) {
+                whileStmt.body.push_back(stmt);
+            }
+            skipWhitespace(lexer, currentToken);
         }
+        eat(lexer, currentToken, TOKEN_RBRACE);
+    } else {
         std::string stmt = parseSingleStatement(lexer, currentToken);
         if (!stmt.empty()) {
             whileStmt.body.push_back(stmt);
         }
-        skipWhitespace(lexer, currentToken);
     }
-    eat(lexer, currentToken, TOKEN_RBRACE);
     return whileStmt;
 }
 
@@ -890,7 +1027,13 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
     }
     eat(lexer, currentToken, TOKEN_SEMICOLON);
     std::string iter;
-    while (currentToken.type != TOKEN_RPAREN && currentToken.type != TOKEN_EOF) {
+    int iterParenDepth = 0;
+    while (currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_LPAREN) iterParenDepth++;
+        if (currentToken.type == TOKEN_RPAREN) {
+            if (iterParenDepth == 0) break;
+            iterParenDepth--;
+        }
         iter += currentToken.value;
         iter += " ";
         currentToken = lexer.nextToken();
@@ -907,19 +1050,26 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
     end = iter.find_last_not_of(" ");
     forStmt.iter = (start != std::string::npos) ? iter.substr(start, end - start + 1) : "";
 
-    eat(lexer, currentToken, TOKEN_LBRACE);
-    while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
-        if (currentToken.type == TOKEN_NEWLINE) {
-            currentToken = lexer.nextToken();
-            continue;
+    if (currentToken.type == TOKEN_LBRACE) {
+        eat(lexer, currentToken, TOKEN_LBRACE);
+        while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+            if (currentToken.type == TOKEN_NEWLINE) {
+                currentToken = lexer.nextToken();
+                continue;
+            }
+            std::string stmt = parseSingleStatement(lexer, currentToken);
+            if (!stmt.empty()) {
+                forStmt.body.push_back(stmt);
+            }
+            skipWhitespace(lexer, currentToken);
         }
+        eat(lexer, currentToken, TOKEN_RBRACE);
+    } else {
         std::string stmt = parseSingleStatement(lexer, currentToken);
         if (!stmt.empty()) {
             forStmt.body.push_back(stmt);
         }
-        skipWhitespace(lexer, currentToken);
     }
-    eat(lexer, currentToken, TOKEN_RBRACE);
     return forStmt;
 }
 

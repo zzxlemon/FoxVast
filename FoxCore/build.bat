@@ -33,7 +33,7 @@ for /r %%f in (*.cpp) do (
     echo -^> Compiling: %%~nxf ...
     
     :: Use UTF-8 for compilation
-    g++ -c "%%f" %include_paths% -I ./native/glfw/include -o "builds\%%~nxf.o" -finput-charset=UTF-8 -fexec-charset=UTF-8
+    g++ -c "%%f" %include_paths% -I ./native/glfw/include -I ./native/glad/include -o "builds\%%~nxf.o" -finput-charset=UTF-8 -fexec-charset=UTF-8
     
     if !errorlevel! neq 0 (
         echo -----------------------------------

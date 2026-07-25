@@ -88,24 +88,14 @@ void Chunk::patchJumpOffset(size_t jumpInstrOffset, int32_t offset) {
 std::vector<uint8_t> Chunk::serialize() const {
     std::vector<uint8_t> data;
 
-    auto write32 = [&](uint32_t v) {
-        data.push_back(static_cast<uint8_t>(v & 0xFF));
-        data.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-        data.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
-        data.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
-    };
-
     // Constants
-    write32(static_cast<uint32_t>(constants.size()));
+    writeUint32(data, static_cast<uint32_t>(constants.size()));
     for (const auto& v : constants) {
         switch (v.getType()) {
         case Value::Type::Int: {
             data.push_back(0);
             int32_t iv = v.asInt();
-            data.push_back(static_cast<uint8_t>(iv & 0xFF));
-            data.push_back(static_cast<uint8_t>((iv >> 8) & 0xFF));
-            data.push_back(static_cast<uint8_t>((iv >> 16) & 0xFF));
-            data.push_back(static_cast<uint8_t>((iv >> 24) & 0xFF));
+            writeUint32(data, static_cast<uint32_t>(iv));
             break;
         }
         case Value::Type::Double: {
@@ -120,17 +110,12 @@ std::vector<uint8_t> Chunk::serialize() const {
         }
         case Value::Type::String: {
             data.push_back(2);
-            const std::string& sv = v.asString();
-            write32(static_cast<uint32_t>(sv.size()));
-            for (char c : sv) data.push_back(static_cast<uint8_t>(c));
+            writeString(data, v.asString());
             break;
         }
         case Value::Type::Array: {
             data.push_back(3);
-            const auto& arr = v.asArray();
-            write32(static_cast<uint32_t>(arr.size()));
-            // Simplified: store array elements as constants recursively
-            // For now, empty array placeholder
+            writeUint32(data, static_cast<uint32_t>(v.asArray().size()));
             break;
         }
         case Value::Type::Void: {
@@ -140,7 +125,7 @@ std::vector<uint8_t> Chunk::serialize() const {
         case Value::Type::Bytes: {
             data.push_back(5);
             const auto& bv = v.asBytes();
-            write32(static_cast<uint32_t>(bv.size()));
+            writeUint32(data, static_cast<uint32_t>(bv.size()));
             for (uint8_t byte : bv) data.push_back(byte);
             break;
         }
@@ -148,7 +133,7 @@ std::vector<uint8_t> Chunk::serialize() const {
 }
 
     // Code
-    write32(static_cast<uint32_t>(code.size()));
+    writeUint32(data, static_cast<uint32_t>(code.size()));
     data.insert(data.end(), code.begin(), code.end());
 
     return data;
@@ -156,35 +141,25 @@ std::vector<uint8_t> Chunk::serialize() const {
 
 bool Chunk::deserialize(const std::vector<uint8_t>& data) {
     size_t offset = 0;
-    auto read32 = [&]() -> uint32_t {
-        if (offset + 4 > data.size()) return 0;
-        uint32_t v = static_cast<uint32_t>(data[offset]) |
-                     (static_cast<uint32_t>(data[offset + 1]) << 8) |
-                     (static_cast<uint32_t>(data[offset + 2]) << 16) |
-                     (static_cast<uint32_t>(data[offset + 3]) << 24);
-        offset += 4;
-        return v;
-    };
+    return deserialize(data.data(), data.size(), offset);
+}
 
+bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
     // Constants
-    uint32_t constCount = read32();
+    uint32_t constCount = readUint32(data, size, offset);
     constants.clear();
     for (uint32_t i = 0; i < constCount; i++) {
-        if (offset >= data.size()) return false;
+        if (offset >= size) return false;
         uint8_t type = data[offset++];
         switch (type) {
         case 0: { // int
-            if (offset + 4 > data.size()) return false;
-            int32_t iv = static_cast<int32_t>(data[offset]) |
-                         (static_cast<int32_t>(data[offset + 1]) << 8) |
-                         (static_cast<int32_t>(data[offset + 2]) << 16) |
-                         (static_cast<int32_t>(data[offset + 3]) << 24);
-            offset += 4;
+            if (offset + 4 > size) return false;
+            int32_t iv = static_cast<int32_t>(readUint32(data, size, offset));
             constants.push_back(Value(iv));
             break;
         }
         case 1: { // double
-            if (offset + 8 > data.size()) return false;
+            if (offset + 8 > size) return false;
             uint64_t bits = 0;
             for (int j = 0; j < 8; j++) {
                 bits |= (static_cast<uint64_t>(data[offset + j]) << (j * 8));
@@ -196,15 +171,12 @@ bool Chunk::deserialize(const std::vector<uint8_t>& data) {
             break;
         }
         case 2: { // string
-            uint32_t len = read32();
-            if (offset + len > data.size()) return false;
-            std::string sv(reinterpret_cast<const char*>(data.data() + offset), len);
-            offset += len;
+            std::string sv = readString(data, size, offset);
             constants.push_back(Value(sv));
             break;
         }
         case 3: { // array
-            uint32_t arrLen = read32();
+            uint32_t arrLen = readUint32(data, size, offset);
             std::vector<Value> arr;
             for (uint32_t j = 0; j < arrLen; j++) {
                 arr.push_back(Value());
@@ -213,9 +185,9 @@ bool Chunk::deserialize(const std::vector<uint8_t>& data) {
             break;
         }
         case 5: { // bytes
-            uint32_t bytesLen = read32();
-            if (offset + bytesLen > data.size()) return false;
-            std::vector<uint8_t> bv(data.begin() + offset, data.begin() + offset + bytesLen);
+            uint32_t bytesLen = readUint32(data, size, offset);
+            if (offset + bytesLen > size) return false;
+            std::vector<uint8_t> bv(data + offset, data + offset + bytesLen);
             offset += bytesLen;
             constants.push_back(Value(bv));
             break;
@@ -227,12 +199,31 @@ bool Chunk::deserialize(const std::vector<uint8_t>& data) {
     }
 
     // Code
-    uint32_t codeSize = read32();
+    uint32_t codeSize = readUint32(data, size, offset);
     code.clear();
-    if (offset + codeSize > data.size()) return false;
-    code.insert(code.end(), data.begin() + offset, data.begin() + offset + codeSize);
+    if (offset + codeSize > size) return false;
+    code.insert(code.end(), data + offset, data + offset + codeSize);
+    offset += codeSize;
 
     return true;
+}
+
+size_t Chunk::serializedSize() const {
+    size_t size = 4; // constant count
+    for (const auto& v : constants) {
+        size += 1; // type byte
+        switch (v.getType()) {
+        case Value::Type::Int:    size += 4; break;
+        case Value::Type::Double: size += 8; break;
+        case Value::Type::String: size += 4 + v.asString().size(); break;
+        case Value::Type::Array:  size += 4; break;
+        case Value::Type::Bytes:  size += 4 + v.asBytes().size(); break;
+        case Value::Type::Void:   break;
+        default: break;
+        }
+    }
+    size += 4 + code.size(); // code size + code data
+    return size;
 }
 
 // ============================================================
@@ -241,50 +232,34 @@ bool Chunk::deserialize(const std::vector<uint8_t>& data) {
 std::vector<uint8_t> CompiledProgram::serialize() const {
     std::vector<uint8_t> data;
 
-    auto write32 = [&](uint32_t v) {
-        data.push_back(static_cast<uint8_t>(v & 0xFF));
-        data.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
-        data.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
-        data.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
-    };
-
     // Magic "FOXC"
     data.push_back('F'); data.push_back('O'); data.push_back('X'); data.push_back('C');
     // Version
-    write32(1);
+    writeUint32(data, 1);
 
     // Import entries
-    write32(static_cast<uint32_t>(imports.size()));
+    writeUint32(data, static_cast<uint32_t>(imports.size()));
     for (const auto& imp : imports) {
-        write32(static_cast<uint32_t>(imp.libName.size()));
-        for (char c : imp.libName) data.push_back(static_cast<uint8_t>(c));
-        write32(static_cast<uint32_t>(imp.alias.size()));
-        for (char c : imp.alias) data.push_back(static_cast<uint8_t>(c));
+        writeString(data, imp.libName);
+        writeString(data, imp.alias);
     }
 
     // Number of functions
-    write32(static_cast<uint32_t>(functions.size()));
+    writeUint32(data, static_cast<uint32_t>(functions.size()));
 
     for (const auto& func : functions) {
-        // Function name
-        write32(static_cast<uint32_t>(func.name.size()));
-        for (char c : func.name) data.push_back(static_cast<uint8_t>(c));
-
-        // Return type
-        write32(static_cast<uint32_t>(func.returnType.size()));
-        for (char c : func.returnType) data.push_back(static_cast<uint8_t>(c));
+        writeString(data, func.name);
+        writeString(data, func.returnType);
 
         // Parameters
-        write32(static_cast<uint32_t>(func.parameters.size()));
+        writeUint32(data, static_cast<uint32_t>(func.parameters.size()));
         for (const auto& param : func.parameters) {
-            write32(static_cast<uint32_t>(param.name.size()));
-            for (char c : param.name) data.push_back(static_cast<uint8_t>(c));
-            write32(static_cast<uint32_t>(param.type.size()));
-            for (char c : param.type) data.push_back(static_cast<uint8_t>(c));
+            writeString(data, param.name);
+            writeString(data, param.type);
         }
 
         // Local count
-        write32(static_cast<uint32_t>(func.localCount));
+        writeUint32(data, static_cast<uint32_t>(func.localCount));
 
         // Chunk
         std::vector<uint8_t> chunkData = func.chunk.serialize();
@@ -298,24 +273,6 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
     CompiledProgram prog;
     size_t offset = 0;
 
-    auto read32 = [&]() -> uint32_t {
-        if (offset + 4 > size) return 0;
-        uint32_t v = static_cast<uint32_t>(data[offset]) |
-                     (static_cast<uint32_t>(data[offset + 1]) << 8) |
-                     (static_cast<uint32_t>(data[offset + 2]) << 16) |
-                     (static_cast<uint32_t>(data[offset + 3]) << 24);
-        offset += 4;
-        return v;
-    };
-
-    auto readStr = [&]() -> std::string {
-        uint32_t len = read32();
-        if (offset + len > size) return "";
-        std::string s(reinterpret_cast<const char*>(data + offset), len);
-        offset += len;
-        return s;
-    };
-
     if (offset + 4 > size) {
         throw std::runtime_error("Invalid .fc file: too short");
     }
@@ -324,72 +281,40 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
     }
     offset += 4;
 
-    uint32_t version = read32();
+    uint32_t version = readUint32(data, size, offset);
     if (version != 1) {
         throw std::runtime_error("Unsupported .fc version: " + std::to_string(version));
     }
 
-    uint32_t importCount = read32();
+    uint32_t importCount = readUint32(data, size, offset);
     for (uint32_t i = 0; i < importCount; i++) {
         ImportEntry ie;
-        ie.libName = readStr();
-        ie.alias = readStr();
+        ie.libName = readString(data, size, offset);
+        ie.alias = readString(data, size, offset);
         prog.imports.push_back(ie);
     }
     prog.restoreImports();
 
-    uint32_t funcCount = read32();
+    uint32_t funcCount = readUint32(data, size, offset);
 
     for (uint32_t i = 0; i < funcCount; i++) {
         CompiledFunction cf;
-        cf.name = readStr();
-        cf.returnType = readStr();
+        cf.name = readString(data, size, offset);
+        cf.returnType = readString(data, size, offset);
 
-        uint32_t paramCount = read32();
+        uint32_t paramCount = readUint32(data, size, offset);
         for (uint32_t j = 0; j < paramCount; j++) {
             Parameter p;
-            p.name = readStr();
-            p.type = readStr();
+            p.name = readString(data, size, offset);
+            p.type = readString(data, size, offset);
             cf.parameters.push_back(p);
         }
 
-        cf.localCount = static_cast<int>(read32());
+        cf.localCount = static_cast<int>(readUint32(data, size, offset));
 
-        size_t chunkStart = offset;
-
-        if (offset + 4 > size) throw std::runtime_error("Corrupt .fc: no constant count");
-        uint32_t constCount = read32();
-        for (uint32_t j = 0; j < constCount; j++) {
-            if (offset >= size) throw std::runtime_error("Corrupt .fc: constant data");
-            uint8_t type = data[offset++];
-            switch (type) {
-            case 0: offset += 4; break;
-            case 1: offset += 8; break;
-            case 2: {
-                uint32_t slen = read32();
-                offset += slen;
-                break;
-            }
-            case 3: {
-                uint32_t alen = read32();
-                offset += alen * 4;
-                break;
-            }
-            case 5: {
-                uint32_t blen = read32();
-                offset += blen;
-                break;
-            }
-            default: break;
-            }
+        if (!cf.chunk.deserialize(data, size, offset)) {
+            throw std::runtime_error("Corrupt .fc: chunk deserialization failed");
         }
-
-        if (offset + 4 > size) throw std::runtime_error("Corrupt .fc: no code size");
-        uint32_t codeSize = read32();
-        offset += codeSize;
-
-        std::vector<uint8_t> chunkData(data + chunkStart, data + offset);
-        cf.chunk.deserialize(chunkData);
 
         prog.functions.push_back(cf);
         prog.functionIndex[cf.name] = i;
@@ -915,6 +840,18 @@ Value::Type BytecodeCompiler::compileExpr(CompiledFunction& cf, Expr* expr) {
         cf.chunk.writeOp(OpCode::OP_NEW, 0);
         return Value::Type::Bytes;
     }
+    if (auto* unary = dynamic_cast<UnaryExpr*>(expr)) {
+        compileExpr(cf, unary->operand.get());
+        if (unary->op == TOKEN_NOT) {
+            cf.chunk.writeOp(OpCode::OP_NOT, 0);
+            return Value::Type::Int;
+        }
+        if (unary->op == TOKEN_MINUS) {
+            cf.chunk.writeOp(OpCode::OP_NEGATE, 0);
+            return Value::Type::Unknown;
+        }
+        throw std::runtime_error("BytecodeCompiler: unsupported unary operator");
+    }
     throw std::runtime_error(std::string("BytecodeCompiler: unsupported expression type: ") + typeid(*expr).name());
 }
 
@@ -960,18 +897,20 @@ void VM::push(const Value& val) {
 
 void VM::runtimeErr(const std::string& msg) {
     if (!runtimeError) {
-        std::cerr << "[Runtime Error] " << msg << std::endl;
+        ErrorReporter::reportSimple("RuntimeError", msg, "");
         runtimeError = true;
     }
 }
 
 bool VM::callSystemFunction(const std::string& name, int argCount) {
-    std::vector<Value> args;
-    for (int i = argCount - 1; i >= 0; i--) {
-        args.insert(args.begin(), pop());
-    }
-    // Pop function name
+    // Stack: [arg0, arg1, ..., argN, funcName] (funcName on top)
+    // Pop function name first
     pop();
+
+    std::vector<Value> args(argCount);
+    for (int i = argCount - 1; i >= 0; i--) {
+        args[i] = pop();
+    }
 
     Value result = executeSystemCall(name, args);
 
@@ -993,13 +932,7 @@ Value VM::executeSystemCall(const std::string& funcName, const std::vector<Value
 bool VM::callFunction(const std::string& name, int argCount) {
     auto it = program.functionIndex.find(name);
     if (it == program.functionIndex.end()) {
-        // Check if it's a system function
-        Interpreter sys;
-        if (sys.isSystemFunction(name)) {
-            return callSystemFunction(name, argCount);
-        }
-        runtimeErr("Undefined function: " + name);
-        return false;
+        return callSystemFunction(name, argCount);
     }
 
     const CompiledFunction& func = program.functions[it->second];
@@ -1252,26 +1185,11 @@ void VM::run() {
             break;
         }
         case OpCode::OP_PRINT: {
-            Value v = pop();
-            switch (v.getType()) {
-            case Value::Type::Int: std::cout << v.asInt(); break;
-            case Value::Type::Double: std::cout << v.asDouble(); break;
-            case Value::Type::String: std::cout << v.asString(); break;
-            case Value::Type::Void: break;
-            case Value::Type::Array: std::cout << "[array]"; break;
-            }
+            std::cout << pop().toString();
             break;
         }
         case OpCode::OP_PRINTLN: {
-            Value v = pop();
-            switch (v.getType()) {
-            case Value::Type::Int: std::cout << v.asInt(); break;
-            case Value::Type::Double: std::cout << v.asDouble(); break;
-            case Value::Type::String: std::cout << v.asString(); break;
-            case Value::Type::Void: break;
-            case Value::Type::Array: std::cout << "[array]"; break;
-            }
-            std::cout << std::endl;
+            std::cout << pop().toString() << std::endl;
             break;
         }
         case OpCode::OP_ENDLN: {
@@ -1419,15 +1337,8 @@ void VM::run() {
                     globals[func.parameters[i].name] = args[i];
                 }
             } else {
-                Interpreter sys;
-                if (sys.isSystemFunction(fnName)) {
-                    std::vector<Value> args(argCount);
-                    for (int i = argCount - 1; i >= 0; i--) {
-                        args[i] = pop();
-                    }
-                    Value result = sys.SystemFunctionBuildIn(fnName, args);
-                    push(result);
-                } else {
+                push(fnVal);
+                if (!callSystemFunction(fnName, argCount)) {
                     runtimeErr("Undefined function: " + fnName);
                 }
             }

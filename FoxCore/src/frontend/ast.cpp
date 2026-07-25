@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "parser.hpp"
 #include "../interpreter/interpreter.hpp"
 #include "../interpreter/library_manager.hpp"
 #include <iostream>   
@@ -167,6 +168,23 @@ Value InputExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     return Value(userInput);
 }
 
+Value UnaryExpr::evaluate(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    Value val = operand->evaluate(variables, functions);
+    if (op == TOKEN_NOT) {
+        return Value(val.asBool() ? 0 : 1);
+    }
+    if (op == TOKEN_MINUS) {
+        if (val.getType() == Value::Type::Int) {
+            return Value(-val.asInt());
+        } else if (val.getType() == Value::Type::Double) {
+            return Value(-val.asDouble());
+        }
+        throw std::runtime_error("Unary minus requires a numeric operand");
+    }
+    throw std::runtime_error("Unsupported unary operator");
+}
+
 Value NewExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     Value sizeVal = sizeExpr->evaluate(variables, functions);
@@ -278,4 +296,244 @@ Value ConditionExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     else {
         throw std::runtime_error("Unsupported condition operator");
     }
+}
+
+// ============================================================
+// Stmt implementations
+// ============================================================
+
+PrintStmt::PrintStmt(std::unique_ptr<Expr> a) : arg(std::move(a)) {}
+Value PrintStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    Value val = arg->evaluate(variables, functions);
+    switch (val.getType()) {
+    case Value::Type::Int: std::cout << val.asInt(); break;
+    case Value::Type::Double: std::cout << val.asDouble(); break;
+    case Value::Type::String: std::cout << val.asString(); break;
+    case Value::Type::Void: break;
+    case Value::Type::Array: std::cout << "[array]"; break;
+    default: break;
+    }
+    return Value();
+}
+
+PrintlnStmt::PrintlnStmt(std::unique_ptr<Expr> a) : arg(std::move(a)) {}
+Value PrintlnStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    Value val = arg->evaluate(variables, functions);
+    switch (val.getType()) {
+    case Value::Type::Int: std::cout << val.asInt(); break;
+    case Value::Type::Double: std::cout << val.asDouble(); break;
+    case Value::Type::String: std::cout << val.asString(); break;
+    case Value::Type::Void: break;
+    case Value::Type::Array: std::cout << "[array]"; break;
+    default: break;
+    }
+    std::cout << std::endl;
+    return Value();
+}
+
+ExitStmt::ExitStmt(std::unique_ptr<Expr> a) : arg(std::move(a)) {}
+Value ExitStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    Value val = arg->evaluate(variables, functions);
+    if (val.getType() == Value::Type::Int) std::exit(val.asInt());
+    std::exit(0);
+    return Value();
+}
+
+RetStmt::RetStmt(std::unique_ptr<Expr> a) : arg(std::move(a)), hasArg(a != nullptr) {}
+Value RetStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    if (hasArg) {
+        return arg->evaluate(variables, functions);
+    }
+    return Value();
+}
+
+Value EndlStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    std::cout << std::endl;
+    return Value();
+}
+
+InputStmt::InputStmt(const std::string& name) : varName(name) {}
+Value InputStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    std::string userInput;
+    std::getline(std::cin, userInput);
+    variables[varName] = Value(userInput);
+    return Value();
+}
+
+CallStmt::CallStmt(const std::string& name, std::vector<std::unique_ptr<Expr>> arguments)
+    : funcName(name), args(std::move(arguments)) {}
+Value CallStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    std::vector<Value> argVals;
+    argVals.reserve(args.size());
+    for (const auto& a : args) {
+        argVals.push_back(a->evaluate(variables, functions));
+    }
+    Interpreter sys;
+    if (sys.isSystemFunction(funcName)) {
+        return sys.SystemFunctionBuildIn(funcName, argVals);
+    }
+    if (functions.find(funcName) == functions.end()) {
+        auto& libMgr = LibraryManager::getInstance();
+        std::string libName = libMgr.getBlockedLibName(funcName);
+        if (!libName.empty()) {
+            std::string shortName = LibraryManager::getLastSegment(libName);
+            throw std::runtime_error("Function '" + funcName + "' is from the '" + libName
+                + "' library. You must call it with the library prefix: '" + shortName + "." + funcName + "(...)'.");
+        }
+        std::string sysLibPath = libMgr.getSystemFuncExternalPath(funcName);
+        if (!sysLibPath.empty()) {
+            std::string shortName = LibraryManager::getLastSegment(sysLibPath);
+            throw std::runtime_error("Function '" + funcName + "' requires importing a library first.\n"
+                "  Use: import " + sysLibPath + "\n"
+                "  Then: " + shortName + "." + funcName + "(...)\n"
+                "  Or with alias: import " + sysLibPath + " -> my_alias\n"
+                "  Then: my_alias." + funcName + "(...)");
+        }
+        throw std::runtime_error("Undefined function: " + funcName);
+    }
+    const Function& func = functions[funcName];
+    if (argVals.size() != func.parameters.size()) {
+        throw std::runtime_error("Function " + funcName + " expects " +
+            std::to_string(func.parameters.size()) + " arguments, got " +
+            std::to_string(argVals.size()));
+    }
+    Interpreter funcInterp;
+    funcInterp.variables = variables;
+    funcInterp.functions = functions;
+    for (size_t i = 0; i < argVals.size(); ++i) {
+        funcInterp.variables[func.parameters[i].name] = argVals[i];
+    }
+    Value result = funcInterp.executeFunction(func);
+    return result;
+}
+
+AssignStmt::AssignStmt(const std::string& name, std::unique_ptr<Expr> e)
+    : varName(name), expr(std::move(e)) {}
+Value AssignStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    variables[varName] = expr->evaluate(variables, functions);
+    if (variables[varName].getType() == Value::Type::Bytes) {
+        int sz = static_cast<int>(variables[varName].asBytes().size());
+        // checkNewAllocBytes is static in Parser
+    }
+    return Value();
+}
+
+IndexAssignStmt::IndexAssignStmt(const std::string& name, std::unique_ptr<Expr> idx, std::unique_ptr<Expr> val)
+    : varName(name), index(std::move(idx)), value(std::move(val)) {}
+Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    Value idxVal = index->evaluate(variables, functions);
+    Value val = value->evaluate(variables, functions);
+    if (variables.find(varName) == variables.end()) {
+        throw std::runtime_error("Undefined array variable: " + varName);
+    }
+    std::vector<Value>& arr = variables[varName].asArrayRef();
+    int idx = idxVal.asInt();
+    if (idx < 0 || idx >= static_cast<int>(arr.size())) {
+        throw std::runtime_error("Array index out of bounds: " + std::to_string(idx));
+    }
+    arr[idx] = val;
+    return Value();
+}
+
+IfStmt::IfStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b)
+    : condition(cond), body(std::move(b)) {}
+Value IfStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    if (condition.empty()) return Value();
+    Lexer condLexer(condition);
+    Token condToken = condLexer.nextToken();
+    Parser::skipWhitespace(condLexer, condToken);
+    auto condExpr = Parser::parseExpr(condLexer, condToken);
+    Value condResult = condExpr->evaluate(variables, functions);
+    if (condResult.asBool()) {
+        for (const auto& stmt : body) {
+            if (!stmt) continue;
+            Value val = stmt->execute(variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
+    }
+    return Value();
+}
+
+WhileStmt::WhileStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b)
+    : condition(cond), body(std::move(b)) {}
+Value WhileStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    if (condition.empty()) return Value();
+    Lexer condLexer(condition);
+    Token condToken = condLexer.nextToken();
+    Parser::skipWhitespace(condLexer, condToken);
+    auto condExpr = Parser::parseExpr(condLexer, condToken);
+    Value condResult = condExpr->evaluate(variables, functions);
+    while (condResult.asBool()) {
+        for (const auto& stmt : body) {
+            if (!stmt) continue;
+            Value val = stmt->execute(variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
+        condLexer = Lexer(condition);
+        condToken = condLexer.nextToken();
+        Parser::skipWhitespace(condLexer, condToken);
+        condExpr = Parser::parseExpr(condLexer, condToken);
+        condResult = condExpr->evaluate(variables, functions);
+    }
+    return Value();
+}
+
+ForStmt::ForStmt(const std::string& i, const std::string& c, const std::string& it,
+    std::vector<std::unique_ptr<Stmt>>&& b)
+    : init(i), condition(c), iter(it), body(std::move(b)) {}
+Value ForStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    if (!init.empty()) {
+        Parser::parseLine(init, variables, functions);
+    }
+    while (true) {
+        if (!condition.empty()) {
+            Lexer condLexer(condition);
+            Token condToken = condLexer.nextToken();
+            Parser::skipWhitespace(condLexer, condToken);
+            auto condExpr = Parser::parseExpr(condLexer, condToken);
+            Value condResult = condExpr->evaluate(variables, functions);
+            if (!condResult.asBool()) break;
+        } else {
+            break;
+        }
+        for (const auto& stmt : body) {
+            if (!stmt) continue;
+            Value val = stmt->execute(variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
+        if (!iter.empty()) {
+            Parser::parseLine(iter, variables, functions);
+        }
+    }
+    return Value();
+}
+
+LabelStmt::LabelStmt(const std::string& n) : name(n) {}
+Value LabelStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    return Value(); // no-op
+}
+
+GotoStmt::GotoStmt(const std::string& l) : label(l) {}
+Value GotoStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    throw GotoException(label);
 }

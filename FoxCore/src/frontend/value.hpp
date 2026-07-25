@@ -28,6 +28,8 @@ public:
     
     int getByteSize() const;
 
+    std::string toString() const;
+
     bool asBool() const {
         switch (type) {
         case Type::Int: return intVal != 0;

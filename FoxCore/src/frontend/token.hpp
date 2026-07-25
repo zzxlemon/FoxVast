@@ -50,8 +50,9 @@ enum TokenT {
     TOKEN_LBRACKET,       
     TOKEN_RBRACKET,       
     TOKEN_SEMICOLON,      
-    TOKEN_DOT,            
-    TOKEN_NEW             
+TOKEN_DOT,            
+    TOKEN_NEW,
+    TOKEN_NOT
 };
 
 struct Token {

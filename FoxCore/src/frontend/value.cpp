@@ -57,3 +57,15 @@ int Value::getByteSize() const {
     default: return 0;
     }
 }
+
+std::string Value::toString() const {
+    switch (type) {
+    case Type::Int: return std::to_string(intVal);
+    case Type::Double: return std::to_string(doubleVal);
+    case Type::String: return strVal;
+    case Type::Array: return "[array]";
+    case Type::Bytes: return "[bytes]";
+    case Type::Void: return "";
+    default: return "<?>";
+    }
+}

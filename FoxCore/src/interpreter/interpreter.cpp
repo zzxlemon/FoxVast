@@ -33,29 +33,27 @@ Value Interpreter::executeFunction(const Function& func) {
 
     // Pre-scan labels for goto
     std::unordered_map<std::string, size_t> labels;
-    for (size_t i = 0; i < func.body.size(); i++) {
-        const auto& line = func.body[i];
-        if (line.rfind("fn ", 0) == 0 && line.back() == ':') {
-            std::string label = line.substr(3, line.size() - 4);
-            size_t start = label.find_first_not_of(" \t");
-            size_t end = label.find_last_not_of(" \t");
-            if (start != std::string::npos && end != std::string::npos)
-                label = label.substr(start, end - start + 1);
-            labels[label] = i;
+    for (size_t i = 0; i < func.compiledBody.size(); i++) {
+        if (auto* labelStmt = dynamic_cast<LabelStmt*>(func.compiledBody[i].get())) {
+            labels[labelStmt->name] = i;
         }
     }
 
     size_t i = 0;
-    while (i < func.body.size()) {
+    while (i < func.compiledBody.size()) {
         try {
-            const auto& stmt = func.body[i];
-
-            if (stmt.rfind("fn ", 0) == 0) {
+            const auto& stmt = func.compiledBody[i];
+            if (!stmt) {
                 i++;
                 continue;
             }
 
-            Value val = execute(stmt);
+            if (dynamic_cast<LabelStmt*>(stmt.get())) {
+                i++;
+                continue;
+            }
+
+            Value val = stmt->execute(variables, functions);
             if (val.getType() != Value::Type::Void) {
                 returnValue = val;
                 break;

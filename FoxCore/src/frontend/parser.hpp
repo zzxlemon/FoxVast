@@ -40,36 +40,35 @@ private:
     Token funcCurrentToken;
     std::vector<Function> tempFunctions;
     
-    // Ö´ÐÐ/½âÎö×¨ÓÃµÄ¹¤¾ß·½·¨
-    static void skipWhitespace(Lexer& lexer, Token& currentToken);
+    // Ö´ï¿½ï¿½/ï¿½ï¿½ï¿½ï¿½×¨ï¿½ÃµÄ¹ï¿½ï¿½ß·ï¿½ï¿½ï¿½
     static void eat(Lexer& lexer, Token& currentToken, TokenT expectedType);
     
-    // ½âÎö»ù´¡±í´ïÊ½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê½
     static std::unique_ptr<Expr> parsePrimary(Lexer& lexer, Token& currentToken);
     static std::unique_ptr<Expr> parsePostfix(Lexer& lexer, Token& currentToken, std::unique_ptr<Expr> expr);
-    static std::unique_ptr<Expr> parseAdd(Lexer& lexer, Token& currentToken); // ½âÎö¼Ó¼õ·¨ +/-
+    static std::unique_ptr<Expr> parseAdd(Lexer& lexer, Token& currentToken); // ï¿½ï¿½ï¿½ï¿½ï¿½Ó¼ï¿½ï¿½ï¿½ +/-
     
-    // ½âÎö¸³ÖµÓï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Öµï¿½ï¿½ï¿½
     static void parseAssignment(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions);
         
-    // ½âÎö print Óï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ print ï¿½ï¿½ï¿½
     static void parsePrint(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions);
         
-    // ½âÎö endl Óï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ endl ï¿½ï¿½ï¿½
     static void parseEndl(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions);
         
-    // ½âÎö exit Óï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ exit ï¿½ï¿½ï¿½
     static void parseExit(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions);
         
-    // ½âÎö ret ·µ»ØÓï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ ret ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     static Value parseRet(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions);
@@ -80,27 +79,27 @@ private:
 
     static std::unique_ptr<Expr> parseCastExpr(Lexer& lexer, Token& currentToken, CastType castType);
     
-    // ½âÎöµ¥ÌõÓï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     static std::string parseSingleStatement(Lexer& lexer, Token& currentToken);
     
-    // ½âÎöº¯Êý¶¨Òå
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
     void parseFunction();
     
-    // ½âÎö±È½Ï±í´ïÊ½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½È½Ï±ï¿½ï¿½ï¿½Ê½
     static std::unique_ptr<Expr> parseCompare(Lexer& lexer, Token& currentToken);
     
-    // ½âÎöÂß¼­Ìõ¼þ±í´ïÊ½
+    // ï¿½ï¿½ï¿½ï¿½ï¿½ß¼ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê½
     static std::unique_ptr<Expr> parseCondition(Lexer& lexer, Token& currentToken);
     
-    // ½âÎö if Óï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ if ï¿½ï¿½ï¿½
     static IfStatement parseIfStatement(Lexer& lexer, Token& currentToken);
     
-    // ½âÎö while Óï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ while ï¿½ï¿½ï¿½
     static WhileStatement parseWhileStatement(Lexer& lexer, Token& currentToken);
     
     static ForStatement parseForStatement(Lexer& lexer, Token& currentToken);
     
-    // ½âÎö import Óï¾ä
+    // ï¿½ï¿½ï¿½ï¿½ import ï¿½ï¿½ï¿½
     static void parseImportStatement(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions);
@@ -110,9 +109,10 @@ public:
     std::unordered_map<std::string, Function>& functions;
     std::unordered_map<std::string, bool> importedLibraries;
 
+    static void skipWhitespace(Lexer& lexer, Token& currentToken);
     static std::unique_ptr<Expr> parseExpr(Lexer& lexer, Token& currentToken);
 
-    // »ùÓÚ Handler µÄµ¥ÐÐ½âÎö£¨½ö½âÎö£¬²»Ö´ÐÐ£©
+    // ï¿½ï¿½ï¿½ï¿½ Handler ï¿½Äµï¿½ï¿½Ð½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½Ð£ï¿½
     static void parseLine(const std::string& line, StmtHandler& handler);
 
     static Value executeIfStatement(const IfStatement& ifStmt,
@@ -133,4 +133,10 @@ public:
         std::unordered_map<std::string, Function>& functions);
     static void resetNewAllocBytes();
     static bool checkNewAllocBytes(int size);
+
+    // Compile a single source line into a Stmt node (no re-parsing at runtime)
+    static std::unique_ptr<Stmt> parseLineToStmt(const std::string& line);
+
+    // Compile a body of source lines into Stmt nodes
+    static std::vector<std::unique_ptr<Stmt>> compileBody(const std::vector<std::string>& lines);
 };

@@ -3,7 +3,9 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/FoxCore/native/glfw/include",
+                "${workspaceFolder}/FoxCore/native/glad/include"
             ],
             "defines": [
                 "_DEBUG",
@@ -15,7 +17,8 @@
             "cStandard": "c17",
             "cppStandard": "c++17",
             "compilerArgs": [
-                "./FoxCore/native/glfw"
+                "./FoxCore/native/glfw",
+                "./FoxCore/native/glad"
             ]
         }
     ],

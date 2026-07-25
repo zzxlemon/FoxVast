@@ -35,6 +35,9 @@ static void fz1(const std::string& key) {
 }
 
 int main(int argc, char** argv) { 
+    std::ios::sync_with_stdio(false);
+    std::cin.tie(nullptr);
+
     Interpreter interpreter;
     if (argc == 1) {
         return 0;  
@@ -42,6 +45,7 @@ int main(int argc, char** argv) {
 
     int v1 = 1;
     std::string filename;
+    bool bfz = true;
     for (int i = 1; i < argc; i++) {
         std::string in = argv[i];
         if (in == "-version" || in == "-v") {
@@ -57,7 +61,7 @@ int main(int argc, char** argv) {
             filename = argv[i + 1];
             i++;
         }
-        else if (argv[i] == "-str"){
+        else if (argv[i] == "-s" || argv[i] == "--str"){
             if (argv[i + 1] == "utf-8" || argv[i + 1] == "UTF-8"){
                 system("chcp 65001");
             }
@@ -103,6 +107,7 @@ int main(int argc, char** argv) {
                 ErrorReporter::reportSimple("ArgumentError", "'-c' requires a filename");
                 return 1;
             }
+
             filename = argv[i + 1];
             i++;
             std::string fullCode = read_file(filename);
@@ -211,14 +216,14 @@ int main(int argc, char** argv) {
         }
         else if (in == "-help" || in == "-h") {
             std::cout << "FoxLang Interpreter - Usage:" << std::endl;
-            std::cout << "  -f <file>               Run FoxLang source file.(Deprecated)" << std::endl;
+            std::cout << "  -f <file>               Run FoxLang source file(Deprecated)" << std::endl;
             std::cout << "  -c <file>               Compile .fox -> .fc bytecode" << std::endl;
             std::cout << "  -fc <file>              Run .fc bytecode file" << std::endl;
             std::cout << "  -p <out.far> <files>    Package files into .far archive" << std::endl;
             std::cout << "  -u <archive.far> [dir]  Extract .far archive" << std::endl;
             std::cout << "  -far <archive.far>      Run main.fc from .far archive" << std::endl;
             std::cout << "  -version                Show version info" << std::endl;
-            std::cout << "  OutInfo=true            Enable verbose output" << std::endl;
+            std::cout << "  OutInfo=true            Enable verbose output(Deprecated)" << std::endl;
             std::cout << "  pack=true               Encrypt .fx -> .fz file" << std::endl;
             std::cout << "  pack=false              Decrypt .fz -> .fx file" << std::endl;
             return 0;

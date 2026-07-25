@@ -1,4 +1,0 @@
-func main() {
-    a = new(64)
-    println("new(64) ok")
-}

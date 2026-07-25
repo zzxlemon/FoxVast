@@ -1,13 +1,13 @@
 #pragma once
 #include "value.hpp"
 #include "token.hpp"
-#include "function.hpp"
 #include <unordered_map>
 #include <memory>
 #include <string>
 #include <vector>
 
 class Interpreter;
+struct Function;
 enum class CastType { Int, Double };
 
 enum class CompareType {
@@ -18,6 +18,13 @@ class Expr {
 public:
     virtual ~Expr() = default;
     virtual Value evaluate(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) = 0;
+};
+
+class Stmt {
+public:
+    virtual ~Stmt() = default;
+    virtual Value execute(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) = 0;
 };
 
@@ -104,6 +111,15 @@ public:
         std::unordered_map<std::string, Function>& functions) override;
 };
 
+class UnaryExpr : public Expr {
+public:
+    TokenT op;
+    std::unique_ptr<Expr> operand;
+    UnaryExpr(TokenT o, std::unique_ptr<Expr> e) : op(o), operand(std::move(e)) {}
+    Value evaluate(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
 class CastExpr : public Expr {
 public:
     CastType castType;
@@ -137,9 +153,137 @@ public:
         std::unordered_map<std::string, Function>& functions) override;
 };
 
+// ============================================================
+// Statement nodes (pre-compiled, no re-parsing at runtime)
+// ============================================================
+
+class PrintStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> arg;
+    explicit PrintStmt(std::unique_ptr<Expr> a);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class PrintlnStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> arg;
+    explicit PrintlnStmt(std::unique_ptr<Expr> a);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class ExitStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> arg;
+    explicit ExitStmt(std::unique_ptr<Expr> a);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class RetStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> arg;
+    bool hasArg;
+    explicit RetStmt(std::unique_ptr<Expr> a);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class EndlStmt : public Stmt {
+public:
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class InputStmt : public Stmt {
+public:
+    std::string varName;
+    explicit InputStmt(const std::string& name);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class CallStmt : public Stmt {
+public:
+    std::string funcName;
+    std::vector<std::unique_ptr<Expr>> args;
+    CallStmt(const std::string& name, std::vector<std::unique_ptr<Expr>> arguments);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class AssignStmt : public Stmt {
+public:
+    std::string varName;
+    std::unique_ptr<Expr> expr;
+    AssignStmt(const std::string& name, std::unique_ptr<Expr> e);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class IndexAssignStmt : public Stmt {
+public:
+    std::string varName;
+    std::unique_ptr<Expr> index;
+    std::unique_ptr<Expr> value;
+    IndexAssignStmt(const std::string& name, std::unique_ptr<Expr> idx, std::unique_ptr<Expr> val);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class IfStmt : public Stmt {
+public:
+    std::string condition;
+    std::vector<std::unique_ptr<Stmt>> body;
+    IfStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class WhileStmt : public Stmt {
+public:
+    std::string condition;
+    std::vector<std::unique_ptr<Stmt>> body;
+    WhileStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class ForStmt : public Stmt {
+public:
+    std::string init;
+    std::string condition;
+    std::string iter;
+    std::vector<std::unique_ptr<Stmt>> body;
+    ForStmt(const std::string& i, const std::string& c, const std::string& it,
+            std::vector<std::unique_ptr<Stmt>>&& b);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class LabelStmt : public Stmt {
+public:
+    std::string name;
+    explicit LabelStmt(const std::string& n);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class GotoStmt : public Stmt {
+public:
+    std::string label;
+    explicit GotoStmt(const std::string& l);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+// Keep old struct names as aliases for backward-compat during transition
+// (they are no longer used internally, BytecodeCompiler gets updated separately)
+// Parsing intermediates — store raw source lines, converted to Stmt nodes later
 struct IfStatement {
     std::string condition;
-    std::vector<std::string> body; 
+    std::vector<std::string> body;
 };
 
 struct WhileStatement {
