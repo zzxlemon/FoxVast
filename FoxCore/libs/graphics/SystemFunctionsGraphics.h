@@ -1,20 +1,34 @@
 #pragma once
 
 #include "../../src/interpreter/interpreter.hpp"
+#include <glad/glad.h>
 #include <glfw3.h>
+#include <string>
+#include <iostream>
+#include <vector>
+#include <map>
 
+struct FontAtlas {
+    GLuint texture;
+    void* cdata; // stbtt_bakedchar[96]
+    int bitmap_w;
+    int bitmap_h;
+};
 
-//===============================
-//
-//     Fox Native Graphics 
-//            FG
-//
-//===============================
+struct FGWindow {
+    GLFWwindow* window;
+    GLuint shaderProgram;
+    GLuint VAO;
+    GLuint VBO;
+    int width;
+    int height;
 
-// Now this "Fox Vative Graphics" lib of the don't good
-
-// This function use the set window size of call back.
-void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+    // Text rendering
+    GLuint textShaderProgram;
+    GLuint textVAO;
+    GLuint textVBO;
+    std::map<std::string, FontAtlas> fontCache;
+};
 
 class FG {
 public:
@@ -23,12 +37,16 @@ public:
     Value window_should_close(const std::vector<Value>& args);
     Value swap_buffers(const std::vector<Value>& args);
     Value poll_events(const std::vector<Value>& args);
-    Value update(const std::vector<Value>& args); 
+    Value update(const std::vector<Value>& args);
     Value clear_color(const std::vector<Value>& args);
     Value clear(const std::vector<Value>& args);
     Value draw_triangle(const std::vector<Value>& args);
-    Value begin(const std::vector<Value>& args);
-    Value end(const std::vector<Value>& args);
+    Value draw_rect(const std::vector<Value>& args);
+
+    Value draw_text(const std::vector<Value>& args);
 private:
-    static std::vector<GLFWwindow*> gw;
+    static std::vector<FGWindow> windows;
+    static GLuint compileShader(GLenum type, const char* source);
+    static GLuint createShaderProgram();
+    static GLuint createTextShaderProgram();
 };

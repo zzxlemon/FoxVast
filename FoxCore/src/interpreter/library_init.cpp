@@ -150,12 +150,12 @@ void initSystemLibraries() {
         FG fg;
         return fg.draw_triangle(args);
     });
-    libMgr.registerSystemFunction("gl_fg", "begin", [](const std::vector<Value>& args) -> Value {
+    libMgr.registerSystemFunction("gl_fg", "draw_rect", [](const std::vector<Value>& args) -> Value {
         FG fg;
-        return fg.begin(args);
+        return fg.draw_rect(args);
     });
-    libMgr.registerSystemFunction("gl_fg", "end", [](const std::vector<Value>& args) -> Value {
+    libMgr.registerSystemFunction("gl_fg", "draw_text", [](const std::vector<Value>& args) -> Value {
         FG fg;
-        return fg.end(args);
+        return fg.draw_text(args);
     });
 }
