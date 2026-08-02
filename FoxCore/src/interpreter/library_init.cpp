@@ -158,4 +158,20 @@ void initSystemLibraries() {
         FG fg;
         return fg.draw_text(args);
     });
+    libMgr.registerSystemFunction("gl_fg", "draw_line", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.draw_line(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "draw_circle", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.draw_circle(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "mouse_down", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.mouse_down(args);
+    });
+    libMgr.registerSystemFunction("gl_fg", "mouse_pos", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.mouse_pos(args);
+    });
 }

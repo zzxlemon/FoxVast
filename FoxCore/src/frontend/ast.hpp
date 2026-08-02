@@ -8,6 +8,7 @@
 
 class Interpreter;
 struct Function;
+struct CompiledFunction;
 enum class CastType { Int, Double };
 
 enum class CompareType {
@@ -19,6 +20,8 @@ public:
     virtual ~Expr() = default;
     virtual Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) = 0;
+    virtual Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const = 0;
 };
 
 class Stmt {
@@ -34,6 +37,8 @@ public:
     explicit IdentifierExpr(const std::string& n);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class NumberExpr : public Expr {
@@ -42,6 +47,8 @@ public:
     explicit NumberExpr(int v);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class DoubleExpr : public Expr {
@@ -50,6 +57,8 @@ public:
     explicit DoubleExpr(double v);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class StringExpr : public Expr {
@@ -58,6 +67,8 @@ public:
     explicit StringExpr(const std::string& v);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class ArrayExpr : public Expr {
@@ -66,6 +77,8 @@ public:
     explicit ArrayExpr(std::vector<std::unique_ptr<Expr>>&& elems);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class IndexExpr : public Expr {
@@ -75,6 +88,8 @@ public:
     IndexExpr(std::unique_ptr<Expr> arr, std::unique_ptr<Expr> idx);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class CallExpr : public Expr {
@@ -85,6 +100,8 @@ public:
     CallExpr(const std::string& name, std::vector<std::unique_ptr<Expr>>&& arguments);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class BinaryExpr : public Expr {
@@ -95,12 +112,16 @@ public:
     BinaryExpr(std::unique_ptr<Expr> l, TokenT o, std::unique_ptr<Expr> r);
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class InputExpr : public Expr {
 public:
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class NewExpr : public Expr {
@@ -109,6 +130,8 @@ public:
     explicit NewExpr(std::unique_ptr<Expr> size) : sizeExpr(std::move(size)) {}
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class UnaryExpr : public Expr {
@@ -118,6 +141,8 @@ public:
     UnaryExpr(TokenT o, std::unique_ptr<Expr> e) : op(o), operand(std::move(e)) {}
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class CastExpr : public Expr {
@@ -127,6 +152,8 @@ public:
     CastExpr(CastType type, std::unique_ptr<Expr> e) : castType(type), expr(std::move(e)) {}
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class CompareExpr : public Expr {
@@ -139,6 +166,8 @@ public:
     }
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 class ConditionExpr : public Expr {
@@ -151,6 +180,8 @@ public:
     }
     Value evaluate(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
 // ============================================================
@@ -296,4 +327,19 @@ struct ForStatement {
     std::string condition;
     std::string iter;
     std::vector<std::string> body;
+};
+
+class FreeStmt : public Stmt {
+public:
+    std::string varName;
+    explicit FreeStmt(const std::string& name);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class FreeAllStmt : public Stmt {
+public:
+    FreeAllStmt() = default;
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
 };

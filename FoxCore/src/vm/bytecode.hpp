@@ -39,13 +39,36 @@ inline uint32_t readUint32(const uint8_t* data, size_t size, size_t& offset) {
     return v;
 }
 
+// Varint encoding for compact serialization (saves ~40% on .fc files)
+inline void writeVarint(std::vector<uint8_t>& data, uint32_t v) {
+    while (v >= 0x80) {
+        data.push_back(static_cast<uint8_t>((v & 0x7F) | 0x80));
+        v >>= 7;
+    }
+    data.push_back(static_cast<uint8_t>(v));
+}
+
+inline uint32_t readVarint(const uint8_t* data, size_t size, size_t& offset) {
+    uint32_t v = 0;
+    int shift = 0;
+    while (true) {
+        if (offset >= size) return 0;
+        uint8_t b = data[offset++];
+        v |= static_cast<uint32_t>(b & 0x7F) << shift;
+        if (!(b & 0x80)) break;
+        shift += 7;
+        if (shift >= 28) return v;
+    }
+    return v;
+}
+
 inline void writeString(std::vector<uint8_t>& data, const std::string& s) {
-    writeUint32(data, static_cast<uint32_t>(s.size()));
+    writeVarint(data, static_cast<uint32_t>(s.size()));
     for (char c : s) data.push_back(static_cast<uint8_t>(c));
 }
 
 inline std::string readString(const uint8_t* data, size_t size, size_t& offset) {
-    uint32_t len = readUint32(data, size, offset);
+    uint32_t len = readVarint(data, size, offset);
     if (offset + len > size) return "";
     std::string s(reinterpret_cast<const char*>(data + offset), len);
     offset += len;
@@ -97,6 +120,8 @@ enum class OpCode : uint8_t {
     OP_EXIT            = 0x26,
     OP_IMPORT          = 0x27,
     OP_NEW             = 0x28,
+    OP_UNSET_GLOBAL    = 0x29,
+    OP_CLEAR_GLOBALS   = 0x2A,
     OP_HALT            = 0xFF,
 };
 
@@ -106,13 +131,12 @@ enum class OpCode : uint8_t {
 struct Chunk {
     std::vector<uint8_t> code;
     std::vector<Value> constants;
-    std::vector<int> lines;
 
-    void write(uint8_t byte, int line);
-    void writeOp(OpCode op, int line);
-    void writeInt(uint32_t val, int line);
-    void writeShort(uint16_t val, int line);
-    void writeByte(uint8_t val, int line);
+    void write(uint8_t byte);
+    void writeOp(OpCode op);
+    void writeInt(uint32_t val);
+    void writeShort(uint16_t val);
+    void writeByte(uint8_t val);
 
     uint32_t readInt(size_t offset) const;
     uint16_t readShort(size_t offset) const;
@@ -141,6 +165,15 @@ struct CompiledFunction {
     std::vector<Parameter> parameters;
     Chunk chunk;
     int localCount = 0;
+    std::unordered_map<std::string, int> stringConstMap;
+
+    int addConstantStringDedup(const std::string& str) {
+        auto it = stringConstMap.find(str);
+        if (it != stringConstMap.end()) return it->second;
+        int idx = chunk.addConstantString(str);
+        stringConstMap[str] = idx;
+        return idx;
+    }
 };
 
 // ============================================================
@@ -207,9 +240,25 @@ private:
     std::vector<CallFrame> frames;
     bool runtimeError;
 
-    Value peek(int distance = 0);
-    Value pop();
-    void push(const Value& val);
+    Value peek(int distance = 0) {
+        if (stack.empty()) {
+            runtimeErr("Stack empty");
+            return Value();
+        }
+        return stack[stack.size() - 1 - distance];
+    }
+    Value pop() {
+        if (stack.empty()) {
+            runtimeErr("Stack underflow");
+            return Value();
+        }
+        Value val = stack.back();
+        stack.pop_back();
+        return val;
+    }
+    void push(const Value& val) {
+        stack.push_back(val);
+    }
     void resetStack();
 
     void runtimeErr(const std::string& msg);

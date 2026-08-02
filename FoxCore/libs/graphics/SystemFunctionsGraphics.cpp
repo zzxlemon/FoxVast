@@ -18,8 +18,9 @@ static const char* VERTEX_SHADER_SRC = R"(
 layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec3 aColor;
 out vec3 ourColor;
+uniform mat4 projection;
 void main() {
-    gl_Position = vec4(aPos, 1.0);
+    gl_Position = projection * vec4(aPos, 1.0);
     ourColor = aColor;
 }
 )";
@@ -30,6 +31,29 @@ out vec4 FragColor;
 in vec3 ourColor;
 void main() {
     FragColor = vec4(ourColor, 1.0f);
+}
+)";
+
+static const char* TEXT_VERTEX_SHADER_SRC = R"(
+#version 330 core
+layout (location = 0) in vec4 vertex; // vec2 pos + vec2 texcoord
+out vec2 TexCoords;
+uniform mat4 projection;
+void main() {
+    gl_Position = projection * vec4(vertex.xy, 0.0, 1.0);
+    TexCoords = vertex.zw;
+}
+)";
+
+static const char* TEXT_FRAGMENT_SHADER_SRC = R"(
+#version 330 core
+in vec2 TexCoords;
+out vec4 color;
+uniform sampler2D text;
+uniform vec3 textColor;
+void main() {
+    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r);
+    color = vec4(textColor, 1.0) * sampled;
 }
 )";
 
@@ -72,29 +96,6 @@ GLuint FG::createShaderProgram() {
     glDeleteShader(fs);
     return program;
 }
-
-static const char* TEXT_VERTEX_SHADER_SRC = R"(
-#version 330 core
-layout (location = 0) in vec4 vertex; // vec2 pos + vec2 texcoord
-out vec2 TexCoords;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * vec4(vertex.xy, 0.0, 1.0);
-    TexCoords = vertex.zw;
-}
-)";
-
-static const char* TEXT_FRAGMENT_SHADER_SRC = R"(
-#version 330 core
-in vec2 TexCoords;
-out vec4 color;
-uniform sampler2D text;
-uniform vec3 textColor;
-void main() {
-    vec4 sampled = vec4(1.0, 1.0, 1.0, texture(text, TexCoords).r);
-    color = vec4(textColor, 1.0) * sampled;
-}
-)";
 
 GLuint FG::createTextShaderProgram() {
     GLuint vs = compileShader(GL_VERTEX_SHADER, TEXT_VERTEX_SHADER_SRC);
@@ -139,6 +140,7 @@ Value FG::create_window(const std::vector<Value>& args) {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
     int w = args[1].asInt();
     int h = args[2].asInt();
@@ -285,18 +287,27 @@ Value FG::draw_triangle(const std::vector<Value>& args) {
     if (windows.empty()) return Value();
     FGWindow& fgw = windows.back();
 
-    float vertices[18] = {
-        static_cast<float>(args[0].asDouble()), static_cast<float>(args[1].asDouble()), 0.0f,
-        static_cast<float>(args[2].asDouble()), static_cast<float>(args[3].asDouble()), static_cast<float>(args[4].asDouble()),
-
-        static_cast<float>(args[5].asDouble()), static_cast<float>(args[6].asDouble()), 0.0f,
-        static_cast<float>(args[7].asDouble()), static_cast<float>(args[8].asDouble()), static_cast<float>(args[9].asDouble()),
-
-        static_cast<float>(args[10].asDouble()), static_cast<float>(args[11].asDouble()), 0.0f,
-        static_cast<float>(args[12].asDouble()), static_cast<float>(args[13].asDouble()), static_cast<float>(args[14].asDouble()),
+    auto toFloat = [](const Value& v) -> float {
+        if (v.getType() == Value::Type::Int) return static_cast<float>(v.asInt());
+        return static_cast<float>(v.asDouble());
     };
 
+    float vertices[18] = {
+        toFloat(args[0]), toFloat(args[1]), 0.0f,
+        toFloat(args[2]), toFloat(args[3]), toFloat(args[4]),
+
+        toFloat(args[5]), toFloat(args[6]), 0.0f,
+        toFloat(args[7]), toFloat(args[8]), toFloat(args[9]),
+
+        toFloat(args[10]), toFloat(args[11]), 0.0f,
+        toFloat(args[12]), toFloat(args[13]), toFloat(args[14]),
+    };
+
+    float proj[16];
+    orthoProj(proj, 0.0f, (float)fgw.width, (float)fgw.height, 0.0f);
+
     glUseProgram(fgw.shaderProgram);
+    glUniformMatrix4fv(glGetUniformLocation(fgw.shaderProgram, "projection"), 1, GL_FALSE, proj);
     glBindVertexArray(fgw.VAO);
     glBindBuffer(GL_ARRAY_BUFFER, fgw.VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
@@ -327,6 +338,11 @@ Value FG::draw_rect(const std::vector<Value>& args) {
     if (windows.empty()) return Value();
     FGWindow& fgw = windows.back();
 
+    auto toFloat = [](const Value& v) -> float {
+        if (v.getType() == Value::Type::Int) return static_cast<float>(v.asInt());
+        return static_cast<float>(v.asDouble());
+    };
+
     const auto& v1 = getVertex(0);
     const auto& v2 = getVertex(1);
     const auto& v3 = getVertex(2);
@@ -334,27 +350,31 @@ Value FG::draw_rect(const std::vector<Value>& args) {
 
     float vertices[36] = {
         // Triangle 1: v1, v2, v4
-        static_cast<float>(v1[0].asDouble()), static_cast<float>(v1[1].asDouble()), 0.0f,
-        static_cast<float>(v1[2].asDouble()), static_cast<float>(v1[3].asDouble()), static_cast<float>(v1[4].asDouble()),
+        toFloat(v1[0]), toFloat(v1[1]), 0.0f,
+        toFloat(v1[2]), toFloat(v1[3]), toFloat(v1[4]),
 
-        static_cast<float>(v2[0].asDouble()), static_cast<float>(v2[1].asDouble()), 0.0f,
-        static_cast<float>(v2[2].asDouble()), static_cast<float>(v2[3].asDouble()), static_cast<float>(v2[4].asDouble()),
+        toFloat(v2[0]), toFloat(v2[1]), 0.0f,
+        toFloat(v2[2]), toFloat(v2[3]), toFloat(v2[4]),
 
-        static_cast<float>(v4[0].asDouble()), static_cast<float>(v4[1].asDouble()), 0.0f,
-        static_cast<float>(v4[2].asDouble()), static_cast<float>(v4[3].asDouble()), static_cast<float>(v4[4].asDouble()),
+        toFloat(v4[0]), toFloat(v4[1]), 0.0f,
+        toFloat(v4[2]), toFloat(v4[3]), toFloat(v4[4]),
 
         // Triangle 2: v2, v3, v4
-        static_cast<float>(v2[0].asDouble()), static_cast<float>(v2[1].asDouble()), 0.0f,
-        static_cast<float>(v2[2].asDouble()), static_cast<float>(v2[3].asDouble()), static_cast<float>(v2[4].asDouble()),
+        toFloat(v2[0]), toFloat(v2[1]), 0.0f,
+        toFloat(v2[2]), toFloat(v2[3]), toFloat(v2[4]),
 
-        static_cast<float>(v3[0].asDouble()), static_cast<float>(v3[1].asDouble()), 0.0f,
-        static_cast<float>(v3[2].asDouble()), static_cast<float>(v3[3].asDouble()), static_cast<float>(v3[4].asDouble()),
+        toFloat(v3[0]), toFloat(v3[1]), 0.0f,
+        toFloat(v3[2]), toFloat(v3[3]), toFloat(v3[4]),
 
-        static_cast<float>(v4[0].asDouble()), static_cast<float>(v4[1].asDouble()), 0.0f,
-        static_cast<float>(v4[2].asDouble()), static_cast<float>(v4[3].asDouble()), static_cast<float>(v4[4].asDouble()),
+        toFloat(v4[0]), toFloat(v4[1]), 0.0f,
+        toFloat(v4[2]), toFloat(v4[3]), toFloat(v4[4]),
     };
 
+    float proj[16];
+    orthoProj(proj, 0.0f, (float)fgw.width, (float)fgw.height, 0.0f);
+
     glUseProgram(fgw.shaderProgram);
+    glUniformMatrix4fv(glGetUniformLocation(fgw.shaderProgram, "projection"), 1, GL_FALSE, proj);
     glBindVertexArray(fgw.VAO);
     glBindBuffer(GL_ARRAY_BUFFER, fgw.VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
@@ -364,6 +384,104 @@ Value FG::draw_rect(const std::vector<Value>& args) {
     return Value();
 }
 
+Value FG::draw_line(const std::vector<Value>& args) {
+    if (args.size() != 8) {
+        throw std::runtime_error("draw_line: need 8 args (x1, y1, x2, y2, thickness, r, g, b)");
+    }
+    if (windows.empty()) return Value();
+    FGWindow& fgw = windows.back();
+
+    auto toFloat = [](const Value& v) -> float {
+        if (v.getType() == Value::Type::Int) return static_cast<float>(v.asInt());
+        return static_cast<float>(v.asDouble());
+    };
+
+    float x1 = toFloat(args[0]), y1 = toFloat(args[1]);
+    float x2 = toFloat(args[2]), y2 = toFloat(args[3]);
+    float t  = toFloat(args[4]);
+    float r  = toFloat(args[5]), g = toFloat(args[6]), b = toFloat(args[7]);
+
+    float dx = x2 - x1, dy = y2 - y1;
+    float len = sqrtf(dx * dx + dy * dy);
+    if (len < 0.0001f) return Value();
+
+    dx /= len;
+    dy /= len;
+    float px = -dy, py = dx;
+    float h = t * 0.5f;
+
+    float vertices[36] = {
+        // Triangle 1: side1 start, side2 start, side1 end
+        x1 + px * h, y1 + py * h, 0.0f, r, g, b,
+        x1 - px * h, y1 - py * h, 0.0f, r, g, b,
+        x2 + px * h, y2 + py * h, 0.0f, r, g, b,
+
+        // Triangle 2: side2 start, side2 end, side1 end
+        x1 - px * h, y1 - py * h, 0.0f, r, g, b,
+        x2 - px * h, y2 - py * h, 0.0f, r, g, b,
+        x2 + px * h, y2 + py * h, 0.0f, r, g, b,
+    };
+
+    float proj[16];
+    orthoProj(proj, 0.0f, (float)fgw.width, (float)fgw.height, 0.0f);
+
+    glUseProgram(fgw.shaderProgram);
+    glUniformMatrix4fv(glGetUniformLocation(fgw.shaderProgram, "projection"), 1, GL_FALSE, proj);
+    glBindVertexArray(fgw.VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, fgw.VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    return Value();
+}
+
+// draw_circle: cx, cy, radius, r, g, b
+Value FG::draw_circle(const std::vector<Value>& args) {
+    if (args.size() != 6) {
+        throw std::runtime_error("draw_circle: need 6 args (cx, cy, radius, r, g, b)");
+    }
+    if (windows.empty()) return Value();
+    FGWindow& fgw = windows.back();
+
+    auto toFloat = [](const Value& v) -> float {
+        if (v.getType() == Value::Type::Int) return static_cast<float>(v.asInt());
+        return static_cast<float>(v.asDouble());
+    };
+
+    float cx = toFloat(args[0]), cy = toFloat(args[1]);
+    float radius = toFloat(args[2]);
+    float r = toFloat(args[3]), g = toFloat(args[4]), b = toFloat(args[5]);
+
+    const int SEGMENTS = 64;
+    std::vector<float> vertices;
+    vertices.reserve((SEGMENTS + 2) * 6);
+
+    // Center vertex
+    vertices.push_back(cx); vertices.push_back(cy); vertices.push_back(0.0f);
+    vertices.push_back(r); vertices.push_back(g); vertices.push_back(b);
+
+    for (int i = 0; i <= SEGMENTS; ++i) {
+        float angle = 6.2831853f * i / SEGMENTS;
+        float px = cx + radius * cosf(angle);
+        float py = cy + radius * sinf(angle);
+        vertices.push_back(px); vertices.push_back(py); vertices.push_back(0.0f);
+        vertices.push_back(r); vertices.push_back(g); vertices.push_back(b);
+    }
+
+    float proj[16];
+    orthoProj(proj, 0.0f, (float)fgw.width, (float)fgw.height, 0.0f);
+
+    glUseProgram(fgw.shaderProgram);
+    glUniformMatrix4fv(glGetUniformLocation(fgw.shaderProgram, "projection"), 1, GL_FALSE, proj);
+    glBindVertexArray(fgw.VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, fgw.VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_DYNAMIC_DRAW);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, SEGMENTS + 2);
+    glBindVertexArray(0);
+
+    return Value();
+}
 
 Value FG::draw_text(const std::vector<Value>& args) {
     if (args.size() != 8) {
@@ -486,3 +604,44 @@ Value FG::draw_text(const std::vector<Value>& args) {
 
     return Value();
 }
+
+// mouse_down: window_idx, button (0=left, 1=right, 2=middle)
+// Returns 1 if pressed, 0 if not
+Value FG::mouse_down(const std::vector<Value>& args) {
+    if (args.size() != 2) {
+        throw std::runtime_error("mouse_down: need 2 args (window, button)");
+    }
+    int idx = args[0].asInt();
+    if (idx < 0 || idx >= static_cast<int>(windows.size())) {
+        throw std::runtime_error("mouse_down: invalid window index");
+    }
+    int button = args[1].asInt();
+    int glfwButton;
+    switch (button) {
+        case 0: glfwButton = GLFW_MOUSE_BUTTON_LEFT; break;
+        case 1: glfwButton = GLFW_MOUSE_BUTTON_RIGHT; break;
+        case 2: glfwButton = GLFW_MOUSE_BUTTON_MIDDLE; break;
+        default: throw std::runtime_error("mouse_down: button must be 0 (left), 1 (right), or 2 (middle)");
+    }
+    int state = glfwGetMouseButton(windows[idx].window, glfwButton);
+    return Value(state == GLFW_PRESS ? 1 : 0);
+}
+
+// mouse_pos: window_idx
+// Returns [x, y] with cursor position in pixel coords (0,0 = top-left)
+Value FG::mouse_pos(const std::vector<Value>& args) {
+    if (args.size() != 1) {
+        throw std::runtime_error("mouse_pos: need 1 arg (window)");
+    }
+    int idx = args[0].asInt();
+    if (idx < 0 || idx >= static_cast<int>(windows.size())) {
+        throw std::runtime_error("mouse_pos: invalid window index");
+    }
+    double x, y;
+    glfwGetCursorPos(windows[idx].window, &x, &y);
+    std::vector<Value> pos;
+    pos.push_back(Value(static_cast<int>(x)));
+    pos.push_back(Value(static_cast<int>(y)));
+    return Value(pos);
+}
+

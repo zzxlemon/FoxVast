@@ -43,6 +43,8 @@ enum TokenT {
     TOKEN_WHILE,          
     TOKEN_ENDL,           
     TOKEN_EXIT,           
+    TOKEN_FREE,
+    TOKEN_FREE_ALL,
     TOKEN_IMPORT,         
     TOKEN_FOR,            
     TOKEN_FN,             
@@ -50,7 +52,7 @@ enum TokenT {
     TOKEN_LBRACKET,       
     TOKEN_RBRACKET,       
     TOKEN_SEMICOLON,      
-TOKEN_DOT,            
+    TOKEN_DOT,            
     TOKEN_NEW,
     TOKEN_NOT
 };

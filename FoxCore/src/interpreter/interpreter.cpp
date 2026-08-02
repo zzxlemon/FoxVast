@@ -9,6 +9,7 @@
 #include "library_manager.hpp"   
 
 std::vector<std::string> functions_register_map;
+std::unordered_map<std::string, Value>* Interpreter::currentVariables = nullptr;
 
 void Interpreter::parseCode(const std::string& code, const std::string& filename) {
     if (code.empty()) return;

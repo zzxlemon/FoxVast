@@ -10,6 +10,8 @@ extern std::vector<std::string> functions_register_map;
 
 class Interpreter {
 public:
+    static std::unordered_map<std::string, Value>* currentVariables;
+
     std::unordered_map<std::string, Value> variables;
     std::unordered_map<std::string, Function> functions;
     bool parse_failed = false;

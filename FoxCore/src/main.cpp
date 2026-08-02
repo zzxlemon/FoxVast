@@ -123,9 +123,7 @@ int main(int argc, char** argv) {
                 size_t sep = basePath.find_last_of("/\\");
                 std::string baseName = (sep != std::string::npos) ? basePath.substr(sep + 1) : basePath;
                 std::string parentDir = (sep != std::string::npos) ? basePath.substr(0, sep) : ".";
-                std::string fcDir = parentDir + "\\.fc";
-                CreateDirectoryA(fcDir.c_str(), NULL);
-                std::string outName = fcDir + "\\" + baseName + ".fc";
+                std::string outName = parentDir + "\\" + baseName + ".fc";
                 std::ofstream fcout(outName, std::ios::binary);
                 if (fcout.is_open()) {
                     fcout.write(reinterpret_cast<const char*>(fcData.data()), fcData.size());
@@ -157,7 +155,7 @@ int main(int argc, char** argv) {
                 size_t sep = base.find_last_of("/\\");
                 std::string baseName = (sep != std::string::npos) ? base.substr(sep + 1) : base;
                 std::string parentDir = (sep != std::string::npos) ? base.substr(0, sep) : ".";
-                std::string altPath = parentDir + "\\.fc\\" + baseName + ".fc";
+                std::string altPath = parentDir + "\\" + baseName + ".fc";
                 if (access(altPath.c_str(), 0) == 0) fcFile = altPath;
             }
             std::string fullCode = read_file(fcFile);

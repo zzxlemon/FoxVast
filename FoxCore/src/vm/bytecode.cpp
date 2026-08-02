@@ -7,29 +7,28 @@
 // ============================================================
 // Chunk implementation
 // ============================================================
-void Chunk::write(uint8_t byte, int line) {
+void Chunk::write(uint8_t byte) {
     code.push_back(byte);
-    lines.push_back(line);
 }
 
-void Chunk::writeOp(OpCode op, int line) {
-    write(static_cast<uint8_t>(op), line);
+void Chunk::writeOp(OpCode op) {
+    write(static_cast<uint8_t>(op));
 }
 
-void Chunk::writeInt(uint32_t val, int line) {
-    write(static_cast<uint8_t>(val & 0xFF), line);
-    write(static_cast<uint8_t>((val >> 8) & 0xFF), line);
-    write(static_cast<uint8_t>((val >> 16) & 0xFF), line);
-    write(static_cast<uint8_t>((val >> 24) & 0xFF), line);
+void Chunk::writeInt(uint32_t val) {
+    write(static_cast<uint8_t>(val & 0xFF));
+    write(static_cast<uint8_t>((val >> 8) & 0xFF));
+    write(static_cast<uint8_t>((val >> 16) & 0xFF));
+    write(static_cast<uint8_t>((val >> 24) & 0xFF));
 }
 
-void Chunk::writeShort(uint16_t val, int line) {
-    write(static_cast<uint8_t>(val & 0xFF), line);
-    write(static_cast<uint8_t>((val >> 8) & 0xFF), line);
+void Chunk::writeShort(uint16_t val) {
+    write(static_cast<uint8_t>(val & 0xFF));
+    write(static_cast<uint8_t>((val >> 8) & 0xFF));
 }
 
-void Chunk::writeByte(uint8_t val, int line) {
-    write(val, line);
+void Chunk::writeByte(uint8_t val) {
+    write(val);
 }
 
 uint32_t Chunk::readInt(size_t offset) const {
@@ -71,31 +70,27 @@ size_t Chunk::addConstantInt(int val) {
 }
 
 void Chunk::patchJump(size_t offset, size_t target) {
-    int32_t jumpOffset = static_cast<int32_t>(target - offset - 4);
+    int32_t jumpOffset = static_cast<int32_t>(target - offset - 2);
     code[offset]     = static_cast<uint8_t>(jumpOffset & 0xFF);
     code[offset + 1] = static_cast<uint8_t>((jumpOffset >> 8) & 0xFF);
-    code[offset + 2] = static_cast<uint8_t>((jumpOffset >> 16) & 0xFF);
-    code[offset + 3] = static_cast<uint8_t>((jumpOffset >> 24) & 0xFF);
 }
 
 void Chunk::patchJumpOffset(size_t jumpInstrOffset, int32_t offset) {
     code[jumpInstrOffset]     = static_cast<uint8_t>(offset & 0xFF);
     code[jumpInstrOffset + 1] = static_cast<uint8_t>((offset >> 8) & 0xFF);
-    code[jumpInstrOffset + 2] = static_cast<uint8_t>((offset >> 16) & 0xFF);
-    code[jumpInstrOffset + 3] = static_cast<uint8_t>((offset >> 24) & 0xFF);
 }
 
 std::vector<uint8_t> Chunk::serialize() const {
     std::vector<uint8_t> data;
 
     // Constants
-    writeUint32(data, static_cast<uint32_t>(constants.size()));
+    writeVarint(data, static_cast<uint32_t>(constants.size()));
     for (const auto& v : constants) {
         switch (v.getType()) {
         case Value::Type::Int: {
             data.push_back(0);
             int32_t iv = v.asInt();
-            writeUint32(data, static_cast<uint32_t>(iv));
+            writeVarint(data, static_cast<uint32_t>(iv));
             break;
         }
         case Value::Type::Double: {
@@ -115,7 +110,7 @@ std::vector<uint8_t> Chunk::serialize() const {
         }
         case Value::Type::Array: {
             data.push_back(3);
-            writeUint32(data, static_cast<uint32_t>(v.asArray().size()));
+            writeVarint(data, static_cast<uint32_t>(v.asArray().size()));
             break;
         }
         case Value::Type::Void: {
@@ -125,7 +120,7 @@ std::vector<uint8_t> Chunk::serialize() const {
         case Value::Type::Bytes: {
             data.push_back(5);
             const auto& bv = v.asBytes();
-            writeUint32(data, static_cast<uint32_t>(bv.size()));
+            writeVarint(data, static_cast<uint32_t>(bv.size()));
             for (uint8_t byte : bv) data.push_back(byte);
             break;
         }
@@ -133,7 +128,7 @@ std::vector<uint8_t> Chunk::serialize() const {
 }
 
     // Code
-    writeUint32(data, static_cast<uint32_t>(code.size()));
+    writeVarint(data, static_cast<uint32_t>(code.size()));
     data.insert(data.end(), code.begin(), code.end());
 
     return data;
@@ -146,15 +141,14 @@ bool Chunk::deserialize(const std::vector<uint8_t>& data) {
 
 bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
     // Constants
-    uint32_t constCount = readUint32(data, size, offset);
+    uint32_t constCount = readVarint(data, size, offset);
     constants.clear();
     for (uint32_t i = 0; i < constCount; i++) {
         if (offset >= size) return false;
         uint8_t type = data[offset++];
         switch (type) {
         case 0: { // int
-            if (offset + 4 > size) return false;
-            int32_t iv = static_cast<int32_t>(readUint32(data, size, offset));
+            int32_t iv = static_cast<int32_t>(readVarint(data, size, offset));
             constants.push_back(Value(iv));
             break;
         }
@@ -176,7 +170,7 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
             break;
         }
         case 3: { // array
-            uint32_t arrLen = readUint32(data, size, offset);
+            uint32_t arrLen = readVarint(data, size, offset);
             std::vector<Value> arr;
             for (uint32_t j = 0; j < arrLen; j++) {
                 arr.push_back(Value());
@@ -185,7 +179,7 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
             break;
         }
         case 5: { // bytes
-            uint32_t bytesLen = readUint32(data, size, offset);
+            uint32_t bytesLen = readVarint(data, size, offset);
             if (offset + bytesLen > size) return false;
             std::vector<uint8_t> bv(data + offset, data + offset + bytesLen);
             offset += bytesLen;
@@ -199,7 +193,7 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
     }
 
     // Code
-    uint32_t codeSize = readUint32(data, size, offset);
+    uint32_t codeSize = readVarint(data, size, offset);
     code.clear();
     if (offset + codeSize > size) return false;
     code.insert(code.end(), data + offset, data + offset + codeSize);
@@ -209,20 +203,25 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
 }
 
 size_t Chunk::serializedSize() const {
-    size_t size = 4; // constant count
+    auto varintSize = [](uint32_t v) -> size_t {
+        size_t s = 0;
+        do { s++; v >>= 7; } while (v);
+        return s;
+    };
+    size_t size = varintSize(static_cast<uint32_t>(constants.size()));
     for (const auto& v : constants) {
         size += 1; // type byte
         switch (v.getType()) {
-        case Value::Type::Int:    size += 4; break;
+        case Value::Type::Int:    size += varintSize(static_cast<uint32_t>(v.asInt())); break;
         case Value::Type::Double: size += 8; break;
-        case Value::Type::String: size += 4 + v.asString().size(); break;
-        case Value::Type::Array:  size += 4; break;
-        case Value::Type::Bytes:  size += 4 + v.asBytes().size(); break;
+        case Value::Type::String: size += varintSize(static_cast<uint32_t>(v.asString().size())) + v.asString().size(); break;
+        case Value::Type::Array:  size += varintSize(static_cast<uint32_t>(v.asArray().size())); break;
+        case Value::Type::Bytes:  size += varintSize(static_cast<uint32_t>(v.asBytes().size())) + v.asBytes().size(); break;
         case Value::Type::Void:   break;
         default: break;
         }
     }
-    size += 4 + code.size(); // code size + code data
+    size += varintSize(static_cast<uint32_t>(code.size())) + code.size();
     return size;
 }
 
@@ -238,28 +237,28 @@ std::vector<uint8_t> CompiledProgram::serialize() const {
     writeUint32(data, 1);
 
     // Import entries
-    writeUint32(data, static_cast<uint32_t>(imports.size()));
+    writeVarint(data, static_cast<uint32_t>(imports.size()));
     for (const auto& imp : imports) {
         writeString(data, imp.libName);
         writeString(data, imp.alias);
     }
 
     // Number of functions
-    writeUint32(data, static_cast<uint32_t>(functions.size()));
+    writeVarint(data, static_cast<uint32_t>(functions.size()));
 
     for (const auto& func : functions) {
         writeString(data, func.name);
         writeString(data, func.returnType);
 
         // Parameters
-        writeUint32(data, static_cast<uint32_t>(func.parameters.size()));
+        writeVarint(data, static_cast<uint32_t>(func.parameters.size()));
         for (const auto& param : func.parameters) {
             writeString(data, param.name);
             writeString(data, param.type);
         }
 
         // Local count
-        writeUint32(data, static_cast<uint32_t>(func.localCount));
+        writeVarint(data, static_cast<uint32_t>(func.localCount));
 
         // Chunk
         std::vector<uint8_t> chunkData = func.chunk.serialize();
@@ -286,7 +285,7 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
         throw std::runtime_error("Unsupported .fc version: " + std::to_string(version));
     }
 
-    uint32_t importCount = readUint32(data, size, offset);
+    uint32_t importCount = readVarint(data, size, offset);
     for (uint32_t i = 0; i < importCount; i++) {
         ImportEntry ie;
         ie.libName = readString(data, size, offset);
@@ -295,14 +294,14 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
     }
     prog.restoreImports();
 
-    uint32_t funcCount = readUint32(data, size, offset);
+    uint32_t funcCount = readVarint(data, size, offset);
 
     for (uint32_t i = 0; i < funcCount; i++) {
         CompiledFunction cf;
         cf.name = readString(data, size, offset);
         cf.returnType = readString(data, size, offset);
 
-        uint32_t paramCount = readUint32(data, size, offset);
+        uint32_t paramCount = readVarint(data, size, offset);
         for (uint32_t j = 0; j < paramCount; j++) {
             Parameter p;
             p.name = readString(data, size, offset);
@@ -310,7 +309,7 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
             cf.parameters.push_back(p);
         }
 
-        cf.localCount = static_cast<int>(readUint32(data, size, offset));
+        cf.localCount = static_cast<int>(readVarint(data, size, offset));
 
         if (!cf.chunk.deserialize(data, size, offset)) {
             throw std::runtime_error("Corrupt .fc: chunk deserialization failed");
@@ -344,6 +343,7 @@ void CompiledProgram::restoreImports() const {
 
 void BytecodeCompiler::skipWhitespace(Lexer& lexer, Token& token) {
     while (token.type != TOKEN_EOF && !token.value.empty()
+        && token.type != TOKEN_STRING
         && isspace(static_cast<unsigned char>(token.value[0]))
         && token.value[0] != '\n') {
         token = lexer.nextToken();
@@ -394,7 +394,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
 
         // Ensure every function ends with a return
         if (cf.chunk.code.empty() || cf.chunk.code.back() != static_cast<uint8_t>(OpCode::OP_RETURN)) {
-            cf.chunk.writeOp(OpCode::OP_RETURN, 0);
+            cf.chunk.writeOp(OpCode::OP_RETURN);
         }
 
         program.functions.push_back(cf);
@@ -421,70 +421,79 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             : cf(c), varTypes(vt), compiler(comp), labelAddresses(labels), gotoFixups(fixups) {}
 
         void onPrint(std::unique_ptr<Expr> arg) override {
-            compiler.compileExpr(cf, arg.get());
-            cf.chunk.writeOp(OpCode::OP_PRINT, 0);
+            arg->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_PRINT);
         }
         void onPrintln(std::unique_ptr<Expr> arg) override {
-            compiler.compileExpr(cf, arg.get());
-            cf.chunk.writeOp(OpCode::OP_PRINTLN, 0);
+            arg->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_PRINTLN);
         }
         void onExit(std::unique_ptr<Expr> arg) override {
-            compiler.compileExpr(cf, arg.get());
-            cf.chunk.writeOp(OpCode::OP_EXIT, 0);
+            arg->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_EXIT);
+        }
+        void onFree(const std::string& varName) override {
+            int nameIdx = cf.addConstantStringDedup(varName);
+            cf.chunk.writeOp(OpCode::OP_UNSET_GLOBAL);
+            cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
+        }
+        void onFreeAll() override {
+            cf.chunk.writeOp(OpCode::OP_CLEAR_GLOBALS);
         }
         Value onRet(std::unique_ptr<Expr> arg) override {
-            if (arg) compiler.compileExpr(cf, arg.get());
-            cf.chunk.writeOp(OpCode::OP_RETURN, 0);
+            if (arg) arg->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_RETURN);
             return Value();
         }
         void onEndl() override {
-            cf.chunk.writeOp(OpCode::OP_ENDLN, 0);
+            cf.chunk.writeOp(OpCode::OP_ENDLN);
         }
         void onInput(const std::string& varName) override {
-            cf.chunk.writeOp(OpCode::OP_INPUT, 0);
-            int nameIdx = cf.chunk.addConstantString(varName);
-            cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
-            cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL, 0);
-            cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
+            cf.chunk.writeOp(OpCode::OP_INPUT);
+            int nameIdx = cf.addConstantStringDedup(varName);
+            cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL);
+            cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
         }
         void onCall(const std::string& name, std::vector<std::unique_ptr<Expr>> args) override {
             if (!compiler.validateCall(name)) {
                 throw std::runtime_error(""); // Error already reported via ErrorReporter
             }
             for (auto& arg : args) {
-                compiler.compileExpr(cf, arg.get());
+                arg->compileBytecode(cf, varTypes);
             }
-            int nameIdx = cf.chunk.addConstantString(name);
-            cf.chunk.writeOp(OpCode::OP_CONSTANT, 0);
-            cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
-            cf.chunk.writeOp(OpCode::OP_CALL, 0);
-            cf.chunk.writeByte(static_cast<uint8_t>(args.size()), 0);
+            int nameIdx = cf.addConstantStringDedup(name);
+            cf.chunk.writeOp(OpCode::OP_CONSTANT);
+            cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
+            cf.chunk.writeOp(OpCode::OP_CALL);
+            cf.chunk.writeByte(static_cast<uint8_t>(args.size()));
         }
         void onAssign(const std::string& name, std::unique_ptr<Expr> expr) override {
-            Value::Type rhsType = compiler.compileExpr(cf, expr.get());
+            Value::Type rhsType = expr->compileBytecode(cf, varTypes);
             varTypes[name] = rhsType;
-            int nameIdx = cf.chunk.addConstantString(name);
-            cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL, 0);
-            cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
+            int nameIdx = cf.addConstantStringDedup(name);
+            cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL);
+            cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
         }
         void onIndexAssign(const std::string& name, std::unique_ptr<Expr> index, std::unique_ptr<Expr> value) override {
-            compiler.compileExpr(cf, index.get());
-            int nameIdx = cf.chunk.addConstantString(name);
-            cf.chunk.writeOp(OpCode::OP_GET_GLOBAL, 0);
-            cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
-            compiler.compileExpr(cf, value.get());
-            cf.chunk.writeOp(OpCode::OP_INDEX_SET, 0);
+            value->compileBytecode(cf, varTypes);
+            int nameIdx = cf.addConstantStringDedup(name);
+            cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+            cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
+            index->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_INDEX_SET);
+            cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL);
+            cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
         }
         void onIf(IfStatement ifStmt) override {
             Lexer condLexer(ifStmt.condition);
             Token condToken = condLexer.nextToken();
             BytecodeCompiler::skipWhitespace(condLexer, condToken);
             auto condExpr = Parser::parseExpr(condLexer, condToken);
-            compiler.compileExpr(cf, condExpr.get());
+            condExpr->compileBytecode(cf, varTypes);
 
             size_t jumpInstr = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE, 0);
-            cf.chunk.writeInt(0, 0);
+            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
+            cf.chunk.writeShort(0);
 
             for (const auto& stmt : ifStmt.body) {
                 Parser::parseLine(stmt, *this);
@@ -500,21 +509,21 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             Token condToken = condLexer.nextToken();
             BytecodeCompiler::skipWhitespace(condLexer, condToken);
             auto condExpr = Parser::parseExpr(condLexer, condToken);
-            compiler.compileExpr(cf, condExpr.get());
+            condExpr->compileBytecode(cf, varTypes);
 
             size_t exitJump = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE, 0);
-            cf.chunk.writeInt(0, 0);
+            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
+            cf.chunk.writeShort(0);
 
             for (const auto& stmt : whileStmt.body) {
                 Parser::parseLine(stmt, *this);
             }
 
             size_t afterBody = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_LOOP, 0);
-            int32_t loopOffset = static_cast<int32_t>(loopStart) - static_cast<int32_t>(afterBody + 5);
-            cf.chunk.writeInt(static_cast<uint32_t>(loopOffset), 0);
-            cf.chunk.patchJump(exitJump + 1, afterBody + 5);
+            cf.chunk.writeOp(OpCode::OP_LOOP);
+            int32_t loopOffset = static_cast<int32_t>(loopStart) - static_cast<int32_t>(afterBody + 3);
+            cf.chunk.writeShort(static_cast<uint16_t>(static_cast<int32_t>(loopOffset)));
+            cf.chunk.patchJump(exitJump + 1, afterBody + 3);
         }
         void onFor(ForStatement forStmt) override {
             if (!forStmt.init.empty()) {
@@ -528,14 +537,14 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
                 Token condToken = condLexer.nextToken();
                 BytecodeCompiler::skipWhitespace(condLexer, condToken);
                 auto condExpr = Parser::parseExpr(condLexer, condToken);
-                compiler.compileExpr(cf, condExpr.get());
+                condExpr->compileBytecode(cf, varTypes);
             } else {
-                cf.chunk.writeOp(OpCode::OP_TRUE, 0);
+                cf.chunk.writeOp(OpCode::OP_TRUE);
             }
 
             size_t exitJump = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE, 0);
-            cf.chunk.writeInt(0, 0);
+            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
+            cf.chunk.writeShort(0);
 
             for (const auto& stmt : forStmt.body) {
                 Parser::parseLine(stmt, *this);
@@ -546,18 +555,18 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             }
 
             size_t afterBody = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_LOOP, 0);
-            int32_t loopOffset = static_cast<int32_t>(loopStart) - static_cast<int32_t>(afterBody + 5);
-            cf.chunk.writeInt(static_cast<uint32_t>(loopOffset), 0);
-            cf.chunk.patchJump(exitJump + 1, afterBody + 5);
+            cf.chunk.writeOp(OpCode::OP_LOOP);
+            int32_t loopOffset = static_cast<int32_t>(loopStart) - static_cast<int32_t>(afterBody + 3);
+            cf.chunk.writeShort(static_cast<uint16_t>(static_cast<int32_t>(loopOffset)));
+            cf.chunk.patchJump(exitJump + 1, afterBody + 3);
         }
         void onFnLabel(const std::string& name) override {
             labelAddresses[name] = cf.chunk.code.size();
         }
         void onGoto(const std::string& name) override {
             size_t jumpAddrPos = cf.chunk.code.size() + 1;
-            cf.chunk.writeOp(OpCode::OP_JMP, 0);
-            cf.chunk.writeInt(0, 0);
+            cf.chunk.writeOp(OpCode::OP_JMP);
+            cf.chunk.writeShort(0);
             gotoFixups.push_back({name, jumpAddrPos});
         }
     };
@@ -589,11 +598,11 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
                 Token exprToken = exprLexer.nextToken();
                 skipWhitespace(exprLexer, exprToken);
                 auto expr = Parser::parseExpr(exprLexer, exprToken);
-                Value::Type rhsType = BytecodeCompiler::compileExpr(cf, expr.get());
+                Value::Type rhsType = expr->compileBytecode(cf, varTypes);
                 varTypes[varName] = rhsType;
-                int nameIdx = cf.chunk.addConstantString(varName);
-                cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL, 0);
-                cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
+                int nameIdx = cf.addConstantStringDedup(varName);
+                cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL);
+                cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
             }
         } else {
             Parser::parseLine(line, handler);
@@ -689,170 +698,7 @@ void BytecodeCompiler::typeError(const std::string& msg) {
 }
 
 Value::Type BytecodeCompiler::compileExpr(CompiledFunction& cf, Expr* expr) {
-    if (auto* n = dynamic_cast<NumberExpr*>(expr)) {
-        int idx = cf.chunk.addConstant(Value(n->value));
-        cf.chunk.writeOp(OpCode::OP_CONSTANT, 0);
-        cf.chunk.writeInt(static_cast<uint32_t>(idx), 0);
-        return Value::Type::Int;
-    }
-    if (auto* d = dynamic_cast<DoubleExpr*>(expr)) {
-        int idx = cf.chunk.addConstant(Value(d->value));
-        cf.chunk.writeOp(OpCode::OP_CONSTANT, 0);
-        cf.chunk.writeInt(static_cast<uint32_t>(idx), 0);
-        return Value::Type::Double;
-    }
-    if (auto* s = dynamic_cast<StringExpr*>(expr)) {
-        int idx = cf.chunk.addConstantString(s->value);
-        cf.chunk.writeOp(OpCode::OP_CONSTANT, 0);
-        cf.chunk.writeInt(static_cast<uint32_t>(idx), 0);
-        return Value::Type::String;
-    }
-    if (auto* id = dynamic_cast<IdentifierExpr*>(expr)) {
-        int nameIdx = cf.chunk.addConstantString(id->name);
-        cf.chunk.writeOp(OpCode::OP_GET_GLOBAL, 0);
-        cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
-        auto it = varTypes.find(id->name);
-        if (it != varTypes.end()) return it->second;
-        return Value::Type::Unknown;
-    }
-    if (auto* input = dynamic_cast<InputExpr*>(expr)) {
-        cf.chunk.writeOp(OpCode::OP_INPUT, 0);
-        return Value::Type::Unknown;
-    }
-    if (auto* cast = dynamic_cast<CastExpr*>(expr)) {
-        compileExpr(cf, cast->expr.get());
-        cf.chunk.writeOp(
-            (cast->castType == CastType::Int) ? OpCode::OP_CAST_INT : OpCode::OP_CAST_DOUBLE,
-            0
-        );
-        return (cast->castType == CastType::Int) ? Value::Type::Int : Value::Type::Double;
-    }
-    if (auto* arr = dynamic_cast<ArrayExpr*>(expr)) {
-        int count = 0;
-        for (const auto& elem : arr->elements) {
-            compileExpr(cf, elem.get());
-            count++;
-        }
-        cf.chunk.writeOp(OpCode::OP_ARRAY, 0);
-        cf.chunk.writeByte(static_cast<uint8_t>(count), 0);
-        return Value::Type::Array;
-    }
-    if (auto* idx = dynamic_cast<IndexExpr*>(expr)) {
-        compileExpr(cf, idx->arrayExpr.get());
-        compileExpr(cf, idx->indexExpr.get());
-        cf.chunk.writeOp(OpCode::OP_INDEX_GET, 0);
-        return Value::Type::Unknown;
-    }
-    if (auto* call = dynamic_cast<CallExpr*>(expr)) {
-        if (!validateCall(call->funcName)) {
-            throw std::runtime_error(""); // Error already reported via ErrorReporter
-        }
-        for (const auto& arg : call->args) {
-            compileExpr(cf, arg.get());
-        }
-        int nameIdx = cf.chunk.addConstantString(call->funcName);
-        cf.chunk.writeOp(OpCode::OP_CONSTANT, 0);
-        cf.chunk.writeInt(static_cast<uint32_t>(nameIdx), 0);
-        cf.chunk.writeOp(OpCode::OP_CALL, 0);
-        cf.chunk.writeByte(static_cast<uint8_t>(call->args.size()), 0);
-        return Value::Type::Unknown;
-    }
-    if (auto* bin = dynamic_cast<BinaryExpr*>(expr)) {
-        Value::Type left = compileExpr(cf, bin->left.get());
-        Value::Type right = compileExpr(cf, bin->right.get());
-        if (left != Value::Type::Unknown && right != Value::Type::Unknown &&
-            left != Value::Type::Void && right != Value::Type::Void) {
-            if ((left == Value::Type::Double && right == Value::Type::Int) ||
-                (left == Value::Type::Int && right == Value::Type::Double)) {
-                typeError("Cannot " + std::string(bin->op == TOKEN_PLUS ? "add" : "subtract") + " "
-                    + typeStr(left) + " and " + typeStr(right)
-                    + " without explicit cast (use int() or double())");
-            }
-            if (left == Value::Type::String && right != Value::Type::String) {
-                typeError("Cannot add string and " + typeStr(right));
-            }
-            if (left != Value::Type::String && right == Value::Type::String) {
-                typeError("Cannot add " + typeStr(left) + " and string");
-            }
-        }
-        cf.chunk.writeOp((bin->op == TOKEN_PLUS) ? OpCode::OP_ADD : OpCode::OP_SUB, 0);
-        if (left == Value::Type::Double || right == Value::Type::Double)
-            return Value::Type::Double;
-        if (left == Value::Type::Int && right == Value::Type::Int)
-            return Value::Type::Int;
-        if (left == Value::Type::String && right == Value::Type::String)
-            return Value::Type::String;
-        return Value::Type::Unknown;
-    }
-    if (auto* cmp = dynamic_cast<CompareExpr*>(expr)) {
-        Value::Type left = compileExpr(cf, cmp->left.get());
-        Value::Type right = compileExpr(cf, cmp->right.get());
-        if (left != Value::Type::Unknown && right != Value::Type::Unknown &&
-            left != Value::Type::Void && right != Value::Type::Void) {
-            if ((left == Value::Type::Double && right == Value::Type::Int) ||
-                (left == Value::Type::Int && right == Value::Type::Double)) {
-                typeError("Cannot compare " + typeStr(left) + " and " + typeStr(right)
-                    + " without explicit cast (use int() or double())");
-            }
-        }
-        OpCode opcode;
-        switch (cmp->op) {
-        case CompareType::EQ: opcode = OpCode::OP_EQ; break;
-        case CompareType::NE: opcode = OpCode::OP_NE; break;
-        case CompareType::GT: opcode = OpCode::OP_GT; break;
-        case CompareType::LT: opcode = OpCode::OP_LT; break;
-        case CompareType::GE: opcode = OpCode::OP_GE; break;
-        case CompareType::LE: opcode = OpCode::OP_LE; break;
-        }
-        cf.chunk.writeOp(opcode, 0);
-        return Value::Type::Int;
-    }
-    if (auto* cond = dynamic_cast<ConditionExpr*>(expr)) {
-        compileExpr(cf, cond->left.get());
-        if (cond->op == TOKEN_AND) {
-            size_t jumpInstr = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE, 0);
-            cf.chunk.writeInt(0, 0);
-            compileExpr(cf, cond->right.get());
-            size_t endJump = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP, 0);
-            cf.chunk.writeInt(0, 0);
-            size_t afterJump = cf.chunk.code.size();
-            cf.chunk.patchJump(jumpInstr + 1, afterJump);
-            cf.chunk.patchJump(endJump + 1, cf.chunk.code.size());
-        } else {
-            size_t jumpInstr = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE, 0);
-            cf.chunk.writeInt(0, 0);
-            cf.chunk.writeOp(OpCode::OP_TRUE, 0);
-            size_t endJump = cf.chunk.code.size();
-            cf.chunk.writeOp(OpCode::OP_JMP, 0);
-            cf.chunk.writeInt(0, 0);
-            size_t afterJump = cf.chunk.code.size();
-            cf.chunk.patchJump(jumpInstr + 1, afterJump);
-            compileExpr(cf, cond->right.get());
-            cf.chunk.patchJump(endJump + 1, cf.chunk.code.size());
-        }
-        return Value::Type::Int;
-    }
-    if (auto* newExpr = dynamic_cast<NewExpr*>(expr)) {
-        compileExpr(cf, newExpr->sizeExpr.get());
-        cf.chunk.writeOp(OpCode::OP_NEW, 0);
-        return Value::Type::Bytes;
-    }
-    if (auto* unary = dynamic_cast<UnaryExpr*>(expr)) {
-        compileExpr(cf, unary->operand.get());
-        if (unary->op == TOKEN_NOT) {
-            cf.chunk.writeOp(OpCode::OP_NOT, 0);
-            return Value::Type::Int;
-        }
-        if (unary->op == TOKEN_MINUS) {
-            cf.chunk.writeOp(OpCode::OP_NEGATE, 0);
-            return Value::Type::Unknown;
-        }
-        throw std::runtime_error("BytecodeCompiler: unsupported unary operator");
-    }
-    throw std::runtime_error(std::string("BytecodeCompiler: unsupported expression type: ") + typeid(*expr).name());
+    return expr->compileBytecode(cf, varTypes);
 }
 
 // ============================================================
@@ -871,28 +717,6 @@ void VM::loadProgram(const CompiledProgram& prog) {
 
 void VM::resetStack() {
     stack.clear();
-}
-
-Value VM::peek(int distance) {
-    if (stack.empty()) {
-        runtimeErr("Stack empty");
-        return Value();
-    }
-    return stack[stack.size() - 1 - distance];
-}
-
-Value VM::pop() {
-    if (stack.empty()) {
-        runtimeErr("Stack underflow");
-        return Value();
-    }
-    Value val = stack.back();
-    stack.pop_back();
-    return val;
-}
-
-void VM::push(const Value& val) {
-    stack.push_back(val);
 }
 
 void VM::runtimeErr(const std::string& msg) {
@@ -921,6 +745,7 @@ bool VM::callSystemFunction(const std::string& name, int argCount) {
 }
 
 Value VM::executeSystemCall(const std::string& funcName, const std::vector<Value>& args) {
+    Interpreter::currentVariables = &globals;
     Interpreter sys;
     if (sys.isSystemFunction(funcName)) {
         return sys.SystemFunctionBuildIn(funcName, args);
@@ -1024,8 +849,8 @@ void VM::run() {
             break;
         }
         case OpCode::OP_CONSTANT: {
-            uint32_t idx = chunk.readInt(cf.ip);
-            cf.ip += 4;
+            uint16_t idx = chunk.readShort(cf.ip);
+            cf.ip += 2;
             if (idx < chunk.constants.size()) {
                 push(chunk.constants[idx]);
             } else {
@@ -1201,8 +1026,8 @@ void VM::run() {
             break;
         }
         case OpCode::OP_DEF_GLOBAL: {
-            uint32_t nameIdx = chunk.readInt(cf.ip);
-            cf.ip += 4;
+            uint16_t nameIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
             if (nameIdx >= chunk.constants.size() ||
                 chunk.constants[nameIdx].getType() != Value::Type::String) {
                 runtimeErr("Invalid global variable name constant");
@@ -1214,8 +1039,8 @@ void VM::run() {
             break;
         }
         case OpCode::OP_GET_GLOBAL: {
-            uint32_t nameIdx = chunk.readInt(cf.ip);
-            cf.ip += 4;
+            uint16_t nameIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
             if (nameIdx >= chunk.constants.size() ||
                 chunk.constants[nameIdx].getType() != Value::Type::String) {
                 runtimeErr("Invalid global variable name constant");
@@ -1231,8 +1056,8 @@ void VM::run() {
             break;
         }
         case OpCode::OP_SET_GLOBAL: {
-            uint32_t nameIdx = chunk.readInt(cf.ip);
-            cf.ip += 4;
+            uint16_t nameIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
             if (nameIdx >= chunk.constants.size() ||
                 chunk.constants[nameIdx].getType() != Value::Type::String) {
                 runtimeErr("Invalid global variable name constant");
@@ -1246,6 +1071,22 @@ void VM::run() {
                 break;
             }
             it->second = val;
+            break;
+        }
+        case OpCode::OP_UNSET_GLOBAL: {
+            uint16_t nameIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
+            if (nameIdx >= chunk.constants.size() ||
+                chunk.constants[nameIdx].getType() != Value::Type::String) {
+                runtimeErr("Invalid global variable name constant");
+                break;
+            }
+            std::string name = chunk.constants[nameIdx].asString();
+            globals.erase(name);
+            break;
+        }
+        case OpCode::OP_CLEAR_GLOBALS: {
+            globals.clear();
             break;
         }
         case OpCode::OP_GET_LOCAL: {
@@ -1269,14 +1110,14 @@ void VM::run() {
             break;
         }
         case OpCode::OP_JMP: {
-            int32_t offset = static_cast<int32_t>(chunk.readInt(cf.ip));
-            cf.ip += 4;
+            int32_t offset = static_cast<int16_t>(chunk.readShort(cf.ip));
+            cf.ip += 2;
             cf.ip += offset;
             break;
         }
         case OpCode::OP_JMP_IF_FALSE: {
-            int32_t offset = static_cast<int32_t>(chunk.readInt(cf.ip));
-            cf.ip += 4;
+            int32_t offset = static_cast<int16_t>(chunk.readShort(cf.ip));
+            cf.ip += 2;
             Value cond = pop();
             if (!cond.asBool()) {
                 cf.ip += offset;
@@ -1284,8 +1125,8 @@ void VM::run() {
             break;
         }
         case OpCode::OP_LOOP: {
-            int32_t offset = static_cast<int32_t>(chunk.readInt(cf.ip));
-            cf.ip += 4;
+            int32_t offset = static_cast<int16_t>(chunk.readShort(cf.ip));
+            cf.ip += 2;
             cf.ip += offset;
             break;
         }
@@ -1348,6 +1189,7 @@ void VM::run() {
             std::string userInput;
             std::getline(std::cin, userInput);
             push(Value(userInput));
+            // nameIdx follows but handled by subsequent OP_DEF_GLOBAL
             break;
         }
         case OpCode::OP_CAST_INT: {
@@ -1410,9 +1252,9 @@ void VM::run() {
             break;
         }
         case OpCode::OP_INDEX_SET: {
-            Value value = pop();
             Value index = pop();
             Value arr = pop();
+            Value value = pop();
             if (arr.getType() != Value::Type::Array) {
                 runtimeErr("Index target is not an array");
                 break;
@@ -1422,13 +1264,13 @@ void VM::run() {
                 break;
             }
             int idx = index.asInt();
-            std::vector<Value>& elements = const_cast<std::vector<Value>&>(arr.asArray());
+            std::vector<Value>& elements = arr.asArrayRef();
             if (idx < 0 || idx >= static_cast<int>(elements.size())) {
                 runtimeErr("Array index out of bounds");
                 break;
             }
             elements[idx] = value;
-            push(value);
+            push(arr);
             break;
         }
         case OpCode::OP_EXIT: {

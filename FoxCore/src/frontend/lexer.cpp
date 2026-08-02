@@ -308,6 +308,8 @@ Token Lexer::nextToken() {
             if (ident == "while") return makeToken(TOKEN_WHILE, "while", tokenLine, tokenCol);
             if (ident == "endl" || ident == "ENDL") return makeToken(TOKEN_ENDL, "endl", tokenLine, tokenCol);
             if (ident == "exit") return makeToken(TOKEN_EXIT, "exit", tokenLine, tokenCol);
+            if (ident == "free") return makeToken(TOKEN_FREE, "free", tokenLine, tokenCol);
+            if (ident == "free_all") return makeToken(TOKEN_FREE_ALL, "free_all", tokenLine, tokenCol);
             if (ident == "import") return makeToken(TOKEN_IMPORT, "import", tokenLine, tokenCol);
             if (ident == "new") return makeToken(TOKEN_NEW, "new", tokenLine, tokenCol);
             return makeToken(TOKEN_IDENTIFIER, ident, tokenLine, tokenCol);

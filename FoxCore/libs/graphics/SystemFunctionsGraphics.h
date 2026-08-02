@@ -42,8 +42,11 @@ public:
     Value clear(const std::vector<Value>& args);
     Value draw_triangle(const std::vector<Value>& args);
     Value draw_rect(const std::vector<Value>& args);
-
+    Value draw_line(const std::vector<Value>& args);
+    Value draw_circle(const std::vector<Value>& args);
     Value draw_text(const std::vector<Value>& args);
+    Value mouse_down(const std::vector<Value>& args);
+    Value mouse_pos(const std::vector<Value>& args);
 private:
     static std::vector<FGWindow> windows;
     static GLuint compileShader(GLenum type, const char* source);

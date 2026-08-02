@@ -66,6 +66,7 @@ static const char* tokenTypeName(TokenT type) {
 
 void Parser::skipWhitespace(Lexer& lexer, Token& currentToken) {
     while (currentToken.type != TOKEN_EOF && !currentToken.value.empty()
+        && currentToken.type != TOKEN_STRING
         && isspace(static_cast<unsigned char>(currentToken.value[0]))
         && currentToken.value[0] != '\n') {
         currentToken = lexer.nextToken();
@@ -559,6 +560,23 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
         handler.onExit(std::move(expr));
         return;
     }
+    if (currentToken.type == TOKEN_FREE) {
+        eat(lineLexer, currentToken, TOKEN_FREE);
+        eat(lineLexer, currentToken, TOKEN_LPAREN);
+        skipWhitespace(lineLexer, currentToken);
+        std::string varName = currentToken.value;
+        eat(lineLexer, currentToken, TOKEN_IDENTIFIER);
+        eat(lineLexer, currentToken, TOKEN_RPAREN);
+        handler.onFree(varName);
+        return;
+    }
+    if (currentToken.type == TOKEN_FREE_ALL) {
+        eat(lineLexer, currentToken, TOKEN_FREE_ALL);
+        eat(lineLexer, currentToken, TOKEN_LPAREN);
+        eat(lineLexer, currentToken, TOKEN_RPAREN);
+        handler.onFreeAll();
+        return;
+    }
     if (currentToken.type == TOKEN_RET) {
         eat(lineLexer, currentToken, TOKEN_RET);
         if (currentToken.type != TOKEN_NEWLINE && currentToken.type != TOKEN_EOF && currentToken.type != TOKEN_RBRACE) {
@@ -678,6 +696,12 @@ namespace {
             if (val.getType() == Value::Type::Int) std::exit(val.asInt());
             std::exit(0);
         }
+        void onFree(const std::string& varName) override {
+            variables.erase(varName);
+        }
+        void onFreeAll() override {
+            variables.clear();
+        }
         Value onRet(std::unique_ptr<Expr> arg) override {
             if (arg) {
                 retValue = arg->evaluate(variables, functions);
@@ -746,6 +770,12 @@ namespace {
         }
         void onExit(std::unique_ptr<Expr> arg) override {
             stmt = std::make_unique<ExitStmt>(std::move(arg));
+        }
+        void onFree(const std::string& varName) override {
+            stmt = std::make_unique<FreeStmt>(varName);
+        }
+        void onFreeAll() override {
+            stmt = std::make_unique<FreeAllStmt>();
         }
         Value onRet(std::unique_ptr<Expr> arg) override {
             stmt = std::make_unique<RetStmt>(std::move(arg));
@@ -880,7 +910,10 @@ IfStatement Parser::parseIfStatement(Lexer& lexer, Token& currentToken) {
             if (parenDepth == 0) break;
             parenDepth--;
         }
-        condStr += currentToken.value + " ";
+        if (currentToken.type == TOKEN_STRING)
+            condStr += "\"" + currentToken.value + "\" ";
+        else
+            condStr += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
     }
@@ -947,7 +980,10 @@ WhileStatement Parser::parseWhileStatement(Lexer& lexer, Token& currentToken) {
             if (parenDepth == 0) break;
             parenDepth--;
         }
-        condStr += currentToken.value + " ";
+        if (currentToken.type == TOKEN_STRING)
+            condStr += "\"" + currentToken.value + "\" ";
+        else
+            condStr += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
     }
@@ -1012,16 +1048,20 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
 
     std::string init;
     while (currentToken.type != TOKEN_SEMICOLON && currentToken.type != TOKEN_EOF) {
-        init += currentToken.value;
-        init += " ";
+        if (currentToken.type == TOKEN_STRING)
+            init += "\"" + currentToken.value + "\" ";
+        else
+            init += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
     }
     eat(lexer, currentToken, TOKEN_SEMICOLON);
     std::string condition;
     while (currentToken.type != TOKEN_SEMICOLON && currentToken.type != TOKEN_EOF) {
-        condition += currentToken.value;
-        condition += " ";
+        if (currentToken.type == TOKEN_STRING)
+            condition += "\"" + currentToken.value + "\" ";
+        else
+            condition += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
     }
@@ -1034,8 +1074,10 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
             if (iterParenDepth == 0) break;
             iterParenDepth--;
         }
-        iter += currentToken.value;
-        iter += " ";
+        if (currentToken.type == TOKEN_STRING)
+            iter += "\"" + currentToken.value + "\" ";
+        else
+            iter += currentToken.value + " ";
         currentToken = lexer.nextToken();
         skipWhitespace(lexer, currentToken);
     }

@@ -2,8 +2,10 @@
 #include "parser.hpp"
 #include "../interpreter/interpreter.hpp"
 #include "../interpreter/library_manager.hpp"
+#include "../vm/bytecode.hpp"
 #include <iostream>   
 #include <stdexcept> 
+#include <typeinfo>
 
 IdentifierExpr::IdentifierExpr(const std::string& n) : name(n) {}
 Value IdentifierExpr::evaluate(std::unordered_map<std::string, Value>& variables,
@@ -72,6 +74,7 @@ Value CallExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         argVals.push_back(a->evaluate(variables, functions));
     }
 
+    Interpreter::currentVariables = &variables;
     Interpreter sys;
     if (sys.isSystemFunction(funcName)) {
         return sys.SystemFunctionBuildIn(funcName, argVals);
@@ -299,6 +302,193 @@ Value ConditionExpr::evaluate(std::unordered_map<std::string, Value>& variables,
 }
 
 // ============================================================
+// Bytecode compilation (virtual dispatch, no dynamic_cast)
+// ============================================================
+Value::Type IdentifierExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    int nameIdx = cf.addConstantStringDedup(name);
+    cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+    cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
+    auto it = varTypes.find(name);
+    if (it != varTypes.end()) return it->second;
+    return Value::Type::Unknown;
+}
+
+Value::Type NumberExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    int idx = cf.chunk.addConstant(Value(value));
+    cf.chunk.writeOp(OpCode::OP_CONSTANT);
+    cf.chunk.writeShort(static_cast<uint16_t>(idx));
+    return Value::Type::Int;
+}
+
+Value::Type DoubleExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    int idx = cf.chunk.addConstant(Value(value));
+    cf.chunk.writeOp(OpCode::OP_CONSTANT);
+    cf.chunk.writeShort(static_cast<uint16_t>(idx));
+    return Value::Type::Double;
+}
+
+Value::Type StringExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    int idx = cf.addConstantStringDedup(value);
+    cf.chunk.writeOp(OpCode::OP_CONSTANT);
+    cf.chunk.writeShort(static_cast<uint16_t>(idx));
+    return Value::Type::String;
+}
+
+Value::Type ArrayExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    int count = 0;
+    for (const auto& elem : elements) {
+        elem->compileBytecode(cf, varTypes);
+        count++;
+    }
+    cf.chunk.writeOp(OpCode::OP_ARRAY);
+    cf.chunk.writeByte(static_cast<uint8_t>(count));
+    return Value::Type::Array;
+}
+
+Value::Type IndexExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    arrayExpr->compileBytecode(cf, varTypes);
+    indexExpr->compileBytecode(cf, varTypes);
+    cf.chunk.writeOp(OpCode::OP_INDEX_GET);
+    return Value::Type::Unknown;
+}
+
+Value::Type CallExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    for (const auto& arg : args) {
+        arg->compileBytecode(cf, varTypes);
+    }
+    int nameIdx = cf.addConstantStringDedup(funcName);
+    cf.chunk.writeOp(OpCode::OP_CONSTANT);
+    cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
+    cf.chunk.writeOp(OpCode::OP_CALL);
+    cf.chunk.writeByte(static_cast<uint8_t>(args.size()));
+    return Value::Type::Unknown;
+}
+
+Value::Type BinaryExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    Value::Type leftType = this->left->compileBytecode(cf, varTypes);
+    Value::Type rightType = this->right->compileBytecode(cf, varTypes);
+    if (leftType != Value::Type::Unknown && rightType != Value::Type::Unknown &&
+        leftType != Value::Type::Void && rightType != Value::Type::Void) {
+        if ((leftType == Value::Type::Double && rightType == Value::Type::Int) ||
+            (leftType == Value::Type::Int && rightType == Value::Type::Double)) {
+            std::string opName = (op == TOKEN_PLUS) ? "add" : "subtract";
+            throw std::runtime_error("TypeError: Cannot " + opName + " int and double without explicit cast");
+        }
+        if (leftType == Value::Type::String && rightType != Value::Type::String) {
+            throw std::runtime_error("TypeError: Cannot add string and non-string");
+        }
+        if (leftType != Value::Type::String && rightType == Value::Type::String) {
+            throw std::runtime_error("TypeError: Cannot add non-string and string");
+        }
+    }
+    cf.chunk.writeOp((op == TOKEN_PLUS) ? OpCode::OP_ADD : OpCode::OP_SUB);
+    if (leftType == Value::Type::Double || rightType == Value::Type::Double)
+        return Value::Type::Double;
+    if (leftType == Value::Type::Int && rightType == Value::Type::Int)
+        return Value::Type::Int;
+    if (leftType == Value::Type::String && rightType == Value::Type::String)
+        return Value::Type::String;
+    return Value::Type::Unknown;
+}
+
+Value::Type InputExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    cf.chunk.writeOp(OpCode::OP_INPUT);
+    return Value::Type::Unknown;
+}
+
+Value::Type NewExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    sizeExpr->compileBytecode(cf, varTypes);
+    cf.chunk.writeOp(OpCode::OP_NEW);
+    return Value::Type::Bytes;
+}
+
+Value::Type UnaryExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    operand->compileBytecode(cf, varTypes);
+    if (op == TOKEN_NOT) {
+        cf.chunk.writeOp(OpCode::OP_NOT);
+        return Value::Type::Int;
+    }
+    if (op == TOKEN_MINUS) {
+        cf.chunk.writeOp(OpCode::OP_NEGATE);
+        return Value::Type::Unknown;
+    }
+    throw std::runtime_error("BytecodeCompiler: unsupported unary operator");
+}
+
+Value::Type CastExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    expr->compileBytecode(cf, varTypes);
+    cf.chunk.writeOp((castType == CastType::Int) ? OpCode::OP_CAST_INT : OpCode::OP_CAST_DOUBLE);
+    return (castType == CastType::Int) ? Value::Type::Int : Value::Type::Double;
+}
+
+Value::Type CompareExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    Value::Type leftType = left->compileBytecode(cf, varTypes);
+    Value::Type rightType = right->compileBytecode(cf, varTypes);
+    if (leftType != Value::Type::Unknown && rightType != Value::Type::Unknown &&
+        leftType != Value::Type::Void && rightType != Value::Type::Void) {
+        if ((leftType == Value::Type::Double && rightType == Value::Type::Int) ||
+            (leftType == Value::Type::Int && rightType == Value::Type::Double)) {
+            throw std::runtime_error("TypeError: Cannot compare int and double without explicit cast");
+        }
+    }
+    OpCode opcode;
+    switch (op) {
+    case CompareType::EQ: opcode = OpCode::OP_EQ; break;
+    case CompareType::NE: opcode = OpCode::OP_NE; break;
+    case CompareType::GT: opcode = OpCode::OP_GT; break;
+    case CompareType::LT: opcode = OpCode::OP_LT; break;
+    case CompareType::GE: opcode = OpCode::OP_GE; break;
+    case CompareType::LE: opcode = OpCode::OP_LE; break;
+    }
+    cf.chunk.writeOp(opcode);
+    return Value::Type::Int;
+}
+
+Value::Type ConditionExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    left->compileBytecode(cf, varTypes);
+    if (op == TOKEN_AND) {
+        size_t jumpInstr = cf.chunk.code.size();
+        cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
+        cf.chunk.writeShort(0);
+        right->compileBytecode(cf, varTypes);
+        size_t endJump = cf.chunk.code.size();
+        cf.chunk.writeOp(OpCode::OP_JMP);
+        cf.chunk.writeShort(0);
+        size_t afterJump = cf.chunk.code.size();
+        cf.chunk.writeOp(OpCode::OP_FALSE);
+        cf.chunk.patchJump(jumpInstr + 1, afterJump);
+        cf.chunk.patchJump(endJump + 1, cf.chunk.code.size());
+    } else {
+        size_t jumpInstr = cf.chunk.code.size();
+        cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
+        cf.chunk.writeShort(0);
+        cf.chunk.writeOp(OpCode::OP_TRUE);
+        size_t endJump = cf.chunk.code.size();
+        cf.chunk.writeOp(OpCode::OP_JMP);
+        cf.chunk.writeShort(0);
+        size_t afterJump = cf.chunk.code.size();
+        cf.chunk.patchJump(jumpInstr + 1, afterJump);
+        right->compileBytecode(cf, varTypes);
+        cf.chunk.patchJump(endJump + 1, cf.chunk.code.size());
+    }
+    return Value::Type::Int;
+}
+
+// ============================================================
 // Stmt implementations
 // ============================================================
 
@@ -342,6 +532,19 @@ Value ExitStmt::execute(std::unordered_map<std::string, Value>& variables,
     return Value();
 }
 
+FreeStmt::FreeStmt(const std::string& name) : varName(name) {}
+Value FreeStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    variables.erase(varName);
+    return Value();
+}
+
+Value FreeAllStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    variables.clear();
+    return Value();
+}
+
 RetStmt::RetStmt(std::unique_ptr<Expr> a) : arg(std::move(a)), hasArg(a != nullptr) {}
 Value RetStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
@@ -375,6 +578,7 @@ Value CallStmt::execute(std::unordered_map<std::string, Value>& variables,
     for (const auto& a : args) {
         argVals.push_back(a->evaluate(variables, functions));
     }
+    Interpreter::currentVariables = &variables;
     Interpreter sys;
     if (sys.isSystemFunction(funcName)) {
         return sys.SystemFunctionBuildIn(funcName, argVals);

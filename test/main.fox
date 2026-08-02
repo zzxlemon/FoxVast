@@ -1,26 +1,31 @@
 import fox.gl.fg
 
+button = 1
+
 func main() -> void{
     a = fg.create_window("Hello FoxLang", 400, 400)
 
     fg.clear_color(0.1, 0.2, 0.3, 1.0)
 
-    v1 = [0.0, 0.0, 1.0, 0.0, 0.0]
-    v2 = [0.5, 0.0, 0.0, 1.0, 0.0]
-    v3 = [0.5, 0.5, 0.0, 0.0, 1.0]
-    v4 = [0.0, 0.5, 1.0, 1.0, 0.0]
+    v1 = [50, 50, 1.0, 0.0, 0.0]
+    v2 = [200, 50, 0.0, 1.0, 0.0]
+    v3 = [200, 200, 0.0, 0.0, 1.0]
+    v4 = [50, 200, 1.0, 1.0, 0.0]
 
     while (!fg.window_should_close(a)){
         fg.clear_color(0.1, 0.2, 0.3, 1.0)
         fg.clear()
 
-        fg.draw_text("NotoSansSC-VariableFont_wght.ttf", "Hello FoxLang", 0, 15, 24, 1.0, 1.0, 1.0)
-        fg.draw_triangle(0.0, 0.5, 1.0, 0.0, 0.0, -0.5, -0.5, 0.0, 1.0, 0.0, 0.5, -0.5, 0.0, 0.0, 1.0); 
-        fg.draw_rect(v1, v2, v3, v4)
+        pos = fg.mouse_pos(a)
+        fg.draw_circle(pos[0], pos[1], 20, 1.0, 0.0, 1.0)
+        if (fg.mouse_down(a, button) == 1){
+            fg.draw_rect(v1, v2, v3, v4)
+        }
 
         fg.update(a)
     }
 
     fg.close()
+    free_all()
     exit(0)
 } 

@@ -21,6 +21,8 @@ struct StmtHandler {
     virtual void onPrint(std::unique_ptr<Expr> arg) = 0;
     virtual void onPrintln(std::unique_ptr<Expr> arg) = 0;
     virtual void onExit(std::unique_ptr<Expr> arg) = 0;
+    virtual void onFree(const std::string& varName) = 0;
+    virtual void onFreeAll() = 0;
     virtual Value onRet(std::unique_ptr<Expr> arg) = 0;
     virtual void onEndl() = 0;
     virtual void onInput(const std::string& varName) = 0;
