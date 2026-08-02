@@ -57,18 +57,19 @@ func main() -> void {
 ## 快速入门 (Quick Start)
 
 ### 1. 构建编译器
-FoxLang 的核心解释器与编译器后端基于 C++ 开发。请确保您的系统已安装支持 `C++17` 标准的编译器（如 GCC 9+、Clang 或 MSVC）以及 `CMake`。
+FoxLang 的核心解释器与编译器后端基于 C++ 开发。请确保您的系统已安装支持 `C++17` 标准的编译器（如 MinGW-w64 GCC 9+）以及 `CMake`。
 
 ```bash
 # 克隆仓库
-git clone https://github.com
+git clone https://github.com/zzxlemon/FoxLang.git
 cd FoxLang
 
-# 创建构建目录并编译
-mkdir build && cd build
-cmake ..
-cmake --build .
+# 配置并编译（MinGW 环境）
+cmake -S FoxCore -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build build
 ```
+
+构建产物为 `build/fox.exe`。仓库已配置 GitHub Actions CI（`.github/workflows/build.yml`），每次推送会自动执行编译与冒烟测试。
 
 ### 2. 运行您的第一个 FoxLang 脚本
 在可执行文件同级目录下新建一个 `hello.fox` 文件：
@@ -107,14 +108,17 @@ end
 
 ```text
 FoxLang/
-├── src/
-│   ├── lexer.hpp / .cpp     # 词法分析器（Token 提取与识别）
-│   ├── parser.hpp / .cpp    # 语法分析器（AST 抽象语法树构建）
-│   ├── token.hpp            # Token 类型定义与关键字映射
-│   ├── ast.hpp              # 语法树节点结构定义
-|   └── ...
-├── libs/                    # 官方标准库代码
-└── README.md                # 本说明文件
+├── FoxCore/                # 核心解释器与编译器
+│   ├── src/                # 词法/语法分析、AST、字节码 VM 源码
+│   │   ├── frontend/       # lexer / parser / ast / token
+│   │   ├── interpreter/    # 解释器与系统库注册
+│   │   ├── vm/             # 字节码编译器与虚拟机
+│   │   └── util/           # 公共工具
+│   ├── libs/               # 官方标准库（graphics / system）
+│   ├── native/             # 第三方依赖（glfw / glad / stb_truetype / 字体）
+│   └── CMakeLists.txt      # CMake 构建配置
+├── test/                   # FoxLang 示例脚本（贪吃蛇、猜词游戏等）
+└── README.md               # 本说明文件
 ```
 
 ---

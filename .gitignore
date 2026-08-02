@@ -1,2 +1,4 @@
+build/
+builds/
 cmake-build/
 test/smoke.fc
