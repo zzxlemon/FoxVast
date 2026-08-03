@@ -231,7 +231,9 @@ private:
         const CompiledFunction* function;
         std::vector<Value> locals;
         std::unordered_map<std::string, Value> savedGlobals;
+        std::vector<std::string> newGlobals;
         size_t ip;
+        int newAllocBytes = 0; // per-function new() budget (P3-5)
     };
 
     CompiledProgram program;

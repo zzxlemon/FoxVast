@@ -65,8 +65,8 @@ git clone https://github.com/zzxlemon/FoxLang.git
 cd FoxLang
 
 # 配置并编译（MinGW 环境）
-cmake -S FoxCore -B build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
-cmake --build build
+cmake -S FoxCore -B cmake-build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
+cmake --build cmake-build
 ```
 
 构建产物为 `build/fox.exe`。仓库已配置 GitHub Actions CI（`.github/workflows/build.yml`），每次推送会自动执行编译与冒烟测试。
@@ -75,8 +75,10 @@ cmake --build build
 在可执行文件同级目录下新建一个 `hello.fox` 文件：
 
 ```fox
-print("Hello, FoxLang!")
-end
+func main() -> void{
+    print("Hello, FoxLang!")
+    exit(0)
+}
 ```
 
 使用编译生成的编译器运行它：
@@ -98,7 +100,7 @@ end
 | **类型转换** | `int(expr)`, `double(expr)` | 内置强类型相互显式转换函数 |
 | **算术与逻辑**| `+`, `-`, `and`, `or` | 目前暂未引入乘法、除法与取模运算 |
 | **关系比较** | `==`, `!=`, `>`, `<`, `>=`, `<=` | 支持复合布尔表达式求值 |
-| **控制流** | `if (cond) { ... }` | ?? 目前语法树中无 `else` 分支结构 |
+| **控制流** | `if (cond) { ... }` |  目前语法树中无 `else` 分支结构 |
 | **循环流** | `while (cond) { ... }` | 条件必须包裹在括号 `()` 内 |
 | **返回与退出**| `ret expr`, `exit(code)` | `ret` 用于函数返回；`exit` 终止程序 |
 

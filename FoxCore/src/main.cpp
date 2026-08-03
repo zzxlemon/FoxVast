@@ -13,6 +13,20 @@ std::string fz_name_file_v = "";
 const char XOR_KEY = 0x2A;
 std::string encrypt_key = "";
 
+static void print_help(){
+    std::cout << "FoxLang Interpreter - Usage:" << std::endl;
+    std::cout << "  -f <file>               Run FoxLang source file(Deprecated)" << std::endl;
+    std::cout << "  -c <file>               Compile .fox -> .fc bytecode" << std::endl;
+    std::cout << "  -fc <file>              Run .fc bytecode file" << std::endl;
+    std::cout << "  -p <out.far> <files>    Package files into .far archive" << std::endl;
+    std::cout << "  -u <archive.far> [dir]  Extract .far archive" << std::endl;
+    std::cout << "  -far <archive.far>      Run main.fc from .far archive" << std::endl;
+    std::cout << "  -version                Show version info" << std::endl;
+    std::cout << "  OutInfo=true            Enable verbose output(Deprecated)" << std::endl;
+    std::cout << "  pack=true               Encrypt .fx -> .fz file" << std::endl;
+    std::cout << "  pack=false              Decrypt .fz -> .fx file" << std::endl;
+}
+
 static void CreateFile(const std::string& source_code) {
     std::ofstream outfile(fz_name_file_v, std::ios::binary);
     if (outfile.is_open()) {
@@ -40,11 +54,13 @@ int main(int argc, char** argv) {
 
     Interpreter interpreter;
     if (argc == 1) {
+        print_help();
         return 0;  
     }
 
     int v1 = 1;
     std::string filename;
+    std::string just_str;
     bool bfz = true;
     for (int i = 1; i < argc; i++) {
         std::string in = argv[i];
@@ -61,17 +77,24 @@ int main(int argc, char** argv) {
             filename = argv[i + 1];
             i++;
         }
-        else if (argv[i] == "-s" || argv[i] == "--str"){
-            if (argv[i + 1] == "utf-8" || argv[i + 1] == "UTF-8"){
+        else if (in == "-s" || in == "--str"){
+            if (i + 1 >= argc) {
+                ErrorReporter::reportSimple("ArgumentError", "'-s' requires an encoding format");
+                return 1;
+            }
+            just_str = argv[i + 1];
+
+            if (just_str == "utf-8" || just_str == "UTF-8"){
                 system("chcp 65001");
             }
-            else if (argv[i + 1] == "gbk" || argv[i + 1] == "GBK"){
+            else if (just_str == "gbk" || just_str == "GBK"){
                 system("chcp 936");
             }
             else{
-                ErrorReporter::reportSimple("ArgumentError", "'-str' requires an encoding format (utf-8 or gbk)");
+                ErrorReporter::reportSimple("ArgumentError", "'-s'/'--str' requires an encoding format (utf-8 or gbk)");
                 return 1;
             }
+            i++;
         }
         else if (in == "OutInfo=true") {
             isOutInfo = true;
@@ -213,17 +236,7 @@ int main(int argc, char** argv) {
             return 0;
         }
         else if (in == "-help" || in == "-h") {
-            std::cout << "FoxLang Interpreter - Usage:" << std::endl;
-            std::cout << "  -f <file>               Run FoxLang source file(Deprecated)" << std::endl;
-            std::cout << "  -c <file>               Compile .fox -> .fc bytecode" << std::endl;
-            std::cout << "  -fc <file>              Run .fc bytecode file" << std::endl;
-            std::cout << "  -p <out.far> <files>    Package files into .far archive" << std::endl;
-            std::cout << "  -u <archive.far> [dir]  Extract .far archive" << std::endl;
-            std::cout << "  -far <archive.far>      Run main.fc from .far archive" << std::endl;
-            std::cout << "  -version                Show version info" << std::endl;
-            std::cout << "  OutInfo=true            Enable verbose output(Deprecated)" << std::endl;
-            std::cout << "  pack=true               Encrypt .fx -> .fz file" << std::endl;
-            std::cout << "  pack=false              Decrypt .fz -> .fx file" << std::endl;
+            print_help();
             return 0;
         }
         else {

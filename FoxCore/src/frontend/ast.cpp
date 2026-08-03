@@ -159,6 +159,15 @@ Value BinaryExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         }
         return Value(result);
     }
+    else if (leftVal.getType() == Value::Type::String && rightVal.getType() == Value::Type::String) {
+        // Align with VM OP_ADD: string concatenation (P2-1)
+        std::string result;
+        switch (op) {
+        case TOKEN_PLUS: result = leftVal.asString() + rightVal.asString(); break;
+        default: throw std::runtime_error("Unsupported operator for strings");
+        }
+        return Value(result);
+    }
     else {
         throw std::runtime_error("Operation error: type mismatch (only int/double of same type supported)");
     }
@@ -272,6 +281,15 @@ Value CompareExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         case CompareType::LT: result = (l < r); break;
         case CompareType::GE: result = (l >= r); break;
         case CompareType::LE: result = (l <= r); break;
+        }
+    }
+    else if (leftVal.getType() == Value::Type::String && rightVal.getType() == Value::Type::String) {
+        // Align with VM OP_EQ/OP_NE: string equality (P2-1)
+        std::string l = leftVal.asString(), r = rightVal.asString();
+        switch (op) {
+        case CompareType::EQ: result = (l == r); break;
+        case CompareType::NE: result = (l != r); break;
+        default: throw std::runtime_error("Comparison error: only == and != supported for strings");
         }
     }
     else {
@@ -495,31 +513,16 @@ Value::Type ConditionExpr::compileBytecode(CompiledFunction& cf,
 PrintStmt::PrintStmt(std::unique_ptr<Expr> a) : arg(std::move(a)) {}
 Value PrintStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
-    Value val = arg->evaluate(variables, functions);
-    switch (val.getType()) {
-    case Value::Type::Int: std::cout << val.asInt(); break;
-    case Value::Type::Double: std::cout << val.asDouble(); break;
-    case Value::Type::String: std::cout << val.asString(); break;
-    case Value::Type::Void: break;
-    case Value::Type::Array: std::cout << "[array]"; break;
-    default: break;
-    }
+    // Use Value::toString() to match the VM's OP_PRINT formatting (P3-4)
+    std::cout << arg->evaluate(variables, functions).toString();
     return Value();
 }
 
 PrintlnStmt::PrintlnStmt(std::unique_ptr<Expr> a) : arg(std::move(a)) {}
 Value PrintlnStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
-    Value val = arg->evaluate(variables, functions);
-    switch (val.getType()) {
-    case Value::Type::Int: std::cout << val.asInt(); break;
-    case Value::Type::Double: std::cout << val.asDouble(); break;
-    case Value::Type::String: std::cout << val.asString(); break;
-    case Value::Type::Void: break;
-    case Value::Type::Array: std::cout << "[array]"; break;
-    default: break;
-    }
-    std::cout << std::endl;
+    // Use Value::toString() to match the VM's OP_PRINTLN formatting (P3-4)
+    std::cout << arg->evaluate(variables, functions).toString() << std::endl;
     return Value();
 }
 
@@ -545,7 +548,7 @@ Value FreeAllStmt::execute(std::unordered_map<std::string, Value>& variables,
     return Value();
 }
 
-RetStmt::RetStmt(std::unique_ptr<Expr> a) : arg(std::move(a)), hasArg(a != nullptr) {}
+RetStmt::RetStmt(std::unique_ptr<Expr> a) : arg(std::move(a)), hasArg(arg != nullptr) {}
 Value RetStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     if (hasArg) {
@@ -581,7 +584,10 @@ Value CallStmt::execute(std::unordered_map<std::string, Value>& variables,
     Interpreter::currentVariables = &variables;
     Interpreter sys;
     if (sys.isSystemFunction(funcName)) {
-        return sys.SystemFunctionBuildIn(funcName, argVals);
+        // Statement-level call: discard the result (P0-1) so it does not
+        // leak into the enclosing function's return value.
+        sys.SystemFunctionBuildIn(funcName, argVals);
+        return Value();
     }
     if (functions.find(funcName) == functions.end()) {
         auto& libMgr = LibraryManager::getInstance();
@@ -614,8 +620,10 @@ Value CallStmt::execute(std::unordered_map<std::string, Value>& variables,
     for (size_t i = 0; i < argVals.size(); ++i) {
         funcInterp.variables[func.parameters[i].name] = argVals[i];
     }
-    Value result = funcInterp.executeFunction(func);
-    return result;
+    // Statement-level call: discard the result (P0-1) so it does not
+    // leak into the enclosing function's return value.
+    funcInterp.executeFunction(func);
+    return Value();
 }
 
 AssignStmt::AssignStmt(const std::string& name, std::unique_ptr<Expr> e)
@@ -625,7 +633,7 @@ Value AssignStmt::execute(std::unordered_map<std::string, Value>& variables,
     variables[varName] = expr->evaluate(variables, functions);
     if (variables[varName].getType() == Value::Type::Bytes) {
         int sz = static_cast<int>(variables[varName].asBytes().size());
-        // checkNewAllocBytes is static in Parser
+        Parser::checkNewAllocBytes(sz); // same limit as the interpreter path (P3-5)
     }
     return Value();
 }
@@ -713,9 +721,8 @@ Value ForStmt::execute(std::unordered_map<std::string, Value>& variables,
             auto condExpr = Parser::parseExpr(condLexer, condToken);
             Value condResult = condExpr->evaluate(variables, functions);
             if (!condResult.asBool()) break;
-        } else {
-            break;
         }
+        // Empty condition = infinite loop (C semantics, aligns with bytecode OP_TRUE)
         for (const auto& stmt : body) {
             if (!stmt) continue;
             Value val = stmt->execute(variables, functions);

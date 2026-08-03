@@ -5,7 +5,6 @@
 #include <algorithm>
 
 static int g_funcNewAllocBytes = -1;
-static const int MAX_FUNC_NEW_BYTES = 512;
 
 void Parser::resetNewAllocBytes() {
     g_funcNewAllocBytes = 0;
@@ -128,14 +127,10 @@ std::unique_ptr<Expr> Parser::parsePrimary(Lexer& lexer, Token& currentToken) {
 
     if (token.type == TOKEN_IDENTIFIER) {
         eat(lexer, currentToken, TOKEN_IDENTIFIER);
+        // NOTE (P3-7): library-qualified names (lib.func) arrive pre-merged by
+        // the lexer (readIdentifier includes '.'), so TOKEN_DOT never appears
+        // here. Supporting real member access requires a lexer change first.
         std::string fullName = token.value;
-
-        // Handle dot notation: lib.func or lib.func(...)
-        while (currentToken.type == TOKEN_DOT) {
-            eat(lexer, currentToken, TOKEN_DOT);
-            fullName += "." + currentToken.value;
-            eat(lexer, currentToken, TOKEN_IDENTIFIER);
-        }
 
         std::unique_ptr<Expr> baseExpr;
         if (currentToken.type == TOKEN_LPAREN) {
@@ -285,6 +280,7 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
     if (currentToken.type == TOKEN_IF || currentToken.type == TOKEN_WHILE || currentToken.type == TOKEN_FOR) {
         int braceDepth = 0;
         bool insideBlock = false;
+        int parenDepth = 0;
         while (currentToken.type != TOKEN_EOF) {
             if (currentToken.type == TOKEN_LBRACE) {
                 insideBlock = true;
@@ -299,7 +295,13 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
                     break;
                 }
             }
-            else if (!insideBlock && (currentToken.type == TOKEN_NEWLINE || currentToken.type == TOKEN_SEMICOLON)) {
+            else if (currentToken.type == TOKEN_LPAREN) {
+                parenDepth++;
+            }
+            else if (currentToken.type == TOKEN_RPAREN) {
+                if (parenDepth > 0) parenDepth--;
+            }
+            else if (!insideBlock && parenDepth == 0 && (currentToken.type == TOKEN_NEWLINE || currentToken.type == TOKEN_SEMICOLON)) {
                 if (currentToken.type == TOKEN_SEMICOLON) {
                     stmt += "; ";
                 }
@@ -428,19 +430,18 @@ void Parser::parseFunction() {
     func.returnType = returnType;
 	func.parameters = params;
 
-    funcCurrentToken = funcLexer.nextToken();
+    // NOTE: eat(LBRACE) already advanced funcCurrentToken to the first body
+    // token. Calling nextToken() again here would discard it (single-line
+    // bodies like "{ ret 5 }" would lose the first statement).
     skipWhitespace(funcLexer, funcCurrentToken);
 
     while (funcCurrentToken.type != TOKEN_RBRACE && funcCurrentToken.type != TOKEN_EOF) {
         std::string line = parseSingleStatement(funcLexer, funcCurrentToken);
         if (!line.empty()) {
             func.body.push_back(line);
-            try {
-                func.compiledBody.push_back(std::move(parseLineToStmt(line)));
-            } catch (...) {
-                // Type declarations (int x = 5) don't compile to Stmts; store nullptr
-                func.compiledBody.push_back(nullptr);
-            }
+            // Type declarations (int x = 5) return nullptr from parseLineToStmt;
+            // real syntax errors propagate so they are reported (P2-2).
+            func.compiledBody.push_back(std::move(parseLineToStmt(line)));
         }
         skipWhitespace(funcLexer, funcCurrentToken);
     }
@@ -619,30 +620,6 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
             eat(lineLexer, currentToken, TOKEN_EQUAL);
             auto expr = parseExpr(lineLexer, currentToken);
             handler.onIndexAssign(identName, std::move(indexExpr), std::move(expr));
-        } else if (nextToken.type == TOKEN_DOT) {
-            currentToken = nextToken;
-            eat(lineLexer, currentToken, TOKEN_DOT);
-            std::string funcName = currentToken.value;
-            eat(lineLexer, currentToken, TOKEN_IDENTIFIER);
-            if (currentToken.type == TOKEN_LPAREN) {
-                eat(lineLexer, currentToken, TOKEN_LPAREN);
-                std::vector<std::unique_ptr<Expr>> args;
-                while (currentToken.type != TOKEN_RPAREN && currentToken.type != TOKEN_EOF) {
-                    args.push_back(parseExpr(lineLexer, currentToken));
-                    if (currentToken.type == TOKEN_COMMA) {
-                        eat(lineLexer, currentToken, TOKEN_COMMA);
-                        skipWhitespace(lineLexer, currentToken);
-                    }
-                }
-                eat(lineLexer, currentToken, TOKEN_RPAREN);
-                handler.onCall(identName + "." + funcName, std::move(args));
-            } else {
-                std::string nextVal = currentToken.value.empty()
-                    ? "<" + std::string(tokenTypeName(currentToken.type)) + ">"
-                    : "'" + currentToken.value + "'";
-                throw std::runtime_error(makeParseError(currentToken,
-                    "Expected '(' after function name in qualified call, got " + nextVal));
-            }
         } else if (identName == "END" || identName == "end") {
             handler.onEndl();
         } else {
@@ -671,25 +648,12 @@ namespace {
             : variables(vars), functions(funcs) {}
 
         void onPrint(std::unique_ptr<Expr> arg) override {
-            Value val = arg->evaluate(variables, functions);
-            switch (val.getType()) {
-            case Value::Type::Int: std::cout << val.asInt(); break;
-            case Value::Type::Double: std::cout << val.asDouble(); break;
-            case Value::Type::String: std::cout << val.asString(); break;
-            case Value::Type::Void: break;
-            case Value::Type::Array: std::cout << "[array]"; break;
-            }
+            // Use Value::toString() to match the VM's OP_PRINT formatting (P3-4)
+            std::cout << arg->evaluate(variables, functions).toString();
         }
         void onPrintln(std::unique_ptr<Expr> arg) override {
-            Value val = arg->evaluate(variables, functions);
-            switch (val.getType()) {
-            case Value::Type::Int: std::cout << val.asInt(); break;
-            case Value::Type::Double: std::cout << val.asDouble(); break;
-            case Value::Type::String: std::cout << val.asString(); break;
-            case Value::Type::Void: break;
-            case Value::Type::Array: std::cout << "[array]"; break;
-            }
-            std::cout << std::endl;
+            // Use Value::toString() to match the VM's OP_PRINTLN formatting (P3-4)
+            std::cout << arg->evaluate(variables, functions).toString() << std::endl;
         }
         void onExit(std::unique_ptr<Expr> arg) override {
             Value val = arg->evaluate(variables, functions);
@@ -755,7 +719,7 @@ namespace {
 }
 
 // ============================================================
-// CompilingHandler — builds Stmt nodes without executing
+// CompilingHandler �� builds Stmt nodes without executing
 // ============================================================
 namespace {
     class CompilingHandler : public StmtHandler {
@@ -816,7 +780,7 @@ namespace {
 
 std::unique_ptr<Stmt> Parser::parseLineToStmt(const std::string& line) {
     if (line.empty()) return nullptr;
-    // Skip type declarations (int/double/string var = expr) — not expressible as Stmts
+    // Skip type declarations (int/double/string var = expr) �� not expressible as Stmts
     std::string trimmed = line;
     size_t start = trimmed.find_first_not_of(" \t");
     if (start != std::string::npos) trimmed = trimmed.substr(start);
@@ -866,10 +830,6 @@ void Parser::parseInputStatement(Lexer& lexer, Token& currentToken,
 
     InputExpr inputExpr;
     variables[varName] = inputExpr.evaluate(variables, functions);
-
-    if (isOutInfo) {
-        std::cout << "[执行] 输入赋值：" << varName << " = \"" << variables[varName].asString() << "\"" << std::endl;
-    }
 }
 
 std::unique_ptr<Expr> Parser::parseCompare(Lexer& lexer, Token& currentToken) {
@@ -1130,9 +1090,7 @@ Value Parser::executeForStatement(const ForStatement& forStmt,
             Value condResult = condExpr->evaluate(variables, functions);
             if (!condResult.asBool()) break;
         }
-        else {
-            break;
-        }
+        // Empty condition = infinite loop (C semantics, aligns with bytecode OP_TRUE)
 
         for (const auto& stmt : forStmt.body) {
             Value val = parseLine(stmt, variables, functions);

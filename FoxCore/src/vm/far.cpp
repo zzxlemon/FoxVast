@@ -280,11 +280,37 @@ bool FarArchive::hasFile(const std::string& name) const {
     return false;
 }
 
+// Reject absolute paths, drive letters and ".." segments (P3-2, Zip-slip)
+static bool isSafeEntryName(const std::string& name) {
+    if (name.empty()) return false;
+    if (name[0] == '/' || name[0] == '\\') return false;
+    if (name.size() >= 2 && name[1] == ':') return false; // Windows drive letter
+    std::string norm = name;
+    for (char& c : norm) {
+        if (c == '\\') c = '/';
+    }
+    size_t start = 0;
+    while (true) {
+        size_t end = norm.find('/', start);
+        std::string seg = (end == std::string::npos) ? norm.substr(start) : norm.substr(start, end - start);
+        if (seg == "..") return false;
+        if (end == std::string::npos) break;
+        start = end + 1;
+    }
+    return true;
+}
+
 bool FarArchive::extractAll(const std::string& outputDir) const {
     // Create output directory
     mkdir(outputDir.c_str());
 
+    size_t extracted = 0;
     for (const auto& entry : entries) {
+        if (!isSafeEntryName(entry.name)) {
+            std::cerr << "Skipping unsafe entry name: " << entry.name << std::endl;
+            continue;
+        }
+        extracted++;
         std::string filePath = outputDir + "/" + entry.name;
         // Create subdirectories if needed
         size_t pos = 0;
@@ -303,7 +329,7 @@ bool FarArchive::extractAll(const std::string& outputDir) const {
         std::cout << "  extracted: " << filePath << " (" << entry.data.size() << " bytes)" << std::endl;
     }
 
-    std::cout << "Extracted " << entries.size() << " files to " << outputDir << "/" << std::endl;
+    std::cout << "Extracted " << extracted << " files to " << outputDir << "/" << std::endl;
     return true;
 }
 
@@ -420,15 +446,29 @@ bool farRun(const std::string& archivePath) {
         uint32_t comp_size = read32le(cd_entry + 20);
         uint32_t local_off = read32le(cd_entry + 42);
 
+        // Bound-check the full central directory entry before reading the name
+        if (cd_pos + 46 + (size_t)name_len + extra_len + comment_len > archiveData.size()) {
+            std::cerr << "Invalid .far file: central directory entry out of bounds" << std::endl;
+            return false;
+        }
         std::string name(reinterpret_cast<const char*>(cd_entry + 46), name_len);
 
         // Check if this is a .fc file
         if (name.size() > 3 && name.substr(name.size() - 3) == ".fc") {
-            // Read local header for data offset
-            const uint8_t* local = archiveData.data() + local_off;
+            // Bound-check the local header and file data before reading (P3-3)
+            size_t localOff = local_off;
+            if (localOff + 30 > archiveData.size()) {
+                std::cerr << "Invalid .far file: local header out of bounds" << std::endl;
+                return false;
+            }
+            const uint8_t* local = archiveData.data() + localOff;
             uint16_t lname_len = read16le(local + 26);
             uint16_t lextra_len = read16le(local + 28);
-            size_t data_start = local_off + 30 + lname_len + lextra_len;
+            size_t data_start = localOff + 30 + lname_len + lextra_len;
+            if (data_start > archiveData.size() || data_start + comp_size > archiveData.size()) {
+                std::cerr << "Invalid .far file: file data out of bounds" << std::endl;
+                return false;
+            }
 
             fc_data = archiveData.data() + data_start;
             fc_size = comp_size;

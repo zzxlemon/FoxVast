@@ -3,7 +3,7 @@
  * A library for OpenGL, window and input
  *------------------------------------------------------------------------
  * Copyright (c) 2002-2006 Marcus Geelnard
- * Copyright (c) 2006-2019 Camilla LÃ¶wy <elmindreda@glfw.org>
+ * Copyright (c) 2006-2019 Camilla L?wy <elmindreda@glfw.org>
  *
  * This software is provided 'as-is', without any express or implied
  * warranty. In no event will the authors be held liable for any damages
@@ -3806,7 +3806,7 @@ GLFWAPI void glfwSetWindowOpacity(GLFWwindow* window, float opacity);
  *  @errors Possible errors include @ref GLFW_NOT_INITIALIZED and @ref
  *  GLFW_PLATFORM_ERROR.
  *
- *  @remark @wayland Once a window is iconified, @ref glfwRestoreWindow wonâ€™t
+ *  @remark @wayland Once a window is iconified, @ref glfwRestoreWindow won¡¯t
  *  be able to restore it.  This is a design decision of the xdg-shell
  *  protocol.
  *

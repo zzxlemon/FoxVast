@@ -80,52 +80,121 @@ void Chunk::patchJumpOffset(size_t jumpInstrOffset, int32_t offset) {
     code[jumpInstrOffset + 1] = static_cast<uint8_t>((offset >> 8) & 0xFF);
 }
 
+// ============================================================
+// Value serialization helpers (recursive; arrays embed elements)
+// ============================================================
+namespace {
+void writeValue(std::vector<uint8_t>& data, const Value& v) {
+    switch (v.getType()) {
+    case Value::Type::Int: {
+        data.push_back(0);
+        writeVarint(data, static_cast<uint32_t>(v.asInt()));
+        break;
+    }
+    case Value::Type::Double: {
+        data.push_back(1);
+        double dv = v.asDouble();
+        uint64_t bits;
+        std::memcpy(&bits, &dv, sizeof(bits));
+        for (int i = 0; i < 8; i++) {
+            data.push_back(static_cast<uint8_t>((bits >> (i * 8)) & 0xFF));
+        }
+        break;
+    }
+    case Value::Type::String: {
+        data.push_back(2);
+        writeString(data, v.asString());
+        break;
+    }
+    case Value::Type::Array: {
+        data.push_back(3);
+        const auto& arr = v.asArray();
+        writeVarint(data, static_cast<uint32_t>(arr.size()));
+        for (const auto& elem : arr) {
+            writeValue(data, elem);
+        }
+        break;
+    }
+    case Value::Type::Void: {
+        data.push_back(4);
+        break;
+    }
+    case Value::Type::Bytes: {
+        data.push_back(5);
+        const auto& bv = v.asBytes();
+        writeVarint(data, static_cast<uint32_t>(bv.size()));
+        for (uint8_t byte : bv) data.push_back(byte);
+        break;
+    }
+    default:
+        data.push_back(4);
+        break;
+    }
+}
+
+bool readValue(const uint8_t* data, size_t size, size_t& offset, Value& out) {
+    if (offset >= size) return false;
+    uint8_t type = data[offset++];
+    switch (type) {
+    case 0: { // int
+        out = Value(static_cast<int32_t>(readVarint(data, size, offset)));
+        return true;
+    }
+    case 1: { // double
+        if (offset + 8 > size) return false;
+        uint64_t bits = 0;
+        for (int j = 0; j < 8; j++) {
+            bits |= (static_cast<uint64_t>(data[offset + j]) << (j * 8));
+        }
+        offset += 8;
+        double dv;
+        std::memcpy(&dv, &bits, sizeof(dv));
+        out = Value(dv);
+        return true;
+    }
+    case 2: { // string
+        out = Value(readString(data, size, offset));
+        return true;
+    }
+    case 3: { // array
+        uint32_t arrLen = readVarint(data, size, offset);
+        std::vector<Value> arr;
+        arr.reserve(arrLen);
+        for (uint32_t j = 0; j < arrLen; j++) {
+            Value elem;
+            if (!readValue(data, size, offset, elem)) return false;
+            arr.push_back(std::move(elem));
+        }
+        out = Value(arr);
+        return true;
+    }
+    case 4: { // void
+        out = Value();
+        return true;
+    }
+    case 5: { // bytes
+        uint32_t bytesLen = readVarint(data, size, offset);
+        if (offset + bytesLen > size) return false;
+        std::vector<uint8_t> bv(data + offset, data + offset + bytesLen);
+        offset += bytesLen;
+        out = Value(bv);
+        return true;
+    }
+    default:
+        out = Value();
+        return true;
+    }
+}
+} // namespace
+
 std::vector<uint8_t> Chunk::serialize() const {
     std::vector<uint8_t> data;
 
     // Constants
     writeVarint(data, static_cast<uint32_t>(constants.size()));
     for (const auto& v : constants) {
-        switch (v.getType()) {
-        case Value::Type::Int: {
-            data.push_back(0);
-            int32_t iv = v.asInt();
-            writeVarint(data, static_cast<uint32_t>(iv));
-            break;
-        }
-        case Value::Type::Double: {
-            data.push_back(1);
-            double dv = v.asDouble();
-            uint64_t bits;
-            std::memcpy(&bits, &dv, sizeof(bits));
-            for (int i = 0; i < 8; i++) {
-                data.push_back(static_cast<uint8_t>((bits >> (i * 8)) & 0xFF));
-            }
-            break;
-        }
-        case Value::Type::String: {
-            data.push_back(2);
-            writeString(data, v.asString());
-            break;
-        }
-        case Value::Type::Array: {
-            data.push_back(3);
-            writeVarint(data, static_cast<uint32_t>(v.asArray().size()));
-            break;
-        }
-        case Value::Type::Void: {
-            data.push_back(4);
-            break;
-        }
-        case Value::Type::Bytes: {
-            data.push_back(5);
-            const auto& bv = v.asBytes();
-            writeVarint(data, static_cast<uint32_t>(bv.size()));
-            for (uint8_t byte : bv) data.push_back(byte);
-            break;
-        }
+        writeValue(data, v);
     }
-}
 
     // Code
     writeVarint(data, static_cast<uint32_t>(code.size()));
@@ -144,52 +213,9 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
     uint32_t constCount = readVarint(data, size, offset);
     constants.clear();
     for (uint32_t i = 0; i < constCount; i++) {
-        if (offset >= size) return false;
-        uint8_t type = data[offset++];
-        switch (type) {
-        case 0: { // int
-            int32_t iv = static_cast<int32_t>(readVarint(data, size, offset));
-            constants.push_back(Value(iv));
-            break;
-        }
-        case 1: { // double
-            if (offset + 8 > size) return false;
-            uint64_t bits = 0;
-            for (int j = 0; j < 8; j++) {
-                bits |= (static_cast<uint64_t>(data[offset + j]) << (j * 8));
-            }
-            offset += 8;
-            double dv;
-            std::memcpy(&dv, &bits, sizeof(dv));
-            constants.push_back(Value(dv));
-            break;
-        }
-        case 2: { // string
-            std::string sv = readString(data, size, offset);
-            constants.push_back(Value(sv));
-            break;
-        }
-        case 3: { // array
-            uint32_t arrLen = readVarint(data, size, offset);
-            std::vector<Value> arr;
-            for (uint32_t j = 0; j < arrLen; j++) {
-                arr.push_back(Value());
-            }
-            constants.push_back(Value(arr));
-            break;
-        }
-        case 5: { // bytes
-            uint32_t bytesLen = readVarint(data, size, offset);
-            if (offset + bytesLen > size) return false;
-            std::vector<uint8_t> bv(data + offset, data + offset + bytesLen);
-            offset += bytesLen;
-            constants.push_back(Value(bv));
-            break;
-        }
-        default: // nil/void
-            constants.push_back(Value());
-            break;
-        }
+        Value v;
+        if (!readValue(data, size, offset, v)) return false;
+        constants.push_back(std::move(v));
     }
 
     // Code
@@ -203,26 +229,14 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
 }
 
 size_t Chunk::serializedSize() const {
-    auto varintSize = [](uint32_t v) -> size_t {
-        size_t s = 0;
-        do { s++; v >>= 7; } while (v);
-        return s;
-    };
-    size_t size = varintSize(static_cast<uint32_t>(constants.size()));
+    std::vector<uint8_t> dummy;
+    writeVarint(dummy, static_cast<uint32_t>(constants.size()));
     for (const auto& v : constants) {
-        size += 1; // type byte
-        switch (v.getType()) {
-        case Value::Type::Int:    size += varintSize(static_cast<uint32_t>(v.asInt())); break;
-        case Value::Type::Double: size += 8; break;
-        case Value::Type::String: size += varintSize(static_cast<uint32_t>(v.asString().size())) + v.asString().size(); break;
-        case Value::Type::Array:  size += varintSize(static_cast<uint32_t>(v.asArray().size())); break;
-        case Value::Type::Bytes:  size += varintSize(static_cast<uint32_t>(v.asBytes().size())) + v.asBytes().size(); break;
-        case Value::Type::Void:   break;
-        default: break;
-        }
+        writeValue(dummy, v);
     }
-    size += varintSize(static_cast<uint32_t>(code.size())) + code.size();
-    return size;
+    writeVarint(dummy, static_cast<uint32_t>(code.size()));
+    dummy.insert(dummy.end(), code.begin(), code.end());
+    return dummy.size();
 }
 
 // ============================================================
@@ -392,10 +406,12 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
 
         compileFunctionBody(cf, func.body);
 
-        // Ensure every function ends with a return
-        if (cf.chunk.code.empty() || cf.chunk.code.back() != static_cast<uint8_t>(OpCode::OP_RETURN)) {
-            cf.chunk.writeOp(OpCode::OP_RETURN);
-        }
+        // Ensure every function ends with a return instruction.
+        // NOTE: cannot use code.back() here: the operand byte of a 0-arg OP_CALL
+        // is 0x00, which collides with the OP_RETURN opcode (P0-2). Appending
+        // unconditionally is safe — an already-emitted OP_RETURN pops the frame,
+        // so a trailing extra OP_RETURN is dead code.
+        cf.chunk.writeOp(OpCode::OP_RETURN);
 
         program.functions.push_back(cf);
         program.functionIndex[cf.name] = program.functions.size() - 1;
@@ -466,6 +482,7 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
             cf.chunk.writeOp(OpCode::OP_CALL);
             cf.chunk.writeByte(static_cast<uint8_t>(args.size()));
+            cf.chunk.writeOp(OpCode::OP_POP);
         }
         void onAssign(const std::string& name, std::unique_ptr<Expr> expr) override {
             Value::Type rhsType = expr->compileBytecode(cf, varTypes);
@@ -835,11 +852,15 @@ void VM::run() {
             if (!stack.empty()) {
                 retVal = pop();
             }
-            // Restore globals shadowed by this frame's parameters
+            // Restore globals shadowed by this frame's parameters, and
+            // remove parameters that did not exist before the call (P1-1)
             if (!frames.empty()) {
                 CallFrame& curFrame = frames.back();
                 for (const auto& [name, val] : curFrame.savedGlobals) {
                     globals[name] = val;
+                }
+                for (const auto& name : curFrame.newGlobals) {
+                    globals.erase(name);
                 }
             }
             frames.pop_back();
@@ -1174,6 +1195,8 @@ void VM::run() {
                     auto it = globals.find(func.parameters[i].name);
                     if (it != globals.end()) {
                         newFrame.savedGlobals[func.parameters[i].name] = it->second;
+                    } else {
+                        newFrame.newGlobals.push_back(func.parameters[i].name);
                     }
                     globals[func.parameters[i].name] = args[i];
                 }
@@ -1312,6 +1335,19 @@ void VM::run() {
             if (size < 0) {
                 runtimeErr("new() size must be non-negative");
                 break;
+            }
+            // Same per-function stack budget as the interpreter path (P3-5)
+            if (!frames.empty()) {
+                CallFrame& curFrame = frames.back();
+                if (curFrame.newAllocBytes + size > Parser::MAX_FUNC_NEW_BYTES) {
+                    runtimeErr("Function stack memory exceeded. new() total would be " +
+                        std::to_string(curFrame.newAllocBytes + size) +
+                        " bytes, but func stack limit is " +
+                        std::to_string(Parser::MAX_FUNC_NEW_BYTES) +
+                        " bytes. Define this variable outside the function (heap).");
+                    break;
+                }
+                curFrame.newAllocBytes += size;
             }
             std::vector<uint8_t> bytes(size, 0);
             push(Value(bytes));

@@ -13,6 +13,7 @@ std::unordered_map<std::string, Value>* Interpreter::currentVariables = nullptr;
 
 void Interpreter::parseCode(const std::string& code, const std::string& filename) {
     if (code.empty()) return;
+    parse_failed = false; // reset so a reused instance can recover (P3-6)
     try {
         Parser parser(code, variables, functions);
         parser.parseAllFunctions();
@@ -80,6 +81,10 @@ Value Interpreter::executeFunction(const Function& func) {
         else if (func.returnType == "double" && returnValue.getType() != Value::Type::Double) {
             throw std::runtime_error("Function " + func.name + " expects to return double type, actually returned other type");
         }
+    }
+    // A void function must not return a value (P3-8)
+    if (func.returnType == "void" && returnValue.getType() != Value::Type::Void) {
+        throw std::runtime_error("Function " + func.name + " is declared void but returned a value");
     }
 
     return returnValue;
