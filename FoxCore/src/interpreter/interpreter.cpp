@@ -1,5 +1,6 @@
 #include "interpreter.hpp"
 #include "../util/common.hpp"
+#include "../util/utils.hpp"
 #include "../frontend/parser.hpp"
 #include "../util/error_reporter.hpp"
 #include <iostream>
@@ -10,13 +11,50 @@
 
 std::vector<std::string> functions_register_map;
 std::unordered_map<std::string, Value>* Interpreter::currentVariables = nullptr;
+thread_local std::vector<std::string> interpreter_call_stack;
 
 void Interpreter::parseCode(const std::string& code, const std::string& filename) {
     if (code.empty()) return;
     parse_failed = false; // reset so a reused instance can recover (P3-6)
     try {
-        Parser parser(code, variables, functions);
-        parser.parseAllFunctions();
+        std::unordered_map<std::string, std::string> funcOrigins; // func name -> source file
+
+        auto parseInto = [&](const std::string& src, const std::string& label) {
+            std::unordered_map<std::string, Value> fileVars;
+            std::unordered_map<std::string, Function> fileFuncs;
+            Parser parser(src, fileVars, fileFuncs);
+            parser.parseAllFunctions();
+            for (const auto& [funcName, func] : fileFuncs) {
+                if (funcOrigins.find(funcName) != funcOrigins.end()) {
+                    throw std::runtime_error("Duplicate function '" + funcName + "' defined in '"
+                        + funcOrigins[funcName] + "' and '" + label + "'");
+                }
+                funcOrigins[funcName] = label;
+                functions[funcName] = func;
+            }
+        };
+
+        // Parse the main file, then every imported file (import "file.fox").
+        // Nested imports are appended to imported_source_files while parsing;
+        // 'visited' prevents cycles and duplicate processing.
+        imported_source_files.clear();
+        import_base_file = filename;
+        parseInto(code, filename.empty() ? "<main>" : filename);
+
+        std::unordered_set<std::string> visited;
+        for (size_t idx = 0; idx < imported_source_files.size(); idx++) {
+            // Copy: parsing appends to imported_source_files (nested imports),
+            // which may reallocate the vector.
+            std::string path = imported_source_files[idx];
+            if (!visited.insert(path).second) continue;
+            std::string src = read_file(path);
+            if (src.empty()) {
+                throw std::runtime_error("Cannot read imported file: " + path);
+            }
+            import_base_file = path;
+            parseInto(src, path);
+        }
+        import_base_file.clear();
     }
     catch (const std::exception& e) {
         parse_failed = true;
@@ -33,6 +71,7 @@ Value Interpreter::executeFunction(const Function& func) {
     Value returnValue;
     Parser::resetNewAllocBytes();
 
+    interpreter_call_stack.push_back(func.name);
     // Pre-scan labels for goto
     std::unordered_map<std::string, size_t> labels;
     for (size_t i = 0; i < func.compiledBody.size(); i++) {
@@ -102,12 +141,17 @@ void Interpreter::runMainFunc() {
             "every FoxLang program must define a 'main' function");
         return;
     }
+    interpreter_call_stack.clear();
     try {
         RegFunc();
         executeFunction(functions["main"]);
     }
     catch (const std::exception& e) {
-        ErrorReporter::reportFromException("RuntimeError", e.what());
+        if (interpreter_call_stack.empty()) {
+            ErrorReporter::reportFromException("RuntimeError", e.what());
+        } else {
+            ErrorReporter::reportRuntimeError(e.what(), interpreter_call_stack);
+        }
     }
 }
 

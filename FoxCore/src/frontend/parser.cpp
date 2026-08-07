@@ -4,6 +4,32 @@
 #include <iostream>
 #include <algorithm>
 
+std::vector<std::string> imported_source_files;
+std::string import_base_file;
+
+namespace {
+std::string dirOf(const std::string& path) {
+    size_t sep = path.find_last_of("/\\");
+    if (sep == std::string::npos) return ".";
+    if (sep == 0) return path.substr(0, 1);
+    return path.substr(0, sep);
+}
+}
+
+// Resolve an 'import "..."' path relative to the importing file's directory
+// (falling back to the current working directory).
+std::string resolveImportPath(const std::string& importPath) {
+    if (!importPath.empty() && (importPath[1] == ':' || importPath[0] == '/' || importPath[0] == '\\')) {
+        return importPath; // already absolute
+    }
+    if (!import_base_file.empty()) {
+        std::string candidate = dirOf(import_base_file) + "/" + importPath;
+        if (fileExists(candidate)) return candidate;
+    }
+    if (fileExists(importPath)) return importPath;
+    return importPath; // caller reports the error
+}
+
 static int g_funcNewAllocBytes = -1;
 
 void Parser::resetNewAllocBytes() {
@@ -1110,6 +1136,20 @@ void Parser::parseImportStatement(Lexer& lexer, Token& currentToken,
     std::unordered_map<std::string, Function>& functions) {
     skipWhitespace(lexer, currentToken);
     eat(lexer, currentToken, TOKEN_IMPORT);
+
+    // Cross-file import: import "path/to/file.fox"
+    if (currentToken.type == TOKEN_STRING) {
+        std::string importPath = currentToken.value;
+        eat(lexer, currentToken, TOKEN_STRING);
+        std::string fullPath = resolveImportPath(importPath);
+        if (!fileExists(fullPath)) {
+            throw std::runtime_error(makeParseError(currentToken,
+                "Cannot find imported file: " + importPath +
+                " (searched relative to the importing file, then the working directory)"));
+        }
+        imported_source_files.push_back(fullPath);
+        return;
+    }
 
     std::string libName = currentToken.value;
     eat(lexer, currentToken, TOKEN_IDENTIFIER);

@@ -16,6 +16,13 @@ struct GotoException : std::exception {
     const char* what() const noexcept override { return label.c_str(); }
 };
 
+// Cross-file import support: 'import "file.fox"' statements are recorded here
+// (resolved to full paths) while parsing; the interpreter/compiler then merge
+// the functions of every imported file. import_base_file is the file currently
+// being parsed, used to resolve relative import paths.
+extern std::vector<std::string> imported_source_files;
+extern std::string import_base_file;
+
 struct StmtHandler {
     virtual ~StmtHandler() = default;
     virtual void onPrint(std::unique_ptr<Expr> arg) = 0;

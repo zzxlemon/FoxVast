@@ -3,8 +3,9 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <cstdio>
 
-// ©¤©¤ ANSI terminal support ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ ANSI terminal support ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 #ifdef _WIN32
 #include <windows.h>
 #ifndef ENABLE_VIRTUAL_TERMINAL_PROCESSING
@@ -43,7 +44,7 @@ inline bool _ansiSupported() {
 #define CYN  (_ansiSupported() ? "\x1b[36m" : "")
 #define BLU  (_ansiSupported() ? "\x1b[34m" : "")
 
-// ©¤©¤ singleton state (shared across TUs via Meyer's singleton) ©¤
+// ï¿½ï¿½ï¿½ï¿½ singleton state (shared across TUs via Meyer's singleton) ï¿½ï¿½
 class _ErrState {
     std::string  m_filename;
     std::vector<std::string> m_lines;
@@ -69,7 +70,7 @@ public:
     bool& hasError() { return m_has_error; }
 };
 
-// ©¤©¤ helper ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ helper ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 inline void _printSrcLine(int ln, int col_start, int col_end, const std::string& msg) {
     std::string l = _ErrState::get().getLine(ln);
     if (l.empty()) return;
@@ -95,7 +96,7 @@ inline void _printLoc(const std::string& filename, int line, int col) {
     }
 }
 
-// ©¤©¤ parse "L:C:" prefix from a message string ©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤©¤
+// ï¿½ï¿½ï¿½ï¿½ parse "L:C:" prefix from a message string ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 inline bool _parseLineCol(const std::string& s, int& line, int& col, std::string& rest) {
     line = col = 0;
     rest = s;
@@ -120,9 +121,9 @@ inline bool _parseLineCol(const std::string& s, int& line, int& col, std::string
     return true;
 }
 
-// ¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T
+// ï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½T
 //  Public API  (callable via ErrorReporter::func(...))
-// ¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T¨T
+// ï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½Tï¿½T
 
 namespace ErrorReporter {
 
@@ -183,6 +184,34 @@ inline void reportSimple(const std::string& tag,
     if (!hint.empty()) {
         std::cerr << "  " << CYN << "= " << RST
                   << DIM << "help:" << RST << " " << hint << std::endl;
+    }
+    std::cerr << std::endl;
+}
+
+// Runtime error with a call-stack traceback.
+// trace[0] = outermost frame (main), last = innermost. offsets are optional
+// bytecode offsets (per frame) matching the addresses printed by 'fox -d'.
+inline void reportRuntimeError(const std::string& message,
+                               const std::vector<std::string>& trace,
+                               const std::vector<size_t>& offsets = {}) {
+    auto& st = _ErrState::get();
+    st.hasError() = true;
+
+    std::cerr << BLD << RED << "ERROR" << RST
+              << "[" << YLW << "RuntimeError" << RST << "]"
+              << ": " << BLD << message << RST << std::endl;
+
+    if (!trace.empty()) {
+        std::cerr << DIM << "Stack trace:" << RST << std::endl;
+        for (size_t i = trace.size(); i-- > 0;) {
+            std::cerr << "  " << CYN << "at " << RST << trace[i];
+            if (i < offsets.size()) {
+                char buf[32];
+                snprintf(buf, sizeof(buf), " (bytecode 0x%04zX)", offsets[i]);
+                std::cerr << DIM << buf << RST;
+            }
+            std::cerr << std::endl;
+        }
     }
     std::cerr << std::endl;
 }

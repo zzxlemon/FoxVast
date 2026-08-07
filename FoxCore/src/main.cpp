@@ -18,6 +18,7 @@ static void print_help(){
     std::cout << "  -f <file>               Run FoxLang source file(Deprecated)" << std::endl;
     std::cout << "  -c <file>               Compile .fox -> .fc bytecode" << std::endl;
     std::cout << "  -fc <file>              Run .fc bytecode file" << std::endl;
+    std::cout << "  -d <file>               Disassemble .fc bytecode file" << std::endl;
     std::cout << "  -p <out.far> <files>    Package files into .far archive" << std::endl;
     std::cout << "  -u <archive.far> [dir]  Extract .far archive" << std::endl;
     std::cout << "  -far <archive.far>      Run main.fc from .far archive" << std::endl;
@@ -192,7 +193,40 @@ int main(int argc, char** argv) {
                 vm.loadProgram(prog);
                 vm.run();
             } catch (const std::exception& e) {
-                ErrorReporter::reportFromException("RuntimeError", e.what());
+                if (!ErrorReporter::hasError()) {
+                    ErrorReporter::reportFromException("RuntimeError", e.what());
+                }
+                return 1;
+            }
+            return 0;
+        }
+        else if (in == "-d" || in == "--disassemble") {
+            if (i + 1 >= argc) {
+                ErrorReporter::reportSimple("ArgumentError", "'-d' requires a filename");
+                return 1;
+            }
+            filename = argv[i + 1];
+            i++;
+            // Same .fc path resolution as -fc
+            std::string fcFile = filename;
+            if (access(fcFile.c_str(), 0) != 0 || filename.find(".fc") == std::string::npos) {
+                size_t dot = filename.rfind('.');
+                std::string base = (dot != std::string::npos) ? filename.substr(0, dot) : filename;
+                size_t sep = base.find_last_of("/\\");
+                std::string baseName = (sep != std::string::npos) ? base.substr(sep + 1) : base;
+                std::string parentDir = (sep != std::string::npos) ? base.substr(0, sep) : ".";
+                std::string altPath = parentDir + "\\" + baseName + ".fc";
+                if (access(altPath.c_str(), 0) == 0) fcFile = altPath;
+            }
+            std::string fullCode = read_file(fcFile);
+            if (fullCode.empty()) return 1;
+            try {
+                std::vector<uint8_t> fcData(fullCode.begin(), fullCode.end());
+                xor_crypt(fcData, FC_XOR_KEY);
+                CompiledProgram prog = CompiledProgram::deserialize(fcData);
+                disassembleProgram(prog, std::cout);
+            } catch (const std::exception& e) {
+                ErrorReporter::reportFromException("DisassembleError", e.what());
                 return 1;
             }
             return 0;

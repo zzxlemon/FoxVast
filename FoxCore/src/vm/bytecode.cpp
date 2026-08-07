@@ -1,6 +1,8 @@
 #include "bytecode.hpp"
 #include <typeinfo>
+#include <cstdio>
 #include "../util/error_reporter.hpp"
+#include "../util/utils.hpp"
 
 // This VM name is FVM
 
@@ -370,12 +372,48 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
     // Initialize system libraries before parsing (needed for import resolution)
     RegFunc();
 
-    // Use existing parser to get function definitions
-    std::unordered_map<std::string, Value> dummyVars;
+    // Parse each file into its own function map, then merge with duplicate
+    // detection across files (import "file.fox" support)
     std::unordered_map<std::string, Function> parsedFunctions;
+    std::unordered_map<std::string, std::string> funcOrigins; // func name -> source file
 
-    Parser parser(source, dummyVars, parsedFunctions);
-    parser.parseAllFunctions();
+    auto parseInto = [&](const std::string& src, const std::string& label) {
+        std::unordered_map<std::string, Value> fileVars;
+        std::unordered_map<std::string, Function> fileFuncs;
+        Parser parser(src, fileVars, fileFuncs);
+        parser.parseAllFunctions();
+        for (const auto& [funcName, func] : fileFuncs) {
+            auto it = parsedFunctions.find(funcName);
+            if (it != parsedFunctions.end()) {
+                throw std::runtime_error("Duplicate function '" + funcName + "' defined in '"
+                    + funcOrigins[funcName] + "' and '" + label + "'");
+            }
+            funcOrigins[funcName] = label;
+            parsedFunctions[funcName] = func;
+        }
+    };
+
+    // Parse the main file, then every imported file. Nested imports are
+    // appended to imported_source_files while parsing; 'visited' prevents
+    // cycles and duplicate processing.
+    imported_source_files.clear();
+    import_base_file = filename;
+    parseInto(source, filename.empty() ? "<main>" : filename);
+
+    std::unordered_set<std::string> visited;
+    for (size_t idx = 0; idx < imported_source_files.size(); idx++) {
+        // Copy: parsing appends to imported_source_files (nested imports),
+        // which may reallocate the vector.
+        std::string path = imported_source_files[idx];
+        if (!visited.insert(path).second) continue;
+        std::string src = read_file(path);
+        if (src.empty()) {
+            throw std::runtime_error("Cannot read imported file: " + path);
+        }
+        import_base_file = path;
+        parseInto(src, path);
+    }
+    import_base_file.clear();
 
     // Record import aliases from LibraryManager (populated by Parser's parseImportStatement)
     auto& libMgr = LibraryManager::getInstance();
@@ -431,6 +469,7 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
         BytecodeCompiler& compiler;
         std::unordered_map<std::string, size_t>& labelAddresses;
         std::vector<std::pair<std::string, size_t>>& gotoFixups;
+        bool sawRetWithValue = false;
         BytecodeStmtHandler(CompiledFunction& c, std::unordered_map<std::string, Value::Type>& vt, BytecodeCompiler& comp,
             std::unordered_map<std::string, size_t>& labels,
             std::vector<std::pair<std::string, size_t>>& fixups)
@@ -457,7 +496,16 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             cf.chunk.writeOp(OpCode::OP_CLEAR_GLOBALS);
         }
         Value onRet(std::unique_ptr<Expr> arg) override {
-            if (arg) arg->compileBytecode(cf, varTypes);
+            if (arg) {
+                if (cf.returnType == "void") {
+                    throw std::runtime_error("Function " + cf.name + " is declared void but returned a value");
+                }
+                sawRetWithValue = true;
+                arg->compileBytecode(cf, varTypes);
+            }
+            else if (cf.returnType != "void") {
+                throw std::runtime_error("Function " + cf.name + " is declared " + cf.returnType + " but 'ret' returns no value");
+            }
             cf.chunk.writeOp(OpCode::OP_RETURN);
             return Value();
         }
@@ -626,6 +674,12 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
         }
     }
 
+    // A non-void function must contain at least one 'ret <expr>' statement
+    // (a runtime check catches paths that fall through without returning)
+    if (cf.returnType != "void" && !handler.sawRetWithValue) {
+        throw std::runtime_error("Function " + cf.name + " is declared to return " + cf.returnType + " but never returns a value");
+    }
+
     // Patch goto fixups
     for (auto& fixup : gotoFixups) {
         auto it = labelAddresses.find(fixup.first);
@@ -738,7 +792,15 @@ void VM::resetStack() {
 
 void VM::runtimeErr(const std::string& msg) {
     if (!runtimeError) {
-        ErrorReporter::reportSimple("RuntimeError", msg, "");
+        std::vector<std::string> trace;
+        std::vector<size_t> offsets;
+        for (const auto& f : frames) {
+            trace.push_back(f.function->name);
+            // Suspended frames are paused at their OP_CALL instruction; the
+            // innermost frame points at the instruction that raised the error.
+            offsets.push_back(f.instrStart);
+        }
+        ErrorReporter::reportRuntimeError(msg, trace, offsets);
         runtimeError = true;
     }
 }
@@ -832,7 +894,8 @@ void VM::run() {
     frames.push_back(frame);
 
     // Execution loop
-    while (!frames.empty() && !runtimeError) {
+    try {
+        while (!frames.empty() && !runtimeError) {
         CallFrame& cf = frames.back();
         const Chunk& chunk = cf.function->chunk;
 
@@ -845,12 +908,33 @@ void VM::run() {
         }
 
         uint8_t instruction = chunk.code[cf.ip++];
+        cf.instrStart = cf.ip - 1;
 
         switch (static_cast<OpCode>(instruction)) {
         case OpCode::OP_RETURN: {
             Value retVal = Value();
             if (!stack.empty()) {
                 retVal = pop();
+            }
+            // Return type validation (mirrors Interpreter::executeFunction)
+            {
+                const CompiledFunction& retFunc = *frames.back().function;
+                if (retFunc.returnType != "void") {
+                    bool mismatch = false;
+                    if (retVal.getType() == Value::Type::Int) mismatch = (retFunc.returnType != "int");
+                    else if (retVal.getType() == Value::Type::Double) mismatch = (retFunc.returnType != "double");
+                    else if (retVal.getType() == Value::Type::String) mismatch = (retFunc.returnType != "string");
+                    else mismatch = true; // Void or any other type
+                    if (mismatch) {
+                        runtimeErr("Function " + retFunc.name + " expects to return " + retFunc.returnType + " type, actually returned " +
+                            (retVal.getType() == Value::Type::Void ? "void" : "other type"));
+                        break;
+                    }
+                }
+                else if (retVal.getType() != Value::Type::Void) {
+                    runtimeErr("Function " + retFunc.name + " is declared void but returned a value");
+                    break;
+                }
             }
             // Restore globals shadowed by this frame's parameters, and
             // remove parameters that did not exist before the call (P1-1)
@@ -1361,5 +1445,224 @@ void VM::run() {
             runtimeErr("Unknown opcode: " + std::to_string(instruction));
             break;
         }
+    }
+    } catch (const std::exception& e) {
+        runtimeErr(e.what());
+    }
+}
+
+// ============================================================
+// Disassembler (fox -d)
+// ============================================================
+namespace {
+const char* opcodeName(uint8_t byte) {
+    switch (static_cast<OpCode>(byte)) {
+    case OpCode::OP_RETURN: return "OP_RETURN";
+    case OpCode::OP_CONSTANT: return "OP_CONSTANT";
+    case OpCode::OP_NEGATE: return "OP_NEGATE";
+    case OpCode::OP_ADD: return "OP_ADD";
+    case OpCode::OP_SUB: return "OP_SUB";
+    case OpCode::OP_MUL: return "OP_MUL";
+    case OpCode::OP_DIV: return "OP_DIV";
+    case OpCode::OP_TRUE: return "OP_TRUE";
+    case OpCode::OP_FALSE: return "OP_FALSE";
+    case OpCode::OP_NIL: return "OP_NIL";
+    case OpCode::OP_NOT: return "OP_NOT";
+    case OpCode::OP_EQ: return "OP_EQ";
+    case OpCode::OP_NE: return "OP_NE";
+    case OpCode::OP_GT: return "OP_GT";
+    case OpCode::OP_LT: return "OP_LT";
+    case OpCode::OP_GE: return "OP_GE";
+    case OpCode::OP_LE: return "OP_LE";
+    case OpCode::OP_PRINT: return "OP_PRINT";
+    case OpCode::OP_PRINTLN: return "OP_PRINTLN";
+    case OpCode::OP_POP: return "OP_POP";
+    case OpCode::OP_DEF_GLOBAL: return "OP_DEF_GLOBAL";
+    case OpCode::OP_GET_GLOBAL: return "OP_GET_GLOBAL";
+    case OpCode::OP_SET_GLOBAL: return "OP_SET_GLOBAL";
+    case OpCode::OP_GET_LOCAL: return "OP_GET_LOCAL";
+    case OpCode::OP_SET_LOCAL: return "OP_SET_LOCAL";
+    case OpCode::OP_JMP: return "OP_JMP";
+    case OpCode::OP_JMP_IF_FALSE: return "OP_JMP_IF_FALSE";
+    case OpCode::OP_LOOP: return "OP_LOOP";
+    case OpCode::OP_CALL: return "OP_CALL";
+    case OpCode::OP_INPUT: return "OP_INPUT";
+    case OpCode::OP_CAST_INT: return "OP_CAST_INT";
+    case OpCode::OP_CAST_DOUBLE: return "OP_CAST_DOUBLE";
+    case OpCode::OP_ARRAY: return "OP_ARRAY";
+    case OpCode::OP_INDEX_GET: return "OP_INDEX_GET";
+    case OpCode::OP_INDEX_SET: return "OP_INDEX_SET";
+    case OpCode::OP_AND: return "OP_AND";
+    case OpCode::OP_OR: return "OP_OR";
+    case OpCode::OP_ENDLN: return "OP_ENDLN";
+    case OpCode::OP_EXIT: return "OP_EXIT";
+    case OpCode::OP_IMPORT: return "OP_IMPORT";
+    case OpCode::OP_NEW: return "OP_NEW";
+    case OpCode::OP_UNSET_GLOBAL: return "OP_UNSET_GLOBAL";
+    case OpCode::OP_CLEAR_GLOBALS: return "OP_CLEAR_GLOBALS";
+    case OpCode::OP_HALT: return "OP_HALT";
+    default: return "OP_UNKNOWN";
+    }
+}
+
+std::string disasmValue(const Value& v) {
+    switch (v.getType()) {
+    case Value::Type::String: return "\"" + v.asString() + "\"";
+    case Value::Type::Array: return "[array]";
+    case Value::Type::Bytes: return "[bytes]";
+    case Value::Type::Void: return "void";
+    default: return v.toString();
+    }
+}
+
+void printAddr(std::ostream& out, size_t addr) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "0x%04zX", addr);
+    out << buf;
+}
+} // namespace
+
+void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
+    if (!prog.imports.empty()) {
+        out << "== Imports ==" << std::endl;
+        for (const auto& imp : prog.imports) {
+            out << "  import " << imp.libName;
+            if (!imp.alias.empty() && imp.alias != imp.libName) out << " -> " << imp.alias;
+            out << std::endl;
+        }
+        out << std::endl;
+    }
+
+    for (const auto& func : prog.functions) {
+        out << "=== " << func.name << " -> " << func.returnType << " (";
+        for (size_t p = 0; p < func.parameters.size(); p++) {
+            if (p > 0) out << ", ";
+            out << func.parameters[p].name << " : " << func.parameters[p].type;
+        }
+        out << " | " << func.localCount << " locals) ===" << std::endl;
+
+        const Chunk& chunk = func.chunk;
+
+        // Collect jump targets so they can be marked as labels
+        std::unordered_set<size_t> targets;
+        size_t ip = 0;
+        while (ip < chunk.code.size()) {
+            OpCode op = static_cast<OpCode>(chunk.code[ip]);
+            ip++;
+            switch (op) {
+            case OpCode::OP_JMP:
+            case OpCode::OP_JMP_IF_FALSE:
+            case OpCode::OP_LOOP: {
+                int16_t off = static_cast<int16_t>(chunk.readShort(ip));
+                targets.insert(ip + 2 + static_cast<size_t>(off));
+                ip += 2;
+                break;
+            }
+            case OpCode::OP_CONSTANT:
+            case OpCode::OP_DEF_GLOBAL:
+            case OpCode::OP_GET_GLOBAL:
+            case OpCode::OP_SET_GLOBAL:
+            case OpCode::OP_UNSET_GLOBAL:
+                ip += 2;
+                break;
+            case OpCode::OP_GET_LOCAL:
+            case OpCode::OP_SET_LOCAL:
+            case OpCode::OP_CALL:
+            case OpCode::OP_ARRAY:
+                ip += 1;
+                break;
+            default:
+                break;
+            }
+        }
+
+        // Decode instructions
+        ip = 0;
+        int lastConstIdx = -1;
+        while (ip < chunk.code.size()) {
+            if (targets.count(ip) > 0) out << "  ==> ";
+            else out << "      ";
+            printAddr(out, ip);
+            out << "  ";
+
+            OpCode op = static_cast<OpCode>(chunk.code[ip]);
+            ip++;
+            switch (op) {
+            case OpCode::OP_CONSTANT: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                lastConstIdx = idx;
+                out << "OP_CONSTANT  #" << idx;
+                if (idx < chunk.constants.size()) out << "  " << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_DEF_GLOBAL: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                out << "OP_DEF_GLOBAL  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_GET_GLOBAL: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                out << "OP_GET_GLOBAL  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_SET_GLOBAL: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                out << "OP_SET_GLOBAL  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_UNSET_GLOBAL: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                out << "OP_UNSET_GLOBAL  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_JMP:
+            case OpCode::OP_JMP_IF_FALSE:
+            case OpCode::OP_LOOP: {
+                int16_t off = static_cast<int16_t>(chunk.readShort(ip));
+                size_t target = ip + 2 + static_cast<size_t>(off);
+                ip += 2;
+                out << opcodeName(static_cast<uint8_t>(op)) << "  -> ";
+                printAddr(out, target);
+                break;
+            }
+            case OpCode::OP_GET_LOCAL:
+            case OpCode::OP_SET_LOCAL: {
+                uint8_t slot = chunk.readByte(ip);
+                ip += 1;
+                out << opcodeName(static_cast<uint8_t>(op)) << "  slot " << static_cast<int>(slot);
+                break;
+            }
+            case OpCode::OP_CALL: {
+                uint8_t argc = chunk.readByte(ip);
+                ip += 1;
+                out << "OP_CALL  " << static_cast<int>(argc) << " arg(s)";
+                if (lastConstIdx >= 0 && lastConstIdx < static_cast<int>(chunk.constants.size()) &&
+                    chunk.constants[lastConstIdx].getType() == Value::Type::String) {
+                    out << "  " << disasmValue(chunk.constants[lastConstIdx]);
+                }
+                break;
+            }
+            case OpCode::OP_ARRAY: {
+                uint8_t n = chunk.readByte(ip);
+                ip += 1;
+                out << "OP_ARRAY  " << static_cast<int>(n) << " elem(s)";
+                break;
+            }
+            default:
+                out << opcodeName(static_cast<uint8_t>(op));
+                break;
+            }
+            out << std::endl;
+        }
+        out << std::endl;
     }
 }

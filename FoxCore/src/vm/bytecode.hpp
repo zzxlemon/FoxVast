@@ -196,6 +196,11 @@ struct CompiledProgram {
 };
 
 // ============================================================
+// Disassembler - human-readable dump of .fc bytecode
+// ============================================================
+void disassembleProgram(const CompiledProgram& prog, std::ostream& out);
+
+// ============================================================
 // BytecodeCompiler - compiles FoxLang source to bytecode
 // ============================================================
 class BytecodeCompiler {
@@ -233,6 +238,7 @@ private:
         std::unordered_map<std::string, Value> savedGlobals;
         std::vector<std::string> newGlobals;
         size_t ip;
+        size_t instrStart = 0; // offset of the instruction being executed
         int newAllocBytes = 0; // per-function new() budget (P3-5)
     };
 
