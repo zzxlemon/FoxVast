@@ -1,6 +1,7 @@
 #include "interpreter.hpp"
 #include "../util/common.hpp"
 #include "../util/utils.hpp"
+#include "../util/dll_loader.hpp"
 #include "../frontend/parser.hpp"
 #include "../util/error_reporter.hpp"
 #include <iostream>
@@ -190,7 +191,10 @@ Value Interpreter::SystemFunctionBuildIn(const std::string& funcName, const std:
 void RegFunc() {
     static bool initialized = false;
     if (!initialized) {
+        // Always register the built-in libraries (fallback if DLLs are missing)
         initSystemLibraries();
+        // Load external library DLLs — overwrites built-in entries when found
+        LoadFoxLibs(LibraryManager::getInstance());
         initialized = true;
     }
 }
