@@ -128,6 +128,16 @@ void writeValue(std::vector<uint8_t>& data, const Value& v) {
         for (uint8_t byte : bv) data.push_back(byte);
         break;
     }
+    case Value::Type::Dict: {
+        data.push_back(6);
+        const auto& dict = v.asDict();
+        writeVarint(data, static_cast<uint32_t>(dict.size()));
+        for (const auto& [key, val] : dict) {
+            writeString(data, key);
+            writeValue(data, *val);
+        }
+        break;
+    }
     default:
         data.push_back(4);
         break;
@@ -180,6 +190,18 @@ bool readValue(const uint8_t* data, size_t size, size_t& offset, Value& out) {
         std::vector<uint8_t> bv(data + offset, data + offset + bytesLen);
         offset += bytesLen;
         out = Value(bv);
+        return true;
+    }
+    case 6: { // dict
+        uint32_t dictLen = readVarint(data, size, offset);
+        std::unordered_map<std::string, std::shared_ptr<Value>> dict;
+        for (uint32_t j = 0; j < dictLen; j++) {
+            std::string key = readString(data, size, offset);
+            Value elem;
+            if (!readValue(data, size, offset, elem)) return false;
+            dict[key] = std::make_shared<Value>(std::move(elem));
+        }
+        out = Value(dict);
         return true;
     }
     default:
@@ -469,6 +491,14 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
         BytecodeCompiler& compiler;
         std::unordered_map<std::string, size_t>& labelAddresses;
         std::vector<std::pair<std::string, size_t>>& gotoFixups;
+        struct LoopFix {
+            size_t pos;
+            size_t depth;
+        };
+        std::vector<LoopFix> breakFixups;
+        std::vector<LoopFix> continueFixups;
+        size_t loopDepth = 0;
+        size_t tryDepth = 0;
         bool sawRetWithValue = false;
         BytecodeStmtHandler(CompiledFunction& c, std::unordered_map<std::string, Value::Type>& vt, BytecodeCompiler& comp,
             std::unordered_map<std::string, size_t>& labels,
@@ -505,6 +535,9 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             }
             else if (cf.returnType != "void") {
                 throw std::runtime_error("Function " + cf.name + " is declared " + cf.returnType + " but 'ret' returns no value");
+            }
+            for (size_t i = 0; i < tryDepth; i++) {
+                cf.chunk.writeOp(OpCode::OP_END_TRY);
             }
             cf.chunk.writeOp(OpCode::OP_RETURN);
             return Value();
@@ -564,8 +597,22 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
                 Parser::parseLine(stmt, *this);
             }
 
+            size_t skipElseJump = 0;
+            if (!ifStmt.elseBody.empty()) {
+                skipElseJump = cf.chunk.code.size();
+                cf.chunk.writeOp(OpCode::OP_JMP);
+                cf.chunk.writeShort(0);
+            }
+
             size_t afterBody = cf.chunk.code.size();
             cf.chunk.patchJump(jumpInstr + 1, afterBody);
+
+            if (!ifStmt.elseBody.empty()) {
+                for (const auto& stmt : ifStmt.elseBody) {
+                    Parser::parseLine(stmt, *this);
+                }
+                cf.chunk.patchJump(skipElseJump + 1, cf.chunk.code.size());
+            }
         }
         void onWhile(WhileStatement whileStmt) override {
             size_t loopStart = cf.chunk.code.size();
@@ -580,15 +627,38 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
             cf.chunk.writeShort(0);
 
+            loopDepth++;
             for (const auto& stmt : whileStmt.body) {
                 Parser::parseLine(stmt, *this);
             }
+            size_t continueTarget = loopStart;
 
             size_t afterBody = cf.chunk.code.size();
             cf.chunk.writeOp(OpCode::OP_LOOP);
             int32_t loopOffset = static_cast<int32_t>(loopStart) - static_cast<int32_t>(afterBody + 3);
             cf.chunk.writeShort(static_cast<uint16_t>(static_cast<int32_t>(loopOffset)));
-            cf.chunk.patchJump(exitJump + 1, afterBody + 3);
+            size_t breakTarget = cf.chunk.code.size();
+            cf.chunk.patchJump(exitJump + 1, breakTarget);
+
+            std::vector<LoopFix> remainingBreaks;
+            for (const auto& fix : breakFixups) {
+                if (fix.depth == loopDepth) {
+                    cf.chunk.patchJump(fix.pos, breakTarget);
+                } else {
+                    remainingBreaks.push_back(fix);
+                }
+            }
+            breakFixups.swap(remainingBreaks);
+            std::vector<LoopFix> remainingContinues;
+            for (const auto& fix : continueFixups) {
+                if (fix.depth == loopDepth) {
+                    cf.chunk.patchJump(fix.pos, continueTarget);
+                } else {
+                    remainingContinues.push_back(fix);
+                }
+            }
+            continueFixups.swap(remainingContinues);
+            loopDepth--;
         }
         void onFor(ForStatement forStmt) override {
             if (!forStmt.init.empty()) {
@@ -611,10 +681,12 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             cf.chunk.writeOp(OpCode::OP_JMP_IF_FALSE);
             cf.chunk.writeShort(0);
 
+            loopDepth++;
             for (const auto& stmt : forStmt.body) {
                 Parser::parseLine(stmt, *this);
             }
 
+            size_t continueTarget = cf.chunk.code.size();
             if (!forStmt.iter.empty()) {
                 Parser::parseLine(forStmt.iter, *this);
             }
@@ -623,7 +695,83 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             cf.chunk.writeOp(OpCode::OP_LOOP);
             int32_t loopOffset = static_cast<int32_t>(loopStart) - static_cast<int32_t>(afterBody + 3);
             cf.chunk.writeShort(static_cast<uint16_t>(static_cast<int32_t>(loopOffset)));
-            cf.chunk.patchJump(exitJump + 1, afterBody + 3);
+            size_t breakTarget = cf.chunk.code.size();
+            cf.chunk.patchJump(exitJump + 1, breakTarget);
+
+            std::vector<LoopFix> remainingBreaks;
+            for (const auto& fix : breakFixups) {
+                if (fix.depth == loopDepth) {
+                    cf.chunk.patchJump(fix.pos, breakTarget);
+                } else {
+                    remainingBreaks.push_back(fix);
+                }
+            }
+            breakFixups.swap(remainingBreaks);
+            std::vector<LoopFix> remainingContinues;
+            for (const auto& fix : continueFixups) {
+                if (fix.depth == loopDepth) {
+                    cf.chunk.patchJump(fix.pos, continueTarget);
+                } else {
+                    remainingContinues.push_back(fix);
+                }
+            }
+            continueFixups.swap(remainingContinues);
+            loopDepth--;
+        }
+        void onTry(TryStatement tryStmt) override {
+            cf.chunk.writeOp(OpCode::OP_TRY);
+            int varNameIdx = cf.addConstantStringDedup(tryStmt.errorVar);
+            cf.chunk.writeShort(static_cast<uint16_t>(varNameIdx));
+            size_t catchOffsetPos = cf.chunk.code.size();
+            cf.chunk.writeShort(0);
+            size_t afterOperands = cf.chunk.code.size();
+
+            tryDepth++;
+            for (const auto& stmt : tryStmt.body) {
+                Parser::parseLine(stmt, *this);
+            }
+
+            cf.chunk.writeOp(OpCode::OP_END_TRY);
+            tryDepth--;
+            size_t skipCatchJump = cf.chunk.code.size();
+            cf.chunk.writeOp(OpCode::OP_JMP);
+            cf.chunk.writeShort(0);
+            size_t catchAddr = cf.chunk.code.size();
+            int32_t catchRel = static_cast<int32_t>(catchAddr) - static_cast<int32_t>(afterOperands);
+            cf.chunk.patchJumpOffset(catchOffsetPos, catchRel);
+
+            for (const auto& stmt : tryStmt.catchBody) {
+                Parser::parseLine(stmt, *this);
+            }
+            cf.chunk.patchJump(skipCatchJump + 1, cf.chunk.code.size());
+        }
+        void onBreak() override {
+            if (loopDepth == 0) {
+                throw std::runtime_error("break outside loop");
+            }
+            for (size_t i = 0; i < tryDepth; i++) {
+                cf.chunk.writeOp(OpCode::OP_END_TRY);
+            }
+            size_t pos = cf.chunk.code.size() + 1;
+            cf.chunk.writeOp(OpCode::OP_JMP);
+            cf.chunk.writeShort(0);
+            breakFixups.push_back({pos, loopDepth});
+        }
+        void onContinue() override {
+            if (loopDepth == 0) {
+                throw std::runtime_error("continue outside loop");
+            }
+            for (size_t i = 0; i < tryDepth; i++) {
+                cf.chunk.writeOp(OpCode::OP_END_TRY);
+            }
+            size_t pos = cf.chunk.code.size() + 1;
+            cf.chunk.writeOp(OpCode::OP_JMP);
+            cf.chunk.writeShort(0);
+            continueFixups.push_back({pos, loopDepth});
+        }
+        void onError(std::unique_ptr<Expr> message) override {
+            message->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_THROW);
         }
         void onFnLabel(const std::string& name) override {
             labelAddresses[name] = cf.chunk.code.size();
@@ -646,10 +794,12 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
         std::string trimmed = line;
         size_t start = trimmed.find_first_not_of(" \t");
         if (start != std::string::npos) trimmed = trimmed.substr(start);
-        if (trimmed.rfind("int ", 0) == 0 || trimmed.rfind("double ", 0) == 0 || trimmed.rfind("string ", 0) == 0) {
+        if (trimmed.rfind("int ", 0) == 0 || trimmed.rfind("double ", 0) == 0 ||
+            trimmed.rfind("string ", 0) == 0 || trimmed.rfind("dict ", 0) == 0) {
             std::string typeEnd;
             if (trimmed.rfind("int ", 0) == 0) typeEnd = trimmed.substr(4);
             else if (trimmed.rfind("double ", 0) == 0) typeEnd = trimmed.substr(7);
+            else if (trimmed.rfind("dict ", 0) == 0) typeEnd = trimmed.substr(5);
             else typeEnd = trimmed.substr(7);
 
             size_t eqPos = typeEnd.find('=');
@@ -760,6 +910,8 @@ std::string BytecodeCompiler::typeStr(Value::Type t) {
     case Value::Type::Double: return "double";
     case Value::Type::String: return "string";
     case Value::Type::Array: return "array";
+    case Value::Type::Bytes: return "bytes";
+    case Value::Type::Dict: return "dict";
     default: return "void";
     }
 }
@@ -783,6 +935,7 @@ void VM::loadProgram(const CompiledProgram& prog) {
     globals.clear();
     stack.clear();
     frames.clear();
+    tryHandlers.clear();
     runtimeError = false;
 }
 
@@ -803,6 +956,35 @@ void VM::runtimeErr(const std::string& msg) {
         ErrorReporter::reportRuntimeError(msg, trace, offsets);
         runtimeError = true;
     }
+}
+
+bool VM::throwValue(const Value& err) {
+    if (tryHandlers.empty()) return false;
+
+    TryHandler handler = tryHandlers.back();
+    tryHandlers.pop_back();
+
+    while (!tryHandlers.empty() && tryHandlers.back().frameIndex >= handler.frameIndex) {
+        tryHandlers.pop_back();
+    }
+    while (frames.size() > handler.frameIndex + 1) {
+        CallFrame& cur = frames.back();
+        for (const auto& [name, val] : cur.savedGlobals) {
+            globals[name] = val;
+        }
+        for (const auto& name : cur.newGlobals) {
+            globals.erase(name);
+        }
+        frames.pop_back();
+    }
+    if (stack.size() > handler.stackDepth) {
+        stack.resize(handler.stackDepth);
+    }
+    globals[handler.varName] = err;
+    if (!frames.empty()) {
+        frames.back().ip = handler.catchAddr;
+    }
+    return true;
 }
 
 bool VM::callSystemFunction(const std::string& name, int argCount) {
@@ -881,6 +1063,7 @@ void VM::run() {
 
     resetStack();
     frames.clear();
+    tryHandlers.clear();
     runtimeError = false;
 
     // Initialize system libraries
@@ -894,7 +1077,10 @@ void VM::run() {
     frames.push_back(frame);
 
     // Execution loop
-    try {
+    bool resumed = false;
+    do {
+        resumed = false;
+        try {
         while (!frames.empty() && !runtimeError) {
         CallFrame& cf = frames.back();
         const Chunk& chunk = cf.function->chunk;
@@ -924,6 +1110,9 @@ void VM::run() {
                     if (retVal.getType() == Value::Type::Int) mismatch = (retFunc.returnType != "int");
                     else if (retVal.getType() == Value::Type::Double) mismatch = (retFunc.returnType != "double");
                     else if (retVal.getType() == Value::Type::String) mismatch = (retFunc.returnType != "string");
+                    else if (retVal.getType() == Value::Type::Array) mismatch = (retFunc.returnType != "array");
+                    else if (retVal.getType() == Value::Type::Dict) mismatch = (retFunc.returnType != "dict");
+                    else if (retVal.getType() == Value::Type::Bytes) mismatch = (retFunc.returnType != "bytes");
                     else mismatch = true; // Void or any other type
                     if (mismatch) {
                         runtimeErr("Function " + retFunc.name + " expects to return " + retFunc.returnType + " type, actually returned " +
@@ -1044,6 +1233,26 @@ void VM::run() {
             }
             break;
         }
+        case OpCode::OP_MOD: {
+            Value b = pop();
+            Value a = pop();
+            if (a.getType() == Value::Type::Int && b.getType() == Value::Type::Int) {
+                if (b.asInt() == 0) { runtimeErr("Modulo by zero"); break; }
+                push(Value(a.asInt() % b.asInt()));
+            } else if (a.getType() == Value::Type::Double && b.getType() == Value::Type::Double) {
+                if (b.asDouble() == 0.0) { runtimeErr("Modulo by zero"); break; }
+                push(Value(std::fmod(a.asDouble(), b.asDouble())));
+            } else if (a.getType() == Value::Type::Int && b.getType() == Value::Type::Double) {
+                if (b.asDouble() == 0.0) { runtimeErr("Modulo by zero"); break; }
+                push(Value(std::fmod(static_cast<double>(a.asInt()), b.asDouble())));
+            } else if (a.getType() == Value::Type::Double && b.getType() == Value::Type::Int) {
+                if (b.asInt() == 0) { runtimeErr("Modulo by zero"); break; }
+                push(Value(std::fmod(a.asDouble(), static_cast<double>(b.asInt()))));
+            } else {
+                runtimeErr("Type mismatch in modulo");
+            }
+            break;
+        }
 
         case OpCode::OP_TRUE: push(Value(1)); break;
         case OpCode::OP_FALSE: push(Value(0)); break;
@@ -1063,6 +1272,11 @@ void VM::run() {
                 result = (a.asDouble() == b.asDouble());
             } else if (a.getType() == Value::Type::String && b.getType() == Value::Type::String) {
                 result = (a.asString() == b.asString());
+            } else if (a.getType() == b.getType() &&
+                       (a.getType() == Value::Type::Array ||
+                        a.getType() == Value::Type::Dict ||
+                        a.getType() == Value::Type::Bytes)) {
+                result = valuesEqual(a, b);
             } else if ((a.getType() == Value::Type::Int || a.getType() == Value::Type::Double) &&
                        (b.getType() == Value::Type::Int || b.getType() == Value::Type::Double)) {
                 double al = (a.getType() == Value::Type::Int) ? static_cast<double>(a.asInt()) : a.asDouble();
@@ -1084,6 +1298,11 @@ void VM::run() {
                 result = (a.asDouble() != b.asDouble());
             } else if (a.getType() == Value::Type::String && b.getType() == Value::Type::String) {
                 result = (a.asString() != b.asString());
+            } else if (a.getType() == b.getType() &&
+                       (a.getType() == Value::Type::Array ||
+                        a.getType() == Value::Type::Dict ||
+                        a.getType() == Value::Type::Bytes)) {
+                result = !valuesEqual(a, b);
             } else if ((a.getType() == Value::Type::Int || a.getType() == Value::Type::Double) &&
                        (b.getType() == Value::Type::Int || b.getType() == Value::Type::Double)) {
                 double al = (a.getType() == Value::Type::Int) ? static_cast<double>(a.asInt()) : a.asDouble();
@@ -1338,46 +1557,81 @@ void VM::run() {
             push(Value(elements));
             break;
         }
+        case OpCode::OP_DICT: {
+            uint8_t entryCount = chunk.readByte(cf.ip);
+            cf.ip++;
+            std::unordered_map<std::string, std::shared_ptr<Value>> dict;
+            for (int i = 0; i < entryCount; i++) {
+                Value keyVal = pop();
+                Value value = pop();
+                if (keyVal.getType() != Value::Type::String) {
+                    runtimeErr("Dict key must be a string");
+                    break;
+                }
+                dict[keyVal.asString()] = std::make_shared<Value>(value);
+            }
+            if (!runtimeError) push(Value(dict));
+            break;
+        }
         case OpCode::OP_INDEX_GET: {
             Value index = pop();
             Value arr = pop();
-            if (arr.getType() != Value::Type::Array) {
-                runtimeErr("Index target is not an array");
-                break;
+            if (arr.getType() == Value::Type::Array) {
+                if (index.getType() != Value::Type::Int) {
+                    runtimeErr("Array index must be an integer");
+                    break;
+                }
+                int idx = index.asInt();
+                const std::vector<Value>& elements = arr.asArray();
+                if (idx < 0 || idx >= static_cast<int>(elements.size())) {
+                    runtimeErr("Array index out of bounds");
+                    break;
+                }
+                push(elements[idx]);
+            } else if (arr.getType() == Value::Type::Dict) {
+                if (index.getType() != Value::Type::String) {
+                    runtimeErr("Dict index must be a string");
+                    break;
+                }
+                const auto& dict = arr.asDict();
+                auto it = dict.find(index.asString());
+                if (it == dict.end()) {
+                    runtimeErr("Undefined dict key: " + index.asString());
+                    break;
+                }
+                push(*it->second);
+            } else {
+                runtimeErr("Index target is not an array or dict");
             }
-            if (index.getType() != Value::Type::Int) {
-                runtimeErr("Array index must be an integer");
-                break;
-            }
-            int idx = index.asInt();
-            const std::vector<Value>& elements = arr.asArray();
-            if (idx < 0 || idx >= static_cast<int>(elements.size())) {
-                runtimeErr("Array index out of bounds");
-                break;
-            }
-            push(elements[idx]);
             break;
         }
         case OpCode::OP_INDEX_SET: {
             Value index = pop();
             Value arr = pop();
             Value value = pop();
-            if (arr.getType() != Value::Type::Array) {
-                runtimeErr("Index target is not an array");
-                break;
+            if (arr.getType() == Value::Type::Array) {
+                if (index.getType() != Value::Type::Int) {
+                    runtimeErr("Array index must be an integer");
+                    break;
+                }
+                int idx = index.asInt();
+                std::vector<Value>& elements = arr.asArrayRef();
+                if (idx < 0 || idx >= static_cast<int>(elements.size())) {
+                    runtimeErr("Array index out of bounds");
+                    break;
+                }
+                elements[idx] = value;
+                push(arr);
+            } else if (arr.getType() == Value::Type::Dict) {
+                if (index.getType() != Value::Type::String) {
+                    runtimeErr("Dict index must be a string");
+                    break;
+                }
+                arr.asDictRef()[index.asString()] = std::make_shared<Value>(value);
+                push(arr);
+            } else {
+                runtimeErr("Index target is not an array or dict");
             }
-            if (index.getType() != Value::Type::Int) {
-                runtimeErr("Array index must be an integer");
-                break;
-            }
-            int idx = index.asInt();
-            std::vector<Value>& elements = arr.asArrayRef();
-            if (idx < 0 || idx >= static_cast<int>(elements.size())) {
-                runtimeErr("Array index out of bounds");
-                break;
-            }
-            elements[idx] = value;
-            push(arr);
             break;
         }
         case OpCode::OP_EXIT: {
@@ -1437,6 +1691,35 @@ void VM::run() {
             push(Value(bytes));
             break;
         }
+        case OpCode::OP_TRY: {
+            uint16_t varNameIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
+            int32_t catchRel = static_cast<int16_t>(chunk.readShort(cf.ip));
+            cf.ip += 2;
+            if (varNameIdx >= chunk.constants.size() ||
+                chunk.constants[varNameIdx].getType() != Value::Type::String) {
+                runtimeErr("Invalid try error variable constant");
+                break;
+            }
+            TryHandler handler;
+            handler.stackDepth = stack.size();
+            handler.frameIndex = frames.size() - 1;
+            handler.catchAddr = cf.ip + static_cast<size_t>(catchRel);
+            handler.varName = chunk.constants[varNameIdx].asString();
+            tryHandlers.push_back(handler);
+            break;
+        }
+        case OpCode::OP_END_TRY: {
+            if (!tryHandlers.empty()) tryHandlers.pop_back();
+            break;
+        }
+        case OpCode::OP_THROW: {
+            Value message = pop();
+            if (!throwValue(message)) {
+                runtimeErr(message.toString());
+            }
+            break;
+        }
         case OpCode::OP_HALT: {
             frames.clear();
             break;
@@ -1445,10 +1728,15 @@ void VM::run() {
             runtimeErr("Unknown opcode: " + std::to_string(instruction));
             break;
         }
-    }
-    } catch (const std::exception& e) {
-        runtimeErr(e.what());
-    }
+        }
+        } catch (const std::exception& e) {
+            if (!throwValue(Value(e.what()))) {
+                runtimeErr(e.what());
+            } else {
+                resumed = true;
+            }
+        }
+    } while (resumed);
 }
 
 // ============================================================
@@ -1500,6 +1788,11 @@ const char* opcodeName(uint8_t byte) {
     case OpCode::OP_NEW: return "OP_NEW";
     case OpCode::OP_UNSET_GLOBAL: return "OP_UNSET_GLOBAL";
     case OpCode::OP_CLEAR_GLOBALS: return "OP_CLEAR_GLOBALS";
+    case OpCode::OP_MOD: return "OP_MOD";
+    case OpCode::OP_DICT: return "OP_DICT";
+    case OpCode::OP_TRY: return "OP_TRY";
+    case OpCode::OP_END_TRY: return "OP_END_TRY";
+    case OpCode::OP_THROW: return "OP_THROW";
     case OpCode::OP_HALT: return "OP_HALT";
     default: return "OP_UNKNOWN";
     }
@@ -1510,6 +1803,7 @@ std::string disasmValue(const Value& v) {
     case Value::Type::String: return "\"" + v.asString() + "\"";
     case Value::Type::Array: return "[array]";
     case Value::Type::Bytes: return "[bytes]";
+    case Value::Type::Dict: return "[dict]";
     case Value::Type::Void: return "void";
     default: return v.toString();
     }
@@ -1569,7 +1863,11 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
             case OpCode::OP_SET_LOCAL:
             case OpCode::OP_CALL:
             case OpCode::OP_ARRAY:
+            case OpCode::OP_DICT:
                 ip += 1;
+                break;
+            case OpCode::OP_TRY:
+                ip += 4;
                 break;
             default:
                 break;
@@ -1655,6 +1953,22 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
                 uint8_t n = chunk.readByte(ip);
                 ip += 1;
                 out << "OP_ARRAY  " << static_cast<int>(n) << " elem(s)";
+                break;
+            }
+            case OpCode::OP_DICT: {
+                uint8_t n = chunk.readByte(ip);
+                ip += 1;
+                out << "OP_DICT  " << static_cast<int>(n) << " entry(s)";
+                break;
+            }
+            case OpCode::OP_TRY: {
+                uint16_t varIdx = chunk.readShort(ip);
+                ip += 2;
+                int16_t rel = static_cast<int16_t>(chunk.readShort(ip));
+                ip += 2;
+                out << "OP_TRY  var#";
+                out << varIdx;
+                out << "  catch +" << rel;
                 break;
             }
             default:

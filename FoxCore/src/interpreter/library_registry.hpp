@@ -1,12 +1,11 @@
-// FoxLang runtime library registration — single source of truth.
+// FoxLang runtime library registration - single source of truth.
 // Each library section is guarded by a FOX_LIB_<NAME> macro so that
-// individual DLLs only compile their own registration while the
-// static fallback (library_init.cpp) compiles everything.
+// each DLL compiles only its own registration.
 //
 // To add a new function:
 //   1. Implement it in libs/system/<lib>/SystemFunctions<Lib>.cpp
 //   2. Add registration call in the appropriate section below
-//   3. Done — both DLL and static paths are updated automatically.
+//   3. Done - fox.exe loads the function from fox.<lib>.dll.
 
 #pragma once
 #include "library_manager.hpp"
@@ -117,6 +116,62 @@ inline void register_util(LibraryManager& mgr) {
         Util util;
         return util.IntChangeDouble(args);
     });
+    mgr.registerSystemFunction("util", "arr_append", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.arr_append(args);
+    });
+    mgr.registerSystemFunction("util", "arr_pop", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.arr_pop(args);
+    });
+    mgr.registerSystemFunction("util", "arr_contains", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.arr_contains(args);
+    });
+    mgr.registerSystemFunction("util", "arr_slice", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.arr_slice(args);
+    });
+    mgr.registerSystemFunction("util", "arr_sort", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.arr_sort(args);
+    });
+    mgr.registerSystemFunction("util", "arr_length", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.arr_length(args);
+    });
+    mgr.registerSystemFunction("util", "str_contains", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_contains(args);
+    });
+    mgr.registerSystemFunction("util", "str_replace", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_replace(args);
+    });
+    mgr.registerSystemFunction("util", "str_split", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_split(args);
+    });
+    mgr.registerSystemFunction("util", "str_trim", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_trim(args);
+    });
+    mgr.registerSystemFunction("util", "str_lower", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_lower(args);
+    });
+    mgr.registerSystemFunction("util", "str_upper", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_upper(args);
+    });
+    mgr.registerSystemFunction("util", "str_substring", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_substring(args);
+    });
+    mgr.registerSystemFunction("util", "str_length", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.str_length(args);
+    });
 }
 #endif
 
@@ -221,27 +276,3 @@ inline void register_graphics(LibraryManager& mgr) {
     });
 }
 #endif
-
-// ============================================================
-//  Aggregate — called from the static fallback path
-// ============================================================
-inline void register_all_libraries(LibraryManager& mgr) {
-#ifdef FOX_LIB_MATH
-    register_math(mgr);
-#endif
-#ifdef FOX_LIB_RANDOM
-    register_random(mgr);
-#endif
-#ifdef FOX_LIB_FILE
-    register_file(mgr);
-#endif
-#ifdef FOX_LIB_UTIL
-    register_util(mgr);
-#endif
-#ifdef FOX_LIB_SOCKET
-    register_socket(mgr);
-#endif
-#ifdef FOX_LIB_GRAPHICS
-    register_graphics(mgr);
-#endif
-}

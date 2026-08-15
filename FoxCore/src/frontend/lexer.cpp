@@ -1,6 +1,14 @@
 #include "lexer.hpp"
 
-Lexer::Lexer(const std::string& src) : source(src), pos(0), line(1), col(1) {}
+Lexer::Lexer(const std::string& src) : source(src), pos(0), line(1), col(1) {
+    // Skip a UTF-8 BOM so source files saved by Windows editors parse cleanly.
+    if (source.size() >= 3 &&
+        static_cast<unsigned char>(source[0]) == 0xEF &&
+        static_cast<unsigned char>(source[1]) == 0xBB &&
+        static_cast<unsigned char>(source[2]) == 0xBF) {
+        pos = 3;
+    }
+}
 
 Token Lexer::makeToken(TokenT type, const std::string& value) {
     return Token(type, value, line, col);
@@ -95,6 +103,13 @@ std::string Lexer::readIdentifier() {
 	if (ident == "import") return "import";
     if (ident == "for") return "for";
     if (ident == "new") return "new";
+    if (ident == "else") return "else";
+    if (ident == "break") return "break";
+    if (ident == "continue") return "continue";
+    if (ident == "dict") return "dict";
+    if (ident == "try") return "try";
+    if (ident == "catch") return "catch";
+    if (ident == "error") return "error";
     return ident;
 }
 
@@ -258,6 +273,9 @@ Token Lexer::nextToken() {
 
     switch (c) {
     case '+': pos++; col++; return makeToken(TOKEN_PLUS, "+", tokenLine, tokenCol);
+    case '*': pos++; col++; return makeToken(TOKEN_MUL, "*", tokenLine, tokenCol);
+    case '/': pos++; col++; return makeToken(TOKEN_DIV, "/", tokenLine, tokenCol);
+    case '%': pos++; col++; return makeToken(TOKEN_MOD, "%", tokenLine, tokenCol);
     case '(': pos++; col++; return makeToken(TOKEN_LPAREN, "(", tokenLine, tokenCol);
     case ')': pos++; col++; return makeToken(TOKEN_RPAREN, ")", tokenLine, tokenCol);
     case '[': pos++; col++; return makeToken(TOKEN_LBRACKET, "[", tokenLine, tokenCol);
@@ -312,6 +330,13 @@ Token Lexer::nextToken() {
             if (ident == "free_all") return makeToken(TOKEN_FREE_ALL, "free_all", tokenLine, tokenCol);
             if (ident == "import") return makeToken(TOKEN_IMPORT, "import", tokenLine, tokenCol);
             if (ident == "new") return makeToken(TOKEN_NEW, "new", tokenLine, tokenCol);
+            if (ident == "else") return makeToken(TOKEN_ELSE, "else", tokenLine, tokenCol);
+            if (ident == "break") return makeToken(TOKEN_BREAK, "break", tokenLine, tokenCol);
+            if (ident == "continue") return makeToken(TOKEN_CONTINUE, "continue", tokenLine, tokenCol);
+            if (ident == "dict") return makeToken(TOKEN_DICT, "dict", tokenLine, tokenCol);
+            if (ident == "try") return makeToken(TOKEN_TRY, "try", tokenLine, tokenCol);
+            if (ident == "catch") return makeToken(TOKEN_CATCH, "catch", tokenLine, tokenCol);
+            if (ident == "error") return makeToken(TOKEN_ERROR, "error", tokenLine, tokenCol);
             return makeToken(TOKEN_IDENTIFIER, ident, tokenLine, tokenCol);
         }
         else if (isdigit(static_cast<unsigned char>(c))) {

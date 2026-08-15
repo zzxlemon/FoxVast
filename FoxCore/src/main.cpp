@@ -192,6 +192,7 @@ int main(int argc, char** argv) {
                 VM vm;
                 vm.loadProgram(prog);
                 vm.run();
+                if (ErrorReporter::hasError()) return 1;
             } catch (const std::exception& e) {
                 if (!ErrorReporter::hasError()) {
                     ErrorReporter::reportFromException("RuntimeError", e.what());
@@ -267,6 +268,7 @@ int main(int argc, char** argv) {
             i++;
             RegFunc();
             if (!farRun(filename)) return 1;
+            if (ErrorReporter::hasError()) return 1;
             return 0;
         }
         else if (in == "-help" || in == "-h") {
@@ -296,6 +298,7 @@ int main(int argc, char** argv) {
         if (!interpreter.parse_failed) {
             interpreter.runMainFunc();
         }
+        if (interpreter.parse_failed || ErrorReporter::hasError()) return 1;
     }
 
     return 0;

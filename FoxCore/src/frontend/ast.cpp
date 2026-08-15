@@ -6,6 +6,7 @@
 #include <iostream>   
 #include <stdexcept> 
 #include <typeinfo>
+#include <cmath>
 
 IdentifierExpr::IdentifierExpr(const std::string& n) : name(n) {}
 Value IdentifierExpr::evaluate(std::unordered_map<std::string, Value>& variables,
@@ -45,21 +46,58 @@ Value ArrayExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     return Value(values);
 }
 
+DictExpr::DictExpr(std::vector<std::pair<std::string, std::unique_ptr<Expr>>>&& e)
+    : entries(std::move(e)) {}
+
+Value DictExpr::evaluate(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    std::unordered_map<std::string, std::shared_ptr<Value>> result;
+    for (const auto& entry : entries) {
+        result[entry.first] = std::make_shared<Value>(entry.second->evaluate(variables, functions));
+    }
+    return Value(result);
+}
+
+Value::Type DictExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    for (const auto& entry : entries) {
+        entry.second->compileBytecode(cf, varTypes);
+        int keyIdx = cf.addConstantStringDedup(entry.first);
+        cf.chunk.writeOp(OpCode::OP_CONSTANT);
+        cf.chunk.writeShort(static_cast<uint16_t>(keyIdx));
+    }
+    cf.chunk.writeOp(OpCode::OP_DICT);
+    cf.chunk.writeByte(static_cast<uint8_t>(entries.size()));
+    return Value::Type::Dict;
+}
+
 IndexExpr::IndexExpr(std::unique_ptr<Expr> arr, std::unique_ptr<Expr> idx)
     : arrayExpr(std::move(arr)), indexExpr(std::move(idx)) {}
 
 Value IndexExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     Value arrValue = arrayExpr->evaluate(variables, functions);
-    if (arrValue.getType() != Value::Type::Array) {
-        throw std::runtime_error("Index target is not an array type");
+    if (arrValue.getType() == Value::Type::Array) {
+        int idx = indexExpr->evaluate(variables, functions).asInt();
+        const std::vector<Value>& arr = arrValue.asArray();
+        if (idx < 0 || idx >= static_cast<int>(arr.size())) {
+            throw std::runtime_error("Array index out of bounds: " + std::to_string(idx));
+        }
+        return arr[idx];
     }
-    int idx = indexExpr->evaluate(variables, functions).asInt();
-    const std::vector<Value>& arr = arrValue.asArray();
-    if (idx < 0 || idx >= static_cast<int>(arr.size())) {
-        throw std::runtime_error("Array index out of bounds: " + std::to_string(idx));
+    if (arrValue.getType() == Value::Type::Dict) {
+        const Value& keyValue = indexExpr->evaluate(variables, functions);
+        if (keyValue.getType() != Value::Type::String) {
+            throw std::runtime_error("Dict index must be a string");
+        }
+        const auto& dict = arrValue.asDict();
+        auto it = dict.find(keyValue.asString());
+        if (it == dict.end()) {
+            throw std::runtime_error("Undefined dict key: " + keyValue.asString());
+        }
+        return *it->second;
     }
-    return arr[idx];
+    throw std::runtime_error("Index target is not an array or dict type");
 }
 
 CallExpr::CallExpr(const std::string& name) : funcName(name) {}
@@ -146,6 +184,13 @@ Value BinaryExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         switch (op) {
         case TOKEN_PLUS: result = leftVal.asInt() + rightVal.asInt(); break;
         case TOKEN_MINUS: result = leftVal.asInt() - rightVal.asInt(); break;
+        case TOKEN_MUL: result = leftVal.asInt() * rightVal.asInt(); break;
+        case TOKEN_DIV:
+            if (rightVal.asInt() == 0) throw std::runtime_error("Division by zero");
+            result = leftVal.asInt() / rightVal.asInt(); break;
+        case TOKEN_MOD:
+            if (rightVal.asInt() == 0) throw std::runtime_error("Modulo by zero");
+            result = leftVal.asInt() % rightVal.asInt(); break;
         default: throw std::runtime_error("Unsupported operator");
         }
         return Value(result);
@@ -155,6 +200,13 @@ Value BinaryExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         switch (op) {
         case TOKEN_PLUS: result = leftVal.asDouble() + rightVal.asDouble(); break;
         case TOKEN_MINUS: result = leftVal.asDouble() - rightVal.asDouble(); break;
+        case TOKEN_MUL: result = leftVal.asDouble() * rightVal.asDouble(); break;
+        case TOKEN_DIV:
+            if (rightVal.asDouble() == 0.0) throw std::runtime_error("Division by zero");
+            result = leftVal.asDouble() / rightVal.asDouble(); break;
+        case TOKEN_MOD:
+            if (rightVal.asDouble() == 0.0) throw std::runtime_error("Modulo by zero");
+            result = std::fmod(leftVal.asDouble(), rightVal.asDouble()); break;
         default: throw std::runtime_error("Unsupported operator");
         }
         return Value(result);
@@ -292,6 +344,17 @@ Value CompareExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         default: throw std::runtime_error("Comparison error: only == and != supported for strings");
         }
     }
+    else if (leftVal.getType() == rightVal.getType() &&
+             (leftVal.getType() == Value::Type::Array ||
+              leftVal.getType() == Value::Type::Dict ||
+              leftVal.getType() == Value::Type::Bytes)) {
+        bool equal = valuesEqual(leftVal, rightVal);
+        switch (op) {
+        case CompareType::EQ: result = equal; break;
+        case CompareType::NE: result = !equal; break;
+        default: throw std::runtime_error("Comparison error: only == and != supported for this type");
+        }
+    }
     else {
         throw std::runtime_error("Comparison error: only int/double of same type supported");
     }
@@ -397,7 +460,15 @@ Value::Type BinaryExpr::compileBytecode(CompiledFunction& cf,
         leftType != Value::Type::Void && rightType != Value::Type::Void) {
         if ((leftType == Value::Type::Double && rightType == Value::Type::Int) ||
             (leftType == Value::Type::Int && rightType == Value::Type::Double)) {
-            std::string opName = (op == TOKEN_PLUS) ? "add" : "subtract";
+            std::string opName;
+            switch (op) {
+            case TOKEN_PLUS: opName = "add"; break;
+            case TOKEN_MINUS: opName = "subtract"; break;
+            case TOKEN_MUL: opName = "multiply"; break;
+            case TOKEN_DIV: opName = "divide"; break;
+            case TOKEN_MOD: opName = "modulo"; break;
+            default: opName = "operate on"; break;
+            }
             throw std::runtime_error("TypeError: Cannot " + opName + " int and double without explicit cast");
         }
         if (leftType == Value::Type::String && rightType != Value::Type::String) {
@@ -407,7 +478,16 @@ Value::Type BinaryExpr::compileBytecode(CompiledFunction& cf,
             throw std::runtime_error("TypeError: Cannot add non-string and string");
         }
     }
-    cf.chunk.writeOp((op == TOKEN_PLUS) ? OpCode::OP_ADD : OpCode::OP_SUB);
+    OpCode opcode;
+    switch (op) {
+    case TOKEN_PLUS: opcode = OpCode::OP_ADD; break;
+    case TOKEN_MINUS: opcode = OpCode::OP_SUB; break;
+    case TOKEN_MUL: opcode = OpCode::OP_MUL; break;
+    case TOKEN_DIV: opcode = OpCode::OP_DIV; break;
+    case TOKEN_MOD: opcode = OpCode::OP_MOD; break;
+    default: throw std::runtime_error("BytecodeCompiler: unsupported binary operator");
+    }
+    cf.chunk.writeOp(opcode);
     if (leftType == Value::Type::Double || rightType == Value::Type::Double)
         return Value::Type::Double;
     if (leftType == Value::Type::Int && rightType == Value::Type::Int)
@@ -645,7 +725,14 @@ Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables
     Value idxVal = index->evaluate(variables, functions);
     Value val = value->evaluate(variables, functions);
     if (variables.find(varName) == variables.end()) {
-        throw std::runtime_error("Undefined array variable: " + varName);
+        throw std::runtime_error("Undefined array or dict variable: " + varName);
+    }
+    if (variables[varName].getType() == Value::Type::Dict) {
+        if (idxVal.getType() != Value::Type::String) {
+            throw std::runtime_error("Dict index must be a string");
+        }
+        variables[varName].asDictRef()[idxVal.asString()] = std::make_shared<Value>(val);
+        return Value();
     }
     std::vector<Value>& arr = variables[varName].asArrayRef();
     int idx = idxVal.asInt();
@@ -656,8 +743,9 @@ Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables
     return Value();
 }
 
-IfStmt::IfStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b)
-    : condition(cond), body(std::move(b)) {}
+IfStmt::IfStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b,
+               std::vector<std::unique_ptr<Stmt>>&& eb)
+    : condition(cond), body(std::move(b)), elseBody(std::move(eb)) {}
 Value IfStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     if (condition.empty()) return Value();
@@ -668,6 +756,14 @@ Value IfStmt::execute(std::unordered_map<std::string, Value>& variables,
     Value condResult = condExpr->evaluate(variables, functions);
     if (condResult.asBool()) {
         for (const auto& stmt : body) {
+            if (!stmt) continue;
+            Value val = stmt->execute(variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
+    } else {
+        for (const auto& stmt : elseBody) {
             if (!stmt) continue;
             Value val = stmt->execute(variables, functions);
             if (val.getType() != Value::Type::Void) {
@@ -689,12 +785,18 @@ Value WhileStmt::execute(std::unordered_map<std::string, Value>& variables,
     auto condExpr = Parser::parseExpr(condLexer, condToken);
     Value condResult = condExpr->evaluate(variables, functions);
     while (condResult.asBool()) {
-        for (const auto& stmt : body) {
-            if (!stmt) continue;
-            Value val = stmt->execute(variables, functions);
-            if (val.getType() != Value::Type::Void) {
-                return val;
+        try {
+            for (const auto& stmt : body) {
+                if (!stmt) continue;
+                Value val = stmt->execute(variables, functions);
+                if (val.getType() != Value::Type::Void) {
+                    return val;
+                }
             }
+        } catch (const BreakException&) {
+            break;
+        } catch (const ContinueException&) {
+            // fall through to condition re-evaluation
         }
         condLexer = Lexer(condition);
         condToken = condLexer.nextToken();
@@ -723,12 +825,18 @@ Value ForStmt::execute(std::unordered_map<std::string, Value>& variables,
             if (!condResult.asBool()) break;
         }
         // Empty condition = infinite loop (C semantics, aligns with bytecode OP_TRUE)
-        for (const auto& stmt : body) {
-            if (!stmt) continue;
-            Value val = stmt->execute(variables, functions);
-            if (val.getType() != Value::Type::Void) {
-                return val;
+        try {
+            for (const auto& stmt : body) {
+                if (!stmt) continue;
+                Value val = stmt->execute(variables, functions);
+                if (val.getType() != Value::Type::Void) {
+                    return val;
+                }
             }
+        } catch (const BreakException&) {
+            break;
+        } catch (const ContinueException&) {
+            // execute iterator below
         }
         if (!iter.empty()) {
             Parser::parseLine(iter, variables, functions);
@@ -747,4 +855,54 @@ GotoStmt::GotoStmt(const std::string& l) : label(l) {}
 Value GotoStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     throw GotoException(label);
+}
+
+Value BreakStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    throw BreakException();
+}
+
+Value ContinueStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    throw ContinueException();
+}
+
+ErrorStmt::ErrorStmt(std::unique_ptr<Expr> m) : message(std::move(m)) {}
+Value ErrorStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    Value msg = message->evaluate(variables, functions);
+    if (msg.getType() != Value::Type::String) {
+        throw std::runtime_error("error() message must be a string");
+    }
+    throw LangErrorException(msg.asString());
+}
+
+TryStmt::TryStmt(const std::string& var, std::vector<std::unique_ptr<Stmt>>&& b,
+                 std::vector<std::unique_ptr<Stmt>>&& cb)
+    : errorVar(var), body(std::move(b)), catchBody(std::move(cb)) {}
+Value TryStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    try {
+        for (const auto& stmt : body) {
+            if (!stmt) continue;
+            Value val = stmt->execute(variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
+    } catch (const BreakException&) {
+        throw;
+    } catch (const ContinueException&) {
+        throw;
+    } catch (const std::exception& e) {
+        variables[errorVar] = Value(e.what());
+        for (const auto& stmt : catchBody) {
+            if (!stmt) continue;
+            Value val = stmt->execute(variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
+    }
+    return Value();
 }

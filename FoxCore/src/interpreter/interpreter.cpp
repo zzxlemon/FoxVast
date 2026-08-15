@@ -6,8 +6,7 @@
 #include "../util/error_reporter.hpp"
 #include <iostream>
 #include <stdexcept>
-#include "../../libs/system/random/SystemFunctionsRandom.h"
-#include "../../libs/system/fs/SystemFunctionsFile.h"
+#include <cstdlib>
 #include "library_manager.hpp"   
 
 std::vector<std::string> functions_register_map;
@@ -121,6 +120,15 @@ Value Interpreter::executeFunction(const Function& func) {
         else if (func.returnType == "double" && returnValue.getType() != Value::Type::Double) {
             throw std::runtime_error("Function " + func.name + " expects to return double type, actually returned other type");
         }
+        else if (func.returnType == "array" && returnValue.getType() != Value::Type::Array) {
+            throw std::runtime_error("Function " + func.name + " expects to return array type, actually returned other type");
+        }
+        else if (func.returnType == "dict" && returnValue.getType() != Value::Type::Dict) {
+            throw std::runtime_error("Function " + func.name + " expects to return dict type, actually returned other type");
+        }
+        else if (func.returnType == "bytes" && returnValue.getType() != Value::Type::Bytes) {
+            throw std::runtime_error("Function " + func.name + " expects to return bytes type, actually returned other type");
+        }
     }
     // A void function must not return a value (P3-8)
     if (func.returnType == "void" && returnValue.getType() != Value::Type::Void) {
@@ -191,10 +199,12 @@ Value Interpreter::SystemFunctionBuildIn(const std::string& funcName, const std:
 void RegFunc() {
     static bool initialized = false;
     if (!initialized) {
-        // Always register the built-in libraries (fallback if DLLs are missing)
-        initSystemLibraries();
-        // Load external library DLLs — overwrites built-in entries when found
-        LoadFoxLibs(LibraryManager::getInstance());
+        initSystemLibraries(); // no-op: system libraries are DLL-only
+        if (!LoadFoxLibs(LibraryManager::getInstance())) {
+            ErrorReporter::reportSimple("LibraryError",
+                "No FoxLang library DLLs found. Place fox.*.dll next to fox.exe.");
+            std::exit(1);
+        }
         initialized = true;
     }
 }

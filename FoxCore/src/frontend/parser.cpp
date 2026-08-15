@@ -85,6 +85,9 @@ static const char* tokenTypeName(TokenT type) {
     case TOKEN_GE: return "'>='";
     case TOKEN_LE: return "'<='";
     case TOKEN_NOT: return "'!'";
+    case TOKEN_MUL: return "'*'";
+    case TOKEN_DIV: return "'/'";
+    case TOKEN_MOD: return "'%'";
     default: return "token";
     }
 }
@@ -204,6 +207,33 @@ std::unique_ptr<Expr> Parser::parsePrimary(Lexer& lexer, Token& currentToken) {
         auto arrayExpr = std::unique_ptr<ArrayExpr>(new ArrayExpr(std::move(elements)));
         return parsePostfix(lexer, currentToken, std::move(arrayExpr));
     }
+    else if (token.type == TOKEN_LBRACE) {
+        eat(lexer, currentToken, TOKEN_LBRACE);
+        std::vector<std::pair<std::string, std::unique_ptr<Expr>>> entries;
+        while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+            std::string key;
+            if (currentToken.type == TOKEN_STRING) {
+                key = currentToken.value;
+                eat(lexer, currentToken, TOKEN_STRING);
+            } else if (currentToken.type == TOKEN_IDENTIFIER) {
+                key = currentToken.value;
+                eat(lexer, currentToken, TOKEN_IDENTIFIER);
+            } else {
+                throw std::runtime_error(makeParseError(currentToken,
+                    "Dict key must be a string or identifier"));
+            }
+            eat(lexer, currentToken, TOKEN_COLON);
+            auto value = parseExpr(lexer, currentToken);
+            entries.emplace_back(key, std::move(value));
+            if (currentToken.type == TOKEN_COMMA) {
+                eat(lexer, currentToken, TOKEN_COMMA);
+                skipWhitespace(lexer, currentToken);
+            }
+        }
+        eat(lexer, currentToken, TOKEN_RBRACE);
+        auto dictExpr = std::unique_ptr<DictExpr>(new DictExpr(std::move(entries)));
+        return parsePostfix(lexer, currentToken, std::move(dictExpr));
+    }
     else if (token.type == TOKEN_LPAREN) {
         eat(lexer, currentToken, TOKEN_LPAREN);
         auto expr = parseExpr(lexer, currentToken);
@@ -215,12 +245,24 @@ std::unique_ptr<Expr> Parser::parsePrimary(Lexer& lexer, Token& currentToken) {
     }
 }
 
-std::unique_ptr<Expr> Parser::parseAdd(Lexer& lexer, Token& currentToken) {
+std::unique_ptr<Expr> Parser::parseTerm(Lexer& lexer, Token& currentToken) {
     auto left = parsePrimary(lexer, currentToken);
-    while (currentToken.type == TOKEN_PLUS || currentToken.type == TOKEN_MINUS) {
+    while (currentToken.type == TOKEN_MUL || currentToken.type == TOKEN_DIV ||
+           currentToken.type == TOKEN_MOD) {
         TokenT op = currentToken.type;
         eat(lexer, currentToken, op);
         auto right = parsePrimary(lexer, currentToken);
+        left = std::unique_ptr<BinaryExpr>(new BinaryExpr(std::move(left), op, std::move(right)));
+    }
+    return left;
+}
+
+std::unique_ptr<Expr> Parser::parseAdd(Lexer& lexer, Token& currentToken) {
+    auto left = parseTerm(lexer, currentToken);
+    while (currentToken.type == TOKEN_PLUS || currentToken.type == TOKEN_MINUS) {
+        TokenT op = currentToken.type;
+        eat(lexer, currentToken, op);
+        auto right = parseTerm(lexer, currentToken);
         left = std::unique_ptr<BinaryExpr>(new BinaryExpr(std::move(left), op, std::move(right)));
     }
     return left;
@@ -303,12 +345,13 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
     std::string stmt;
     skipWhitespace(lexer, currentToken);
 
-    if (currentToken.type == TOKEN_IF || currentToken.type == TOKEN_WHILE || currentToken.type == TOKEN_FOR) {
+    if (currentToken.type == TOKEN_IF || currentToken.type == TOKEN_WHILE ||
+        currentToken.type == TOKEN_FOR || currentToken.type == TOKEN_TRY) {
         int braceDepth = 0;
         bool insideBlock = false;
         int parenDepth = 0;
         while (currentToken.type != TOKEN_EOF) {
-            if (currentToken.type == TOKEN_LBRACE) {
+            if (currentToken.type == TOKEN_LBRACE && parenDepth == 0) {
                 insideBlock = true;
                 braceDepth++;
             }
@@ -318,6 +361,14 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
                     stmt += "} ";
                     currentToken = lexer.nextToken();
                     skipWhitespace(lexer, currentToken);
+                    while (currentToken.type == TOKEN_NEWLINE) {
+                        currentToken = lexer.nextToken();
+                        skipWhitespace(lexer, currentToken);
+                    }
+                    if (currentToken.type == TOKEN_ELSE || currentToken.type == TOKEN_CATCH) {
+                        insideBlock = false;
+                        continue;
+                    }
                     break;
                 }
             }
@@ -346,7 +397,14 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
         }
     }
     else {
-        while (currentToken.type != TOKEN_EOF && currentToken.type != TOKEN_NEWLINE && currentToken.type != TOKEN_RBRACE) {
+        int exprBraceDepth = 0;
+        while (currentToken.type != TOKEN_EOF && currentToken.type != TOKEN_NEWLINE &&
+               !(currentToken.type == TOKEN_RBRACE && exprBraceDepth == 0)) {
+            if (currentToken.type == TOKEN_LBRACE) {
+                exprBraceDepth++;
+            } else if (currentToken.type == TOKEN_RBRACE && exprBraceDepth > 0) {
+                exprBraceDepth--;
+            }
             if (currentToken.type == TOKEN_STRING) {
                 stmt += "\"" + currentToken.value + "\"";
             }
@@ -409,6 +467,10 @@ void Parser::parseFunction() {
             paramType = "string";
             eat(funcLexer, funcCurrentToken, TOKEN_STRING_TYPE);
         }
+        else if (funcCurrentToken.type == TOKEN_DICT) {
+            paramType = "dict";
+            eat(funcLexer, funcCurrentToken, TOKEN_DICT);
+        }
         else {
             throw std::runtime_error(makeParseError(funcCurrentToken, "Unsupported parameter type: " + funcCurrentToken.value));
         }
@@ -440,6 +502,10 @@ void Parser::parseFunction() {
         else if (funcCurrentToken.type == TOKEN_DOUBLE) {
             returnType = "double";
             eat(funcLexer, funcCurrentToken, TOKEN_DOUBLE);
+        }
+        else if (funcCurrentToken.type == TOKEN_DICT) {
+            returnType = "dict";
+            eat(funcLexer, funcCurrentToken, TOKEN_DICT);
         }
         else {
             throw std::runtime_error(makeParseError(funcCurrentToken, "Unsupported return type: " + funcCurrentToken.value));
@@ -531,6 +597,29 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
     if (currentToken.type == TOKEN_WHILE) {
         WhileStatement whileStmt = parseWhileStatement(lineLexer, currentToken);
         handler.onWhile(std::move(whileStmt));
+        return;
+    }
+    if (currentToken.type == TOKEN_TRY) {
+        TryStatement tryStmt = parseTryStatement(lineLexer, currentToken);
+        handler.onTry(std::move(tryStmt));
+        return;
+    }
+    if (currentToken.type == TOKEN_BREAK) {
+        eat(lineLexer, currentToken, TOKEN_BREAK);
+        handler.onBreak();
+        return;
+    }
+    if (currentToken.type == TOKEN_CONTINUE) {
+        eat(lineLexer, currentToken, TOKEN_CONTINUE);
+        handler.onContinue();
+        return;
+    }
+    if (currentToken.type == TOKEN_ERROR) {
+        eat(lineLexer, currentToken, TOKEN_ERROR);
+        eat(lineLexer, currentToken, TOKEN_LPAREN);
+        auto message = parseExpr(lineLexer, currentToken);
+        eat(lineLexer, currentToken, TOKEN_RPAREN);
+        handler.onError(std::move(message));
         return;
     }
     if (currentToken.type == TOKEN_FN) {
@@ -737,6 +826,22 @@ namespace {
         void onFor(ForStatement forStmt) override {
             retValue = Parser::executeForStatement(forStmt, variables, functions);
         }
+        void onTry(TryStatement tryStmt) override {
+            TryStmt stmt(tryStmt.errorVar,
+                Parser::compileBody(tryStmt.body),
+                Parser::compileBody(tryStmt.catchBody));
+            retValue = stmt.execute(variables, functions);
+        }
+        void onBreak() override {
+            throw BreakException();
+        }
+        void onContinue() override {
+            throw ContinueException();
+        }
+        void onError(std::unique_ptr<Expr> message) override {
+            ErrorStmt stmt(std::move(message));
+            stmt.execute(variables, functions);
+        }
         void onFnLabel(const std::string& name) override {}
         void onGoto(const std::string& name) override {
             throw GotoException(name);
@@ -787,13 +892,29 @@ namespace {
             stmt = std::make_unique<IndexAssignStmt>(name, std::move(index), std::move(value));
         }
         void onIf(IfStatement ifStmt) override {
-            stmt = std::make_unique<IfStmt>(ifStmt.condition, Parser::compileBody(ifStmt.body));
+            stmt = std::make_unique<IfStmt>(ifStmt.condition,
+                Parser::compileBody(ifStmt.body),
+                Parser::compileBody(ifStmt.elseBody));
         }
         void onWhile(WhileStatement whileStmt) override {
             stmt = std::make_unique<WhileStmt>(whileStmt.condition, Parser::compileBody(whileStmt.body));
         }
         void onFor(ForStatement forStmt) override {
             stmt = std::make_unique<ForStmt>(forStmt.init, forStmt.condition, forStmt.iter, Parser::compileBody(forStmt.body));
+        }
+        void onTry(TryStatement tryStmt) override {
+            stmt = std::make_unique<TryStmt>(tryStmt.errorVar,
+                Parser::compileBody(tryStmt.body),
+                Parser::compileBody(tryStmt.catchBody));
+        }
+        void onBreak() override {
+            stmt = std::make_unique<BreakStmt>();
+        }
+        void onContinue() override {
+            stmt = std::make_unique<ContinueStmt>();
+        }
+        void onError(std::unique_ptr<Expr> message) override {
+            stmt = std::make_unique<ErrorStmt>(std::move(message));
         }
         void onFnLabel(const std::string& name) override {
             stmt = std::make_unique<LabelStmt>(name);
@@ -810,7 +931,8 @@ std::unique_ptr<Stmt> Parser::parseLineToStmt(const std::string& line) {
     std::string trimmed = line;
     size_t start = trimmed.find_first_not_of(" \t");
     if (start != std::string::npos) trimmed = trimmed.substr(start);
-    if (trimmed.rfind("int ", 0) == 0 || trimmed.rfind("double ", 0) == 0 || trimmed.rfind("string ", 0) == 0) {
+    if (trimmed.rfind("int ", 0) == 0 || trimmed.rfind("double ", 0) == 0 ||
+        trimmed.rfind("string ", 0) == 0 || trimmed.rfind("dict ", 0) == 0) {
         return nullptr;
     }
     CompilingHandler handler;
@@ -891,6 +1013,11 @@ IfStatement Parser::parseIfStatement(Lexer& lexer, Token& currentToken) {
     std::string condStr;
     int parenDepth = 0;
     while (currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_NEWLINE) {
+            currentToken = lexer.nextToken();
+            skipWhitespace(lexer, currentToken);
+            continue;
+        }
         if (currentToken.type == TOKEN_LPAREN) parenDepth++;
         if (currentToken.type == TOKEN_RPAREN) {
             if (parenDepth == 0) break;
@@ -928,6 +1055,30 @@ IfStatement Parser::parseIfStatement(Lexer& lexer, Token& currentToken) {
             ifStmt.body.push_back(stmt);
         }
     }
+
+    if (currentToken.type == TOKEN_ELSE) {
+        eat(lexer, currentToken, TOKEN_ELSE);
+        if (currentToken.type == TOKEN_LBRACE) {
+            eat(lexer, currentToken, TOKEN_LBRACE);
+            while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+                if (currentToken.type == TOKEN_NEWLINE) {
+                    currentToken = lexer.nextToken();
+                    continue;
+                }
+                std::string stmt = parseSingleStatement(lexer, currentToken);
+                if (!stmt.empty()) {
+                    ifStmt.elseBody.push_back(stmt);
+                }
+                skipWhitespace(lexer, currentToken);
+            }
+            eat(lexer, currentToken, TOKEN_RBRACE);
+        } else {
+            std::string stmt = parseSingleStatement(lexer, currentToken);
+            if (!stmt.empty()) {
+                ifStmt.elseBody.push_back(stmt);
+            }
+        }
+    }
     return ifStmt;
 }
 
@@ -948,6 +1099,13 @@ Value Parser::executeIfStatement(const IfStatement& ifStmt,
                 return val;
             }
         }
+    } else {
+        for (const auto& stmt : ifStmt.elseBody) {
+            Value val = parseLine(stmt, variables, functions);
+            if (val.getType() != Value::Type::Void) {
+                return val;
+            }
+        }
     }
     return Value();
 }
@@ -961,6 +1119,11 @@ WhileStatement Parser::parseWhileStatement(Lexer& lexer, Token& currentToken) {
     std::string condStr;
     int parenDepth = 0;
     while (currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_NEWLINE) {
+            currentToken = lexer.nextToken();
+            skipWhitespace(lexer, currentToken);
+            continue;
+        }
         if (currentToken.type == TOKEN_LPAREN) parenDepth++;
         if (currentToken.type == TOKEN_RPAREN) {
             if (parenDepth == 0) break;
@@ -1034,6 +1197,11 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
 
     std::string init;
     while (currentToken.type != TOKEN_SEMICOLON && currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_NEWLINE) {
+            currentToken = lexer.nextToken();
+            skipWhitespace(lexer, currentToken);
+            continue;
+        }
         if (currentToken.type == TOKEN_STRING)
             init += "\"" + currentToken.value + "\" ";
         else
@@ -1044,6 +1212,11 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
     eat(lexer, currentToken, TOKEN_SEMICOLON);
     std::string condition;
     while (currentToken.type != TOKEN_SEMICOLON && currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_NEWLINE) {
+            currentToken = lexer.nextToken();
+            skipWhitespace(lexer, currentToken);
+            continue;
+        }
         if (currentToken.type == TOKEN_STRING)
             condition += "\"" + currentToken.value + "\" ";
         else
@@ -1055,6 +1228,11 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
     std::string iter;
     int iterParenDepth = 0;
     while (currentToken.type != TOKEN_EOF) {
+        if (currentToken.type == TOKEN_NEWLINE) {
+            currentToken = lexer.nextToken();
+            skipWhitespace(lexer, currentToken);
+            continue;
+        }
         if (currentToken.type == TOKEN_LPAREN) iterParenDepth++;
         if (currentToken.type == TOKEN_RPAREN) {
             if (iterParenDepth == 0) break;
@@ -1099,6 +1277,71 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
         }
     }
     return forStmt;
+}
+
+TryStatement Parser::parseTryStatement(Lexer& lexer, Token& currentToken) {
+    TryStatement tryStmt;
+    skipWhitespace(lexer, currentToken);
+    eat(lexer, currentToken, TOKEN_TRY);
+
+    if (currentToken.type == TOKEN_LBRACE) {
+        eat(lexer, currentToken, TOKEN_LBRACE);
+        while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+            if (currentToken.type == TOKEN_NEWLINE) {
+                currentToken = lexer.nextToken();
+                continue;
+            }
+            std::string stmt = parseSingleStatement(lexer, currentToken);
+            if (!stmt.empty()) {
+                tryStmt.body.push_back(stmt);
+            }
+            skipWhitespace(lexer, currentToken);
+        }
+        eat(lexer, currentToken, TOKEN_RBRACE);
+    } else {
+        std::string stmt = parseSingleStatement(lexer, currentToken);
+        if (!stmt.empty()) {
+            tryStmt.body.push_back(stmt);
+        }
+    }
+
+    if (currentToken.type != TOKEN_CATCH) {
+        throw std::runtime_error(makeParseError(currentToken,
+            "Expected 'catch' after try block"));
+    }
+    eat(lexer, currentToken, TOKEN_CATCH);
+
+    if (currentToken.type == TOKEN_LPAREN) {
+        eat(lexer, currentToken, TOKEN_LPAREN);
+        tryStmt.errorVar = currentToken.value;
+        eat(lexer, currentToken, TOKEN_IDENTIFIER);
+        eat(lexer, currentToken, TOKEN_RPAREN);
+    } else {
+        tryStmt.errorVar = currentToken.value;
+        eat(lexer, currentToken, TOKEN_IDENTIFIER);
+    }
+
+    if (currentToken.type == TOKEN_LBRACE) {
+        eat(lexer, currentToken, TOKEN_LBRACE);
+        while (currentToken.type != TOKEN_RBRACE && currentToken.type != TOKEN_EOF) {
+            if (currentToken.type == TOKEN_NEWLINE) {
+                currentToken = lexer.nextToken();
+                continue;
+            }
+            std::string stmt = parseSingleStatement(lexer, currentToken);
+            if (!stmt.empty()) {
+                tryStmt.catchBody.push_back(stmt);
+            }
+            skipWhitespace(lexer, currentToken);
+        }
+        eat(lexer, currentToken, TOKEN_RBRACE);
+    } else {
+        std::string stmt = parseSingleStatement(lexer, currentToken);
+        if (!stmt.empty()) {
+            tryStmt.catchBody.push_back(stmt);
+        }
+    }
+    return tryStmt;
 }
 
 Value Parser::executeForStatement(const ForStatement& forStmt,

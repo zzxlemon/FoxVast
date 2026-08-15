@@ -15,7 +15,7 @@ macro(fox_dll DLL_NAME LIB_CPP LIB_INCLUDE)
     target_include_directories(${DLL_NAME} PRIVATE ${COMMON_INCLUDES} ${LIB_INCLUDE})
     target_link_libraries(${DLL_NAME} PRIVATE fox_rt)
     set_target_properties(${DLL_NAME} PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/core
         OUTPUT_NAME "fox.${DLL_NAME}"
         PREFIX ""
         POSITION_INDEPENDENT_CODE ON
@@ -61,7 +61,7 @@ target_include_directories(socket PRIVATE
 )
 target_link_libraries(socket PRIVATE fox_rt ws2_32)
 set_target_properties(socket PROPERTIES
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/core
     OUTPUT_NAME "fox.socket"
     PREFIX ""
     POSITION_INDEPENDENT_CODE ON
@@ -85,7 +85,7 @@ if(EXISTS ${FOX_ROOT}/native/glad/include/glad/glad.cpp AND
     target_link_directories(graphics PRIVATE ${FOX_ROOT}/native/glfw/lib)
     target_link_libraries(graphics PRIVATE fox_rt glfw3 opengl32 gdi32 user32 kernel32)
     set_target_properties(graphics PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/core
         OUTPUT_NAME "fox.graphics"
         PREFIX ""
         POSITION_INDEPENDENT_CODE ON

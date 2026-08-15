@@ -81,6 +81,16 @@ public:
         std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
+class DictExpr : public Expr {
+public:
+    std::vector<std::pair<std::string, std::unique_ptr<Expr>>> entries;
+    explicit DictExpr(std::vector<std::pair<std::string, std::unique_ptr<Expr>>>&& e);
+    Value evaluate(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
+};
+
 class IndexExpr : public Expr {
 public:
     std::unique_ptr<Expr> arrayExpr;
@@ -267,7 +277,9 @@ class IfStmt : public Stmt {
 public:
     std::string condition;
     std::vector<std::unique_ptr<Stmt>> body;
-    IfStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b);
+    std::vector<std::unique_ptr<Stmt>> elseBody;
+    IfStmt(const std::string& cond, std::vector<std::unique_ptr<Stmt>>&& b,
+           std::vector<std::unique_ptr<Stmt>>&& eb);
     Value execute(std::unordered_map<std::string, Value>& variables,
         std::unordered_map<std::string, Function>& functions) override;
 };
@@ -309,12 +321,44 @@ public:
         std::unordered_map<std::string, Function>& functions) override;
 };
 
+class BreakStmt : public Stmt {
+public:
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class ContinueStmt : public Stmt {
+public:
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class ErrorStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> message;
+    explicit ErrorStmt(std::unique_ptr<Expr> m);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
+class TryStmt : public Stmt {
+public:
+    std::string errorVar;
+    std::vector<std::unique_ptr<Stmt>> body;
+    std::vector<std::unique_ptr<Stmt>> catchBody;
+    TryStmt(const std::string& var, std::vector<std::unique_ptr<Stmt>>&& b,
+            std::vector<std::unique_ptr<Stmt>>&& cb);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
 // Keep old struct names as aliases for backward-compat during transition
 // (they are no longer used internally, BytecodeCompiler gets updated separately)
 // Parsing intermediates — store raw source lines, converted to Stmt nodes later
 struct IfStatement {
     std::string condition;
     std::vector<std::string> body;
+    std::vector<std::string> elseBody;
 };
 
 struct WhileStatement {
@@ -327,6 +371,12 @@ struct ForStatement {
     std::string condition;
     std::string iter;
     std::vector<std::string> body;
+};
+
+struct TryStatement {
+    std::string errorVar;
+    std::vector<std::string> body;
+    std::vector<std::string> catchBody;
 };
 
 class FreeStmt : public Stmt {

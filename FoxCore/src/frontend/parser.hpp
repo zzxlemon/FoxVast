@@ -16,6 +16,20 @@ struct GotoException : std::exception {
     const char* what() const noexcept override { return label.c_str(); }
 };
 
+struct BreakException : std::exception {
+    const char* what() const noexcept override { return "break outside loop"; }
+};
+
+struct ContinueException : std::exception {
+    const char* what() const noexcept override { return "continue outside loop"; }
+};
+
+struct LangErrorException : std::exception {
+    std::string message;
+    explicit LangErrorException(const std::string& m) : message(m) {}
+    const char* what() const noexcept override { return message.c_str(); }
+};
+
 // Cross-file import support: 'import "file.fox"' statements are recorded here
 // (resolved to full paths) while parsing; the interpreter/compiler then merge
 // the functions of every imported file. import_base_file is the file currently
@@ -39,6 +53,10 @@ struct StmtHandler {
     virtual void onIf(IfStatement ifStmt) = 0;
     virtual void onWhile(WhileStatement whileStmt) = 0;
     virtual void onFor(ForStatement forStmt) = 0;
+    virtual void onTry(TryStatement tryStmt) = 0;
+    virtual void onBreak() = 0;
+    virtual void onContinue() = 0;
+    virtual void onError(std::unique_ptr<Expr> message) = 0;
     virtual void onFnLabel(const std::string& name) = 0;
     virtual void onGoto(const std::string& name) = 0;
 };
@@ -53,6 +71,7 @@ private:
     
     static std::unique_ptr<Expr> parsePrimary(Lexer& lexer, Token& currentToken);
     static std::unique_ptr<Expr> parsePostfix(Lexer& lexer, Token& currentToken, std::unique_ptr<Expr> expr);
+    static std::unique_ptr<Expr> parseTerm(Lexer& lexer, Token& currentToken);
     static std::unique_ptr<Expr> parseAdd(Lexer& lexer, Token& currentToken); 
     
     static void parseAssignment(Lexer& lexer, Token& currentToken,
@@ -94,6 +113,8 @@ private:
     static WhileStatement parseWhileStatement(Lexer& lexer, Token& currentToken);
     
     static ForStatement parseForStatement(Lexer& lexer, Token& currentToken);
+
+    static TryStatement parseTryStatement(Lexer& lexer, Token& currentToken);
     
     static void parseImportStatement(Lexer& lexer, Token& currentToken,
         std::unordered_map<std::string, Value>& variables,

@@ -4,7 +4,7 @@
 
 > **FoxLang** 是一款由 [Lemon Studio](https://lemdev.top) 倾力打造的现代化、强类型命令式脚本编程语言。它抛弃了传统语言臃肿的变量声明与复杂的教条，引入了独创的管道式输入流与指令级终端控制，旨在为极客们提供最纯粹、最直观的开发体验。
 
-**官方网站**：[lemdev.top](https://lemdev.top) | **标准库文档**：[标准库文档](https://lemdev.top/fox/docs/index.html)
+**官方网站**：[lemdev.top](https://lemdev.top/fox/) | **标准库文档**：[标准库文档](https://lemdev.top/fox/docs/index.html)
 
 ---
 

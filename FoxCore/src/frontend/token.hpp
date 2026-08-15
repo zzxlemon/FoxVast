@@ -54,7 +54,17 @@ enum TokenT {
     TOKEN_SEMICOLON,      
     TOKEN_DOT,            
     TOKEN_NEW,
-    TOKEN_NOT
+    TOKEN_NOT,
+    TOKEN_MUL,
+    TOKEN_DIV,
+    TOKEN_MOD,
+    TOKEN_ELSE,
+    TOKEN_BREAK,
+    TOKEN_CONTINUE,
+    TOKEN_DICT,
+    TOKEN_TRY,
+    TOKEN_CATCH,
+    TOKEN_ERROR
 };
 
 struct Token {

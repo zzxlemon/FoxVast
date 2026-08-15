@@ -122,6 +122,11 @@ enum class OpCode : uint8_t {
     OP_NEW             = 0x28,
     OP_UNSET_GLOBAL    = 0x29,
     OP_CLEAR_GLOBALS   = 0x2A,
+    OP_MOD             = 0x2B,
+    OP_DICT            = 0x2C,
+    OP_TRY             = 0x2D,
+    OP_END_TRY         = 0x2E,
+    OP_THROW           = 0x2F,
     OP_HALT            = 0xFF,
 };
 
@@ -246,6 +251,13 @@ private:
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
     std::vector<CallFrame> frames;
+    struct TryHandler {
+        size_t stackDepth;
+        size_t frameIndex;
+        size_t catchAddr;
+        std::string varName;
+    };
+    std::vector<TryHandler> tryHandlers;
     bool runtimeError;
 
     Value peek(int distance = 0) {
@@ -270,6 +282,7 @@ private:
     void resetStack();
 
     void runtimeErr(const std::string& msg);
+    bool throwValue(const Value& err);
 
     bool callFunction(const std::string& name, int argCount);
     bool callSystemFunction(const std::string& name, int argCount);
