@@ -1,4 +1,7 @@
 build/
 builds/
 cmake-build/
-test/smoke.fc
+
+# compiled bytecode is a build artifact - source (.fox) is the source of truth
+*.fc
+*.fz

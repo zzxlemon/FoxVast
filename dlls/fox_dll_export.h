@@ -1,6 +1,6 @@
 #pragma once
 
-// Each FoxLang runtime library DLL exports this function.
+// Each FoxVast runtime library DLL exports this function.
 // fox.exe calls it at startup to register the library's functions.
 //
 // Usage in DLL source:

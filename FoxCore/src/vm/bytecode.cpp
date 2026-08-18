@@ -138,6 +138,17 @@ void writeValue(std::vector<uint8_t>& data, const Value& v) {
         }
         break;
     }
+    case Value::Type::Object: {
+        data.push_back(7);
+        writeString(data, v.asObjectClass());
+        const auto& members = v.asObjectDict();
+        writeVarint(data, static_cast<uint32_t>(members.size()));
+        for (const auto& [key, val] : members) {
+            writeString(data, key);
+            writeValue(data, *val);
+        }
+        break;
+    }
     default:
         data.push_back(4);
         break;
@@ -202,6 +213,19 @@ bool readValue(const uint8_t* data, size_t size, size_t& offset, Value& out) {
             dict[key] = std::make_shared<Value>(std::move(elem));
         }
         out = Value(dict);
+        return true;
+    }
+    case 7: { // object
+        std::string className = readString(data, size, offset);
+        uint32_t memberCount = readVarint(data, size, offset);
+        out = Value::makeObject(className);
+        auto& members = out.asObjectDictRef();
+        for (uint32_t j = 0; j < memberCount; j++) {
+            std::string key = readString(data, size, offset);
+            Value elem;
+            if (!readValue(data, size, offset, elem)) return false;
+            members[key] = std::make_shared<Value>(std::move(elem));
+        }
         return true;
     }
     default:
@@ -272,13 +296,30 @@ std::vector<uint8_t> CompiledProgram::serialize() const {
     // Magic "FOXC"
     data.push_back('F'); data.push_back('O'); data.push_back('X'); data.push_back('C');
     // Version
-    writeUint32(data, 1);
+    writeUint32(data, 2);
 
     // Import entries
     writeVarint(data, static_cast<uint32_t>(imports.size()));
     for (const auto& imp : imports) {
         writeString(data, imp.libName);
         writeString(data, imp.alias);
+    }
+
+    // Class/struct definitions
+    writeVarint(data, static_cast<uint32_t>(classes.size()));
+    for (const auto& cls : classes) {
+        writeString(data, cls.name);
+        data.push_back(cls.isStruct ? 1 : 0);
+        writeVarint(data, static_cast<uint32_t>(cls.fields.size()));
+        for (const auto& f : cls.fields) {
+            writeString(data, f.name);
+            writeString(data, f.type);
+        }
+        data.push_back(cls.hasInit ? 1 : 0);
+        writeVarint(data, static_cast<uint32_t>(cls.methodNames.size()));
+        for (const auto& m : cls.methodNames) {
+            writeString(data, m);
+        }
     }
 
     // Number of functions
@@ -319,7 +360,7 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
     offset += 4;
 
     uint32_t version = readUint32(data, size, offset);
-    if (version != 1) {
+    if (version != 2) {
         throw std::runtime_error("Unsupported .fc version: " + std::to_string(version));
     }
 
@@ -331,6 +372,27 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
         prog.imports.push_back(ie);
     }
     prog.restoreImports();
+
+    uint32_t classCount = readVarint(data, size, offset);
+    for (uint32_t i = 0; i < classCount; i++) {
+        CompiledClass cls;
+        cls.name = readString(data, size, offset);
+        cls.isStruct = (data[offset++] != 0);
+        uint32_t fieldCount = readVarint(data, size, offset);
+        for (uint32_t j = 0; j < fieldCount; j++) {
+            ClassField f;
+            f.name = readString(data, size, offset);
+            f.type = readString(data, size, offset);
+            cls.fields.push_back(f);
+        }
+        cls.hasInit = (data[offset++] != 0);
+        uint32_t methodCount = readVarint(data, size, offset);
+        for (uint32_t j = 0; j < methodCount; j++) {
+            cls.methodNames.push_back(readString(data, size, offset));
+        }
+        prog.classIndex[cls.name] = prog.classes.size();
+        prog.classes.push_back(std::move(cls));
+    }
 
     uint32_t funcCount = readVarint(data, size, offset);
 
@@ -388,8 +450,11 @@ void BytecodeCompiler::skipWhitespace(Lexer& lexer, Token& token) {
     }
 }
 
+bool BytecodeCompiler::s_expandImports = true;
+
 CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::string& filename) {
     program = CompiledProgram();
+    g_classRegistry.clear(); // fresh class/struct definitions per program
 
     // Initialize system libraries before parsing (needed for import resolution)
     RegFunc();
@@ -422,6 +487,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
     import_base_file = filename;
     parseInto(source, filename.empty() ? "<main>" : filename);
 
+    if (s_expandImports) {
     std::unordered_set<std::string> visited;
     for (size_t idx = 0; idx < imported_source_files.size(); idx++) {
         // Copy: parsing appends to imported_source_files (nested imports),
@@ -434,6 +500,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
         }
         import_base_file = path;
         parseInto(src, path);
+    }
     }
     import_base_file.clear();
 
@@ -469,12 +536,48 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
         // Ensure every function ends with a return instruction.
         // NOTE: cannot use code.back() here: the operand byte of a 0-arg OP_CALL
         // is 0x00, which collides with the OP_RETURN opcode (P0-2). Appending
-        // unconditionally is safe — an already-emitted OP_RETURN pops the frame,
+        // unconditionally is safe �� an already-emitted OP_RETURN pops the frame,
         // so a trailing extra OP_RETURN is dead code.
         cf.chunk.writeOp(OpCode::OP_RETURN);
 
         program.functions.push_back(cf);
         program.functionIndex[cf.name] = program.functions.size() - 1;
+    }
+
+    // Compile class/struct definitions: methods become functions named
+    // "<Class>.<method>" with 'this' bound as the first parameter.
+    for (const auto& [className, def] : g_classRegistry) {
+        CompiledClass cls;
+        cls.name = className;
+        cls.isStruct = def.isStruct;
+        cls.fields = def.fields;
+        cls.hasInit = def.hasInit;
+
+        auto compileMethod = [&](const Function& method, const std::string& fnName) {
+            CompiledFunction cf;
+            // method.name already carries the "<Class>." prefix for regular
+            // methods (parseClassDef); the VM looks up "className.methodName",
+            // and constructors live under "className.init".
+            cf.name = fnName;
+            cf.returnType = method.returnType;
+            cf.parameters = method.parameters;
+            cf.localCount = static_cast<int>(method.parameters.size());
+            compileFunctionBody(cf, method.body);
+            cf.chunk.writeOp(OpCode::OP_RETURN);
+            program.functions.push_back(cf);
+            program.functionIndex[cf.name] = program.functions.size() - 1;
+        };
+
+        if (def.hasInit) {
+            compileMethod(def.initFunc, className + ".init");
+        }
+        for (const auto& method : def.methods) {
+            compileMethod(method, method.name);
+            cls.methodNames.push_back(method.name);
+        }
+
+        program.classIndex[className] = program.classes.size();
+        program.classes.push_back(std::move(cls));
     }
 
     return program;
@@ -555,6 +658,27 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             if (!compiler.validateCall(name)) {
                 throw std::runtime_error(""); // Error already reported via ErrorReporter
             }
+            size_t dot = name.find('.');
+            if (dot != std::string::npos) {
+                std::string prefix = name.substr(0, dot);
+                auto& libMgr = LibraryManager::getInstance();
+                std::string resolvedLib = libMgr.resolveAlias(prefix);
+                if (!(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
+                    // Object method call statement: obj.method(args)
+                    int objIdx = cf.addConstantStringDedup(prefix);
+                    cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+                    cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
+                    for (auto& arg : args) {
+                        arg->compileBytecode(cf, varTypes);
+                    }
+                    int memberIdx = cf.addConstantStringDedup(name.substr(dot + 1));
+                    cf.chunk.writeOp(OpCode::OP_OBJ_CALL);
+                    cf.chunk.writeShort(static_cast<uint16_t>(memberIdx));
+                    cf.chunk.writeByte(static_cast<uint8_t>(args.size()));
+                    cf.chunk.writeOp(OpCode::OP_POP);
+                    return;
+                }
+            }
             for (auto& arg : args) {
                 arg->compileBytecode(cf, varTypes);
             }
@@ -567,6 +691,24 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
         }
         void onAssign(const std::string& name, std::unique_ptr<Expr> expr) override {
             Value::Type rhsType = expr->compileBytecode(cf, varTypes);
+            size_t dot = name.find('.');
+            if (dot != std::string::npos) {
+                std::string prefix = name.substr(0, dot);
+                auto& libMgr = LibraryManager::getInstance();
+                std::string resolvedLib = libMgr.resolveAlias(prefix);
+                if (!(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
+                    // Object field write: obj.field = value
+                    int objIdx = cf.addConstantStringDedup(prefix);
+                    cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+                    cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
+                    int memberIdx = cf.addConstantStringDedup(name.substr(dot + 1));
+                    cf.chunk.writeOp(OpCode::OP_OBJ_FIELD_SET);
+                    cf.chunk.writeShort(static_cast<uint16_t>(memberIdx));
+                    cf.chunk.writeOp(OpCode::OP_POP);
+                    varTypes[prefix] = Value::Type::Object;
+                    return;
+                }
+            }
             varTypes[name] = rhsType;
             int nameIdx = cf.addConstantStringDedup(name);
             cf.chunk.writeOp(OpCode::OP_DEF_GLOBAL);
@@ -574,6 +716,30 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
         }
         void onIndexAssign(const std::string& name, std::unique_ptr<Expr> index, std::unique_ptr<Expr> value) override {
             value->compileBytecode(cf, varTypes);
+            size_t dot = name.find('.');
+            if (dot != std::string::npos) {
+                std::string prefix = name.substr(0, dot);
+                auto& libMgr = LibraryManager::getInstance();
+                std::string resolvedLib = libMgr.resolveAlias(prefix);
+                if (!(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
+                    // Object field index write: obj.field[idx] = value
+                    int objIdx = cf.addConstantStringDedup(prefix);
+                    int memberIdx = cf.addConstantStringDedup(name.substr(dot + 1));
+                    cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+                    cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
+                    cf.chunk.writeOp(OpCode::OP_OBJ_FIELD_GET);
+                    cf.chunk.writeShort(static_cast<uint16_t>(memberIdx));
+                    index->compileBytecode(cf, varTypes);
+                    cf.chunk.writeOp(OpCode::OP_INDEX_SET);
+                    cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+                    cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
+                    cf.chunk.writeOp(OpCode::OP_OBJ_FIELD_SET);
+                    cf.chunk.writeShort(static_cast<uint16_t>(memberIdx));
+                    cf.chunk.writeOp(OpCode::OP_POP);
+                    varTypes[prefix] = Value::Type::Object;
+                    return;
+                }
+            }
             int nameIdx = cf.addConstantStringDedup(name);
             cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
             cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
@@ -849,10 +1015,9 @@ bool BytecodeCompiler::validateCall(const std::string& name) {
         std::string resolvedLib = libMgr.resolveAlias(libPrefix);
 
         if (!libMgr.hasLibrary(resolvedLib)) {
-            ErrorReporter::reportSimple("CompileError",
-                "Unknown library prefix '" + libPrefix + "' in call '" + name + "'",
-                "Use 'import ...' to import the library first, or check the library name");
-            return false;
+            // Not a library prefix: treat as an object method call
+            // (obj.method(...)); the runtime validates the object.
+            return true;
         }
         if (!libMgr.isImported(resolvedLib)) {
             std::string extPath = libMgr.getSystemFuncExternalPath(funcOnly);
@@ -874,6 +1039,12 @@ bool BytecodeCompiler::validateCall(const std::string& name) {
     }
 
     if (userFuncNames.find(name) != userFuncNames.end()) {
+        return true;
+    }
+
+    // Standalone compilation: the callee may live in another .fc loaded at
+    // runtime, so defer the check (the VM reports missing functions).
+    if (!s_expandImports) {
         return true;
     }
 
@@ -912,6 +1083,7 @@ std::string BytecodeCompiler::typeStr(Value::Type t) {
     case Value::Type::Array: return "array";
     case Value::Type::Bytes: return "bytes";
     case Value::Type::Dict: return "dict";
+    case Value::Type::Object: return "object";
     default: return "void";
     }
 }
@@ -932,11 +1104,44 @@ VM::VM() : runtimeError(false) {}
 
 void VM::loadProgram(const CompiledProgram& prog) {
     program = prog;
+    extraPrograms.clear();
     globals.clear();
     stack.clear();
     frames.clear();
     tryHandlers.clear();
     runtimeError = false;
+}
+
+void VM::addProgram(const CompiledProgram& prog) {
+    extraPrograms.push_back(prog);
+}
+
+const CompiledFunction* VM::findFunction(const std::string& name) const {
+    auto it = program.functionIndex.find(name);
+    if (it != program.functionIndex.end()) {
+        return &program.functions[it->second];
+    }
+    for (const auto& extra : extraPrograms) {
+        auto eIt = extra.functionIndex.find(name);
+        if (eIt != extra.functionIndex.end()) {
+            return &extra.functions[eIt->second];
+        }
+    }
+    return nullptr;
+}
+
+const CompiledClass* VM::findClass(const std::string& name) const {
+    auto it = program.classIndex.find(name);
+    if (it != program.classIndex.end()) {
+        return &program.classes[it->second];
+    }
+    for (const auto& extra : extraPrograms) {
+        auto eIt = extra.classIndex.find(name);
+        if (eIt != extra.classIndex.end()) {
+            return &extra.classes[eIt->second];
+        }
+    }
+    return nullptr;
 }
 
 void VM::resetStack() {
@@ -1016,12 +1221,12 @@ Value VM::executeSystemCall(const std::string& funcName, const std::vector<Value
 }
 
 bool VM::callFunction(const std::string& name, int argCount) {
-    auto it = program.functionIndex.find(name);
-    if (it == program.functionIndex.end()) {
+    const CompiledFunction* funcPtr = findFunction(name);
+    if (funcPtr == nullptr) {
         return callSystemFunction(name, argCount);
     }
 
-    const CompiledFunction& func = program.functions[it->second];
+    const CompiledFunction& func = *funcPtr;
 
     // Check arg count
     if (argCount != static_cast<int>(func.parameters.size())) {
@@ -1044,6 +1249,29 @@ bool VM::callFunction(const std::string& name, int argCount) {
         frame.locals[i] = pop();
     }
 
+    // Save and bind parameters as global variables (mirrors OP_CALL)
+    for (size_t i = 0; i < func.parameters.size(); i++) {
+        auto gIt = globals.find(func.parameters[i].name);
+        if (gIt != globals.end()) {
+            frame.savedGlobals[func.parameters[i].name] = gIt->second;
+        } else {
+            frame.newGlobals.push_back(func.parameters[i].name);
+        }
+        globals[func.parameters[i].name] = frame.locals[i];
+    }
+
+    // Constructor calls: the 'this' object (locals[0]) must be pushed back
+    // onto the caller stack when the constructor frame returns.
+    {
+        size_t lastDot = name.find_last_of('.');
+        if (lastDot != std::string::npos &&
+            name.substr(lastDot + 1) == "init" &&
+            program.classIndex.find(name.substr(0, lastDot)) != program.classIndex.end()) {
+            frame.isCtorFrame = true;
+            frame.ctorResult = frame.locals[0];
+        }
+    }
+
     frames.push_back(frame);
     return true;
 }
@@ -1055,8 +1283,8 @@ void VM::run() {
     }
 
     // Find main function
-    auto it = program.functionIndex.find("main");
-    if (it == program.functionIndex.end()) {
+    const CompiledFunction* mainFunc = findFunction("main");
+    if (mainFunc == nullptr) {
         runtimeErr("No 'main' function found");
         return;
     }
@@ -1071,9 +1299,9 @@ void VM::run() {
 
     // Start with main function
     CallFrame frame;
-    frame.function = &program.functions[it->second];
+    frame.function = mainFunc;
     frame.ip = 0;
-    frame.locals.resize(frame.function->localCount);
+    frame.locals.resize(mainFunc->localCount);
     frames.push_back(frame);
 
     // Execution loop
@@ -1112,6 +1340,7 @@ void VM::run() {
                     else if (retVal.getType() == Value::Type::String) mismatch = (retFunc.returnType != "string");
                     else if (retVal.getType() == Value::Type::Array) mismatch = (retFunc.returnType != "array");
                     else if (retVal.getType() == Value::Type::Dict) mismatch = (retFunc.returnType != "dict");
+                    else if (retVal.getType() == Value::Type::Object) mismatch = (retFunc.returnType != "dict");
                     else if (retVal.getType() == Value::Type::Bytes) mismatch = (retFunc.returnType != "bytes");
                     else mismatch = true; // Void or any other type
                     if (mismatch) {
@@ -1136,9 +1365,14 @@ void VM::run() {
                     globals.erase(name);
                 }
             }
+            CallFrame poppedFrame = frames.back();
             frames.pop_back();
             if (!frames.empty()) {
-                push(retVal);
+                if (poppedFrame.isCtorFrame) {
+                    push(poppedFrame.ctorResult);
+                } else {
+                    push(retVal);
+                }
             }
             break;
         }
@@ -1275,6 +1509,7 @@ void VM::run() {
             } else if (a.getType() == b.getType() &&
                        (a.getType() == Value::Type::Array ||
                         a.getType() == Value::Type::Dict ||
+                        a.getType() == Value::Type::Object ||
                         a.getType() == Value::Type::Bytes)) {
                 result = valuesEqual(a, b);
             } else if ((a.getType() == Value::Type::Int || a.getType() == Value::Type::Double) &&
@@ -1301,6 +1536,7 @@ void VM::run() {
             } else if (a.getType() == b.getType() &&
                        (a.getType() == Value::Type::Array ||
                         a.getType() == Value::Type::Dict ||
+                        a.getType() == Value::Type::Object ||
                         a.getType() == Value::Type::Bytes)) {
                 result = !valuesEqual(a, b);
             } else if ((a.getType() == Value::Type::Int || a.getType() == Value::Type::Double) &&
@@ -1471,9 +1707,9 @@ void VM::run() {
             }
             std::string fnName = fnVal.asString();
 
-            auto progIt = program.functionIndex.find(fnName);
-            if (progIt != program.functionIndex.end()) {
-                const CompiledFunction& func = program.functions[progIt->second];
+            const CompiledFunction* fnPtr = findFunction(fnName);
+            if (fnPtr != nullptr) {
+                const CompiledFunction& func = *fnPtr;
                 if (argCount != static_cast<uint8_t>(func.parameters.size())) {
                     runtimeErr("Function " + fnName + " expects " + std::to_string(func.parameters.size())
                         + " arguments, got " + std::to_string(argCount));
@@ -1691,6 +1927,187 @@ void VM::run() {
             push(Value(bytes));
             break;
         }
+        case OpCode::OP_NEW_OBJ: {
+            uint16_t classIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
+            uint8_t argCount = chunk.readByte(cf.ip);
+            cf.ip++;
+            if (classIdx >= chunk.constants.size() ||
+                chunk.constants[classIdx].getType() != Value::Type::String) {
+                runtimeErr("Invalid class name constant");
+                break;
+            }
+            std::string className = chunk.constants[classIdx].asString();
+            const CompiledClass* clsPtr = findClass(className);
+            if (clsPtr == nullptr) {
+                runtimeErr("Undefined class: " + className);
+                break;
+            }
+            const CompiledClass& cls = *clsPtr;
+            if (static_cast<int>(stack.size()) < argCount) {
+                runtimeErr("Stack underflow in object construction");
+                break;
+            }
+            std::vector<Value> args(argCount);
+            for (int i = argCount - 1; i >= 0; i--) {
+                args[i] = pop();
+            }
+            Value obj = Value::makeObject(className);
+            for (const auto& f : cls.fields) {
+                obj.asObjectDictRef()[f.name] = std::make_shared<Value>(defaultFieldValue(f.type));
+            }
+            std::string initName = className + ".init";
+            if (cls.hasInit) {
+                const CompiledFunction* initPtr = findFunction(initName);
+                if (initPtr == nullptr) {
+                    runtimeErr("Class " + className + " constructor was not compiled");
+                    break;
+                }
+                const CompiledFunction& initFunc = *initPtr;
+                if (argCount + 1 != static_cast<uint8_t>(initFunc.parameters.size())) {
+                    runtimeErr("Class " + className + " constructor expects " +
+                        std::to_string(initFunc.parameters.size() - 1) + " arguments, got " +
+                        std::to_string(argCount));
+                    break;
+                }
+                push(obj);
+                for (const auto& arg : args) push(arg);
+                push(Value(initName));
+                callFunction(initName, argCount + 1);
+            }
+            else {
+                if (argCount != 0) {
+                    if (argCount != static_cast<uint8_t>(cls.fields.size())) {
+                        runtimeErr("Class " + className + " has no constructor; expected " +
+                            std::to_string(cls.fields.size()) + " positional field arguments, got " +
+                            std::to_string(argCount));
+                        break;
+                    }
+                    for (size_t i = 0; i < cls.fields.size(); i++) {
+                        obj.asObjectDictRef()[cls.fields[i].name] =
+                            std::make_shared<Value>(args[i]);
+                    }
+                }
+                push(obj);
+            }
+            break;
+        }
+        case OpCode::OP_OBJ_FIELD_GET: {
+            uint16_t fieldIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
+            if (fieldIdx >= chunk.constants.size() ||
+                chunk.constants[fieldIdx].getType() != Value::Type::String) {
+                runtimeErr("Invalid field name constant");
+                break;
+            }
+            std::string fieldName = chunk.constants[fieldIdx].asString();
+            Value obj = pop();
+            if (obj.getType() != Value::Type::Object) {
+                runtimeErr("Field access '" + fieldName + "' on a non-object value");
+                break;
+            }
+            std::string className = obj.asObjectClass();
+            auto clsIt = program.classIndex.find(className);
+            if (clsIt == program.classIndex.end()) {
+                runtimeErr("Unknown class: " + className);
+                break;
+            }
+            const CompiledClass& cls = program.classes[clsIt->second];
+            bool declared = false;
+            for (const auto& f : cls.fields) {
+                if (f.name == fieldName) { declared = true; break; }
+            }
+            if (!declared) {
+                runtimeErr("Undefined field '" + fieldName + "' in class '" + className + "'");
+                break;
+            }
+            const auto& members = obj.asObjectDict();
+            auto it = members.find(fieldName);
+            if (it == members.end()) {
+                runtimeErr("Field '" + fieldName + "' of class '" + className + "' is not initialized");
+                break;
+            }
+            push(*it->second);
+            break;
+        }
+        case OpCode::OP_OBJ_FIELD_SET: {
+            uint16_t fieldIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
+            if (fieldIdx >= chunk.constants.size() ||
+                chunk.constants[fieldIdx].getType() != Value::Type::String) {
+                runtimeErr("Invalid field name constant");
+                break;
+            }
+            std::string fieldName = chunk.constants[fieldIdx].asString();
+            Value obj = pop();
+            Value val = pop();
+            if (obj.getType() != Value::Type::Object) {
+                runtimeErr("Field write '" + fieldName + "' on a non-object value");
+                break;
+            }
+            std::string className = obj.asObjectClass();
+            auto clsIt = program.classIndex.find(className);
+            if (clsIt == program.classIndex.end()) {
+                runtimeErr("Unknown class: " + className);
+                break;
+            }
+            const CompiledClass& cls = program.classes[clsIt->second];
+            bool declared = false;
+            for (const auto& f : cls.fields) {
+                if (f.name == fieldName) { declared = true; break; }
+            }
+            if (!declared) {
+                runtimeErr("Undefined field '" + fieldName + "' in class '" + className + "'");
+                break;
+            }
+            obj.asObjectDictRef()[fieldName] = std::make_shared<Value>(val);
+            push(obj);
+            break;
+        }
+        case OpCode::OP_OBJ_CALL: {
+            uint16_t methodIdx = chunk.readShort(cf.ip);
+            cf.ip += 2;
+            uint8_t argCount = chunk.readByte(cf.ip);
+            cf.ip++;
+            if (methodIdx >= chunk.constants.size() ||
+                chunk.constants[methodIdx].getType() != Value::Type::String) {
+                runtimeErr("Invalid method name constant");
+                break;
+            }
+            std::string methodName = chunk.constants[methodIdx].asString();
+            if (static_cast<int>(stack.size()) < argCount + 1) {
+                runtimeErr("Stack underflow in method call");
+                break;
+            }
+            std::vector<Value> args(argCount);
+            for (int i = argCount - 1; i >= 0; i--) {
+                args[i] = pop();
+            }
+            Value obj = pop();
+            if (obj.getType() != Value::Type::Object) {
+                runtimeErr("Cannot call method '" + methodName + "' on a non-object value");
+                break;
+            }
+            std::string className = obj.asObjectClass();
+            std::string fullName = className + "." + methodName;
+            const CompiledFunction* mPtr = findFunction(fullName);
+            if (mPtr == nullptr) {
+                runtimeErr("Undefined method '" + methodName + "' in class '" + className + "'");
+                break;
+            }
+            const CompiledFunction& mFunc = *mPtr;
+            if (argCount + 1 != static_cast<uint8_t>(mFunc.parameters.size())) {
+                runtimeErr("Method " + fullName + " expects " +
+                    std::to_string(mFunc.parameters.size() - 1) + " arguments, got " +
+                    std::to_string(argCount));
+                break;
+            }
+            push(obj);
+            for (const auto& arg : args) push(arg);
+            push(Value(fullName));
+            callFunction(fullName, argCount + 1);
+            break;
+        }
         case OpCode::OP_TRY: {
             uint16_t varNameIdx = chunk.readShort(cf.ip);
             cf.ip += 2;
@@ -1793,6 +2210,10 @@ const char* opcodeName(uint8_t byte) {
     case OpCode::OP_TRY: return "OP_TRY";
     case OpCode::OP_END_TRY: return "OP_END_TRY";
     case OpCode::OP_THROW: return "OP_THROW";
+    case OpCode::OP_NEW_OBJ: return "OP_NEW_OBJ";
+    case OpCode::OP_OBJ_FIELD_GET: return "OP_OBJ_FIELD_GET";
+    case OpCode::OP_OBJ_FIELD_SET: return "OP_OBJ_FIELD_SET";
+    case OpCode::OP_OBJ_CALL: return "OP_OBJ_CALL";
     case OpCode::OP_HALT: return "OP_HALT";
     default: return "OP_UNKNOWN";
     }
@@ -1865,6 +2286,14 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
             case OpCode::OP_ARRAY:
             case OpCode::OP_DICT:
                 ip += 1;
+                break;
+            case OpCode::OP_OBJ_FIELD_GET:
+            case OpCode::OP_OBJ_FIELD_SET:
+                ip += 2;
+                break;
+            case OpCode::OP_NEW_OBJ:
+            case OpCode::OP_OBJ_CALL:
+                ip += 3;
                 break;
             case OpCode::OP_TRY:
                 ip += 4;
@@ -1953,6 +2382,32 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
                 uint8_t n = chunk.readByte(ip);
                 ip += 1;
                 out << "OP_ARRAY  " << static_cast<int>(n) << " elem(s)";
+                break;
+            }
+            case OpCode::OP_OBJ_FIELD_GET:
+            case OpCode::OP_OBJ_FIELD_SET: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                out << opcodeName(static_cast<uint8_t>(op)) << "  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_NEW_OBJ: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                uint8_t argc = chunk.readByte(ip);
+                ip += 1;
+                out << "OP_NEW_OBJ  " << static_cast<int>(argc) << " arg(s)  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
+                break;
+            }
+            case OpCode::OP_OBJ_CALL: {
+                uint16_t idx = chunk.readShort(ip);
+                ip += 2;
+                uint8_t argc = chunk.readByte(ip);
+                ip += 1;
+                out << "OP_OBJ_CALL  " << static_cast<int>(argc) << " arg(s)  ";
+                if (idx < chunk.constants.size()) out << disasmValue(chunk.constants[idx]);
                 break;
             }
             case OpCode::OP_DICT: {

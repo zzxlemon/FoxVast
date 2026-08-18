@@ -112,7 +112,7 @@ public:
 
         std::vector<std::string> searchPaths = {
             "C:\\FoxLibs\\",
-            "C:\\Program Files\\FoxLang\\Libs\\",
+            "C:\\Program Files\\FoxVast\\Libs\\",
             ".\\libs\\",
             ".\\"
         };
@@ -143,7 +143,7 @@ public:
 
         std::vector<std::string> searchPaths = {
             "C:\\FoxLibs\\",
-            "C:\\Program Files\\FoxLang\\Libs\\",
+            "C:\\Program Files\\FoxVast\\Libs\\",
             ".\\libs\\",
             ".\\"
         };

@@ -22,7 +22,7 @@ endif()
 if(NOT DEFINED FOXPKG_VERSION OR FOXPKG_VERSION STREQUAL "${FOXPKG_VERSION_DEFAULT}")
     set(FOXPKG_VERSION "${FOXPKG_VERSION_AUTO}")
 endif()
-set(FOXPKG_VERSION "${FOXPKG_VERSION}" CACHE STRING "FoxLang package manager version" FORCE)
+set(FOXPKG_VERSION "${FOXPKG_VERSION}" CACHE STRING "FoxVast package manager version" FORCE)
 
 add_executable(foxpkg
     package_main.cpp

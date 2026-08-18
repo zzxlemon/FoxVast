@@ -358,8 +358,10 @@ bool farPackage(const std::string& outputPath, const std::vector<std::string>& i
         std::vector<uint8_t> fcData;
 
         if (basename.size() > 4 && basename.substr(basename.size() - 4) == ".fox") {
-            // Compile .fox -> .fc
+            // Compile .fox -> .fc (each file standalone; dependencies are
+            // resolved across .fc entries at runtime)
             try {
+                BytecodeCompiler::s_expandImports = false;
                 BytecodeCompiler compiler;
                 CompiledProgram prog = compiler.compile(content, file);
                 fcData = prog.serialize();
@@ -429,11 +431,10 @@ bool farRun(const std::string& archivePath) {
     uint16_t num_entries = read16le(eocd + 8);
     uint32_t cd_offset   = read32le(eocd + 16);
 
-    // Scan central directory for a .fc entry
+    // Scan central directory for .fc entries (first entry is the entry point)
     size_t cd_pos = cd_offset;
-    const uint8_t* fc_data = nullptr;
-    uint32_t fc_size = 0;
-    std::string fc_name;
+    struct FCEntry { std::string name; const uint8_t* data; uint32_t size; };
+    std::vector<FCEntry> fcEntries;
 
     for (uint16_t i = 0; i < num_entries; i++) {
         if (cd_pos + 46 > archiveData.size()) break;
@@ -470,29 +471,35 @@ bool farRun(const std::string& archivePath) {
                 return false;
             }
 
-            fc_data = archiveData.data() + data_start;
-            fc_size = comp_size;
-            fc_name = name;
+            fcEntries.push_back({name, archiveData.data() + data_start, comp_size});
         }
 
         cd_pos += 46 + name_len + extra_len + comment_len;
     }
 
-    if (!fc_data) {
+    if (fcEntries.empty()) {
         std::cerr << "No .fc file found in archive" << std::endl;
         return false;
     }
 
-    std::cout << "Running: " << fc_name << " (" << fc_size << " bytes)" << std::endl;
-
-    // Decrypt in-place (archiveData is owned by this function, discarded after)
-    std::vector<uint8_t> decrypted(fc_data, fc_data + fc_size);
-    xor_crypt(decrypted, FC_XOR_KEY);
+    std::cout << "Running: " << fcEntries[0].name << " (" << fcEntries.size()
+        << " module(s) in archive)" << std::endl;
 
     try {
-        CompiledProgram prog = CompiledProgram::deserialize(decrypted);
         VM vm;
-        vm.loadProgram(prog);
+        bool first = true;
+        for (const auto& entry : fcEntries) {
+            // Decrypt in-place (archiveData is owned by this function, discarded after)
+            std::vector<uint8_t> decrypted(entry.data, entry.data + entry.size);
+            xor_crypt(decrypted, FC_XOR_KEY);
+            CompiledProgram prog = CompiledProgram::deserialize(decrypted);
+            if (first) {
+                vm.loadProgram(prog);
+                first = false;
+            } else {
+                vm.addProgram(prog);
+            }
+        }
         vm.run();
         return true;
     } catch (const std::exception& e) {

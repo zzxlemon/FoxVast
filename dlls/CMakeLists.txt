@@ -1,4 +1,4 @@
-# FoxLang runtime library DLLs — one DLL per library
+# FoxVast runtime library DLLs — one DLL per library
 # Each DLL exports register_fox_library(LibraryManager*).
 
 set(FOX_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../FoxCore)
@@ -23,37 +23,51 @@ macro(fox_dll DLL_NAME LIB_CPP LIB_INCLUDE)
 endmacro()
 
 # ---- fox.math.dll: sin, cos, tan ----
+file(GLOB MATH_SOURCES CONFIGURE_DEPENDS "${FOX_ROOT}/libs/system/math/*.cpp")
 fox_dll(math
-    "${FOX_ROOT}/libs/system/math/SystemFunctionsMath.cpp"
+    "${MATH_SOURCES}"
     "${FOX_ROOT}/libs/system/math"
     fox_math.cpp
 )
 
 # ---- fox.random.dll ----
+file(GLOB RANDOM_SOURCES CONFIGURE_DEPENDS "${FOX_ROOT}/libs/system/random/*.cpp")
 fox_dll(random
-    "${FOX_ROOT}/libs/system/random/SystemFunctionsRandom.cpp"
+    "${RANDOM_SOURCES}"
     "${FOX_ROOT}/libs/system/random"
     fox_random.cpp
 )
 
 # ---- fox.file.dll: file I/O ----
+file(GLOB FILE_SOURCES CONFIGURE_DEPENDS "${FOX_ROOT}/libs/system/fs/*.cpp")
 fox_dll(file
-    "${FOX_ROOT}/libs/system/fs/SystemFunctionsFile.cpp"
+    "${FILE_SOURCES}"
     "${FOX_ROOT}/libs/system/fs"
     fox_file.cpp
 )
 
 # ---- fox.util.dll: length, type conversions ----
+file(GLOB UTIL_SOURCES CONFIGURE_DEPENDS "${FOX_ROOT}/libs/system/io/util/*.cpp")
 fox_dll(util
-    "${FOX_ROOT}/libs/system/io/util/SystemFunctionUtil.cpp"
+    "${UTIL_SOURCES}"
     "${FOX_ROOT}/libs/system/io/util"
     fox_util.cpp
 )
 
+# ---- fox.time.dll: epoch seconds, strftime formatting ----
+file(GLOB TIME_SOURCES CONFIGURE_DEPENDS "${FOX_ROOT}/libs/system/time/*.cpp")
+fox_dll(time
+    "${TIME_SOURCES}"
+    "${FOX_ROOT}/libs/system/time"
+    fox_time.cpp
+)
+
 # ---- fox.socket.dll ----
+file(GLOB SOCKET_SOURCES CONFIGURE_DEPENDS
+    "${FOX_ROOT}/libs/system/api/socket/*.cpp")
 add_library(socket SHARED
     fox_socket.cpp
-    ${FOX_ROOT}/libs/system/api/socket/SystemFunctionsSocket.cpp
+    ${SOCKET_SOURCES}
 )
 target_include_directories(socket PRIVATE
     ${COMMON_INCLUDES}
@@ -70,9 +84,11 @@ set_target_properties(socket PROPERTIES
 # ---- fox.graphics.dll: GL/GLFW drawing (conditional) ----
 if(EXISTS ${FOX_ROOT}/native/glad/include/glad/glad.cpp AND
    EXISTS ${FOX_ROOT}/native/glfw/lib/libglfw3.a)
+    file(GLOB GRAPHICS_SOURCES CONFIGURE_DEPENDS
+        "${FOX_ROOT}/libs/graphics/*.cpp")
     add_library(graphics SHARED
         fox_graphics.cpp
-        ${FOX_ROOT}/libs/graphics/SystemFunctionsGraphics.cpp
+        ${GRAPHICS_SOURCES}
         ${FOX_ROOT}/native/glad/include/glad/glad.cpp
     )
     target_include_directories(graphics PRIVATE

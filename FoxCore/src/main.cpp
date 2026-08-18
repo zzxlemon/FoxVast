@@ -14,8 +14,8 @@ const char XOR_KEY = 0x2A;
 std::string encrypt_key = "";
 
 static void print_help(){
-    std::cout << "FoxLang Interpreter - Usage:" << std::endl;
-    std::cout << "  -f <file>               Run FoxLang source file(Deprecated)" << std::endl;
+    std::cout << "FoxVast Interpreter - Usage:" << std::endl;
+    std::cout << "  -f <file>               Run FoxVast source file(Deprecated)" << std::endl;
     std::cout << "  -c <file>               Compile .fox -> .fc bytecode" << std::endl;
     std::cout << "  -fc <file>              Run .fc bytecode file" << std::endl;
     std::cout << "  -d <file>               Disassemble .fc bytecode file" << std::endl;
@@ -66,8 +66,8 @@ int main(int argc, char** argv) {
     for (int i = 1; i < argc; i++) {
         std::string in = argv[i];
         if (in == "-version" || in == "-v") {
-            printf("FoxLang Version: '%s'\n", fox_version.c_str());
-            printf("FoxLang-VM 64-Bit VM (beta %s, mixed mode)\n", fox_vm_version.c_str());
+            printf("FoxVast Version: '%s'\n", fox_version.c_str());
+            printf("FoxVast-VM 64-Bit VM (beta %s, mixed mode)\n", fox_vm_version.c_str());
 
         }
         else if (in == "-f" || in == "--file") {
@@ -131,36 +131,52 @@ int main(int argc, char** argv) {
                 ErrorReporter::reportSimple("ArgumentError", "'-c' requires a filename");
                 return 1;
             }
-
-            filename = argv[i + 1];
-            i++;
-            std::string fullCode = read_file(filename);
-            if (fullCode.empty()) return 1;
-            try {
-                BytecodeCompiler compiler;
-                CompiledProgram prog = compiler.compile(fullCode, filename);
-                std::vector<uint8_t> fcData = prog.serialize();
-                xor_crypt(fcData, FC_XOR_KEY);
-                std::string basePath = filename;
-                size_t dot = basePath.rfind('.');
-                if (dot != std::string::npos) basePath = basePath.substr(0, dot);
-                size_t sep = basePath.find_last_of("/\\");
-                std::string baseName = (sep != std::string::npos) ? basePath.substr(sep + 1) : basePath;
-                std::string parentDir = (sep != std::string::npos) ? basePath.substr(0, sep) : ".";
-                std::string outName = parentDir + "\\" + baseName + ".fc";
-                std::ofstream fcout(outName, std::ios::binary);
-                if (fcout.is_open()) {
-                    fcout.write(reinterpret_cast<const char*>(fcData.data()), fcData.size());
-                    fcout.close();
-                    std::cout << "Compiled to " << outName << " (" << fcData.size() << " bytes)" << std::endl;
-                } else {
-                    ErrorReporter::reportSimple("FileError", "Cannot create .fc file: " + outName);
-                }
-            } catch (const std::exception& e) {
-                if (!ErrorReporter::hasError()) {
-                    ErrorReporter::reportFromException("CompileError", e.what());
-                }
+            std::vector<std::string> files;
+            for (int j = i + 1; j < argc; j++) {
+                if (argv[j][0] == '-') break;
+                files.push_back(argv[j]);
+            }
+            if (files.empty()) {
+                ErrorReporter::reportSimple("ArgumentError", "'-c' requires a filename");
                 return 1;
+            }
+            i += static_cast<int>(files.size());
+
+            // Compile with import inlining: !import plugins and import "file.fox"
+            // are expanded into the .fc, so a single entry file is
+            // self-contained (plugins resolve from the script dir, C:\FoxLibs,
+            // and the working directory).
+            BytecodeCompiler::s_expandImports = true;
+            for (const auto& f : files) {
+                std::string fullCode = read_file(f);
+                if (fullCode.empty()) return 1;
+                try {
+                    BytecodeCompiler compiler;
+                    CompiledProgram prog = compiler.compile(fullCode, f);
+                    std::vector<uint8_t> fcData = prog.serialize();
+                    xor_crypt(fcData, FC_XOR_KEY);
+                    std::string basePath = f;
+                    size_t dot = basePath.rfind('.');
+                    if (dot != std::string::npos) basePath = basePath.substr(0, dot);
+                    size_t sep = basePath.find_last_of("/\\");
+                    std::string baseName = (sep != std::string::npos) ? basePath.substr(sep + 1) : basePath;
+                    std::string parentDir = (sep != std::string::npos) ? basePath.substr(0, sep) : ".";
+                    std::string outName = parentDir + "\\" + baseName + ".fc";
+                    std::ofstream fcout(outName, std::ios::binary);
+                    if (fcout.is_open()) {
+                        fcout.write(reinterpret_cast<const char*>(fcData.data()), fcData.size());
+                        fcout.close();
+                        std::cout << "Compiled to " << outName << " (" << fcData.size() << " bytes)" << std::endl;
+                    } else {
+                        ErrorReporter::reportSimple("FileError", "Cannot create .fc file: " + outName);
+                        return 1;
+                    }
+                } catch (const std::exception& e) {
+                    if (!ErrorReporter::hasError()) {
+                        ErrorReporter::reportFromException("CompileError", e.what());
+                    }
+                    return 1;
+                }
             }
             return 0;
         }
@@ -169,28 +185,48 @@ int main(int argc, char** argv) {
                 ErrorReporter::reportSimple("ArgumentError", "'-fc' requires a filename");
                 return 1;
             }
-            filename = argv[i + 1];
-            i++;
-            // Try direct path first, then parentDir\.fc\<basename>.fc
-            std::string fcFile = filename;
-            if (access(fcFile.c_str(), 0) != 0 || filename.find(".fc") == std::string::npos) {
-                size_t dot = filename.rfind('.');
-                std::string base = (dot != std::string::npos) ? filename.substr(0, dot) : filename;
-                size_t sep = base.find_last_of("/\\");
-                std::string baseName = (sep != std::string::npos) ? base.substr(sep + 1) : base;
-                std::string parentDir = (sep != std::string::npos) ? base.substr(0, sep) : ".";
-                std::string altPath = parentDir + "\\" + baseName + ".fc";
-                if (access(altPath.c_str(), 0) == 0) fcFile = altPath;
+            std::vector<std::string> files;
+            for (int j = i + 1; j < argc; j++) {
+                if (argv[j][0] == '-') break;
+                files.push_back(argv[j]);
             }
-            std::string fullCode = read_file(fcFile);
-            if (fullCode.empty()) return 1;
+            if (files.empty()) {
+                ErrorReporter::reportSimple("ArgumentError", "'-fc' requires a filename");
+                return 1;
+            }
+            i += static_cast<int>(files.size());
+
+            // Multi-module run: every resolved .fc is loaded into one VM
+            // (the first is the entry program; the rest resolve cross-module
+            // function/class references).
             try {
-                std::vector<uint8_t> fcData(fullCode.begin(), fullCode.end());
-                xor_crypt(fcData, FC_XOR_KEY);
-                CompiledProgram prog = CompiledProgram::deserialize(fcData);
                 RegFunc(); // initialize system libraries for function resolution
                 VM vm;
-                vm.loadProgram(prog);
+                bool first = true;
+                for (const auto& f : files) {
+                    // Try direct path first, then parentDir\.fc\<basename>.fc
+                    std::string fcFile = f;
+                    if (access(fcFile.c_str(), 0) != 0 || f.find(".fc") == std::string::npos) {
+                        size_t dot = f.rfind('.');
+                        std::string base = (dot != std::string::npos) ? f.substr(0, dot) : f;
+                        size_t sep = base.find_last_of("/\\");
+                        std::string baseName = (sep != std::string::npos) ? base.substr(sep + 1) : base;
+                        std::string parentDir = (sep != std::string::npos) ? base.substr(0, sep) : ".";
+                        std::string altPath = parentDir + "\\" + baseName + ".fc";
+                        if (access(altPath.c_str(), 0) == 0) fcFile = altPath;
+                    }
+                    std::string fullCode = read_file(fcFile);
+                    if (fullCode.empty()) return 1;
+                    std::vector<uint8_t> fcData(fullCode.begin(), fullCode.end());
+                    xor_crypt(fcData, FC_XOR_KEY);
+                    CompiledProgram prog = CompiledProgram::deserialize(fcData);
+                    if (first) {
+                        vm.loadProgram(prog);
+                        first = false;
+                    } else {
+                        vm.addProgram(prog);
+                    }
+                }
                 vm.run();
                 if (ErrorReporter::hasError()) return 1;
             } catch (const std::exception& e) {

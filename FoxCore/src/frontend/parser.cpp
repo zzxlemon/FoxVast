@@ -1,11 +1,13 @@
 #include "parser.hpp"
 #include "../util/common.hpp"
 #include "../interpreter/library_manager.hpp" 
+#include "../interpreter/interpreter.hpp"
 #include <iostream>
 #include <algorithm>
 
 std::vector<std::string> imported_source_files;
 std::string import_base_file;
+std::unordered_map<std::string, ClassDef> g_classRegistry;
 
 namespace {
 std::string dirOf(const std::string& path) {
@@ -92,6 +94,29 @@ static const char* tokenTypeName(TokenT type) {
     }
 }
 
+// The lexer decodes escape sequences ("\\" -> '\', "\n" -> newline, \uXXXX ->
+// UTF-8). parseSingleStatement rebuilds source lines from token values, so the
+// decoded content must be escaped again; otherwise a lone '\' or '"' corrupts
+// the reconstructed line ("\\" would become "\" -> unterminated string).
+static std::string reEscapeStringLiteral(const std::string& s) {
+    std::string out;
+    out.reserve(s.size() + 8);
+    for (char c : s) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        case '\b': out += "\\b"; break;
+        case '\f': out += "\\f"; break;
+        case '\x1b': out += "\\e"; break;
+        default: out += c; break;
+        }
+    }
+    return out;
+}
+
 void Parser::skipWhitespace(Lexer& lexer, Token& currentToken) {
     while (currentToken.type != TOKEN_EOF && !currentToken.value.empty()
         && currentToken.type != TOKEN_STRING
@@ -101,9 +126,24 @@ void Parser::skipWhitespace(Lexer& lexer, Token& currentToken) {
     }
 }
 
+// One-token pushback for parseClassDef's method preview: the probe already
+// consumed '(' from the stream, so it is stashed here and pulled back by the
+// next eat() on that lexer. Parser-level, single-threaded, always consumed
+// before the next member is parsed.
+static bool g_classPushbackActive = false;
+static Token g_classPushbackToken = Token(TOKEN_EOF, "");
+
+static Token classPullToken(Lexer& lexer) {
+    if (g_classPushbackActive) {
+        g_classPushbackActive = false;
+        return g_classPushbackToken;
+    }
+    return lexer.nextToken();
+}
+
 void Parser::eat(Lexer& lexer, Token& currentToken, TokenT expectedType) {
     if (currentToken.type == expectedType) {
-        currentToken = lexer.nextToken();
+        currentToken = classPullToken(lexer);
         skipWhitespace(lexer, currentToken);
     }
     else {
@@ -136,6 +176,24 @@ std::unique_ptr<Expr> Parser::parsePrimary(Lexer& lexer, Token& currentToken) {
     }
     else if (token.type == TOKEN_NEW) {
         eat(lexer, currentToken, TOKEN_NEW);
+        // Class instantiation: 'new Point(a, b)' (fields or init arguments).
+        if (currentToken.type == TOKEN_IDENTIFIER &&
+            g_classRegistry.find(currentToken.value) != g_classRegistry.end()) {
+            std::string className = currentToken.value;
+            eat(lexer, currentToken, TOKEN_IDENTIFIER);
+            eat(lexer, currentToken, TOKEN_LPAREN);
+            std::vector<std::unique_ptr<Expr>> args;
+            while (currentToken.type != TOKEN_RPAREN && !currentToken.value.empty()) {
+                args.push_back(parseExpr(lexer, currentToken));
+                if (currentToken.type == TOKEN_COMMA) {
+                    eat(lexer, currentToken, TOKEN_COMMA);
+                    skipWhitespace(lexer, currentToken);
+                }
+            }
+            eat(lexer, currentToken, TOKEN_RPAREN);
+            return std::unique_ptr<ObjectNewExpr>(new ObjectNewExpr(className, std::move(args)));
+        }
+        // Byte buffer allocation: 'new(size)'
         eat(lexer, currentToken, TOKEN_LPAREN);
         auto sizeExpr = parseExpr(lexer, currentToken);
         eat(lexer, currentToken, TOKEN_RPAREN);
@@ -355,7 +413,7 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
                 insideBlock = true;
                 braceDepth++;
             }
-            else if (currentToken.type == TOKEN_RBRACE && insideBlock) {
+            else if (currentToken.type == TOKEN_RBRACE && insideBlock && parenDepth == 0) {
                 braceDepth--;
                 if (braceDepth == 0) {
                     stmt += "} ";
@@ -386,7 +444,7 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
                 break;
             }
             if (currentToken.type == TOKEN_STRING) {
-                stmt += "\"" + currentToken.value + "\"";
+                stmt += "\"" + reEscapeStringLiteral(currentToken.value) + "\"";
             }
             else {
                 stmt += currentToken.value;
@@ -406,7 +464,7 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
                 exprBraceDepth--;
             }
             if (currentToken.type == TOKEN_STRING) {
-                stmt += "\"" + currentToken.value + "\"";
+                stmt += "\"" + reEscapeStringLiteral(currentToken.value) + "\"";
             }
             else {
                 stmt += currentToken.value;
@@ -432,8 +490,88 @@ std::string Parser::parseSingleStatement(Lexer& lexer, Token& currentToken) {
     return stmt;
 }
 
+// ============================================================
+// Object / class support
+// ============================================================
+
+Value defaultFieldValue(const std::string& type) {
+    if (type == "int") return Value(0);
+    if (type == "double") return Value(0.0);
+    if (type == "string") return Value(std::string(""));
+    if (type == "dict") return Value(std::unordered_map<std::string, std::shared_ptr<Value>>());
+    if (type == "array") return Value(std::vector<Value>());
+    if (type == "bytes") return Value(std::vector<uint8_t>());
+    return Value();
+}
+
+bool readObjectMember(const std::unordered_map<std::string, Value>& variables,
+    const std::string& dottedName, Value& out) {
+    size_t dot = dottedName.rfind('.');
+    if (dot == std::string::npos || dot == 0) return false;
+    std::string objName = dottedName.substr(0, dot);
+    std::string memberName = dottedName.substr(dot + 1);
+    auto it = variables.find(objName);
+    if (it == variables.end() || it->second.getType() != Value::Type::Object) return false;
+    const auto& members = it->second.asObjectDict();
+    auto mIt = members.find(memberName);
+    if (mIt == members.end()) {
+        throw std::runtime_error("Undefined field '" + memberName + "' in class '" +
+            it->second.asObjectClass() + "'");
+    }
+    out = *mIt->second;
+    return true;
+}
+
+bool assignObjectMember(std::unordered_map<std::string, Value>& variables,
+    const std::string& dottedName, const Value& value) {
+    size_t dot = dottedName.rfind('.');
+    if (dot == std::string::npos || dot == 0) return false;
+    std::string objName = dottedName.substr(0, dot);
+    std::string memberName = dottedName.substr(dot + 1);
+    auto it = variables.find(objName);
+    if (it == variables.end() || it->second.getType() != Value::Type::Object) return false;
+    it->second.asObjectDictRef()[memberName] = std::make_shared<Value>(value);
+    return true;
+}
+
+bool callObjectMethod(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions,
+    const std::string& dottedName, const std::vector<Value>& argVals, Value& out) {
+    size_t dot = dottedName.rfind('.');
+    if (dot == std::string::npos || dot == 0) return false;
+    std::string objName = dottedName.substr(0, dot);
+    std::string methodName = dottedName.substr(dot + 1);
+    auto it = variables.find(objName);
+    if (it == variables.end() || it->second.getType() != Value::Type::Object) return false;
+
+    std::string fullName = it->second.asObjectClass() + "." + methodName;
+    auto fit = functions.find(fullName);
+    if (fit == functions.end()) return false;
+
+    const Function& func = fit->second;
+    if (argVals.size() != func.parameters.size() - 1) {
+        throw std::runtime_error("Method " + fullName + " expects " +
+            std::to_string(func.parameters.size() - 1) + " arguments, got " +
+            std::to_string(argVals.size()));
+    }
+    Interpreter funcInterp;
+    funcInterp.variables = variables;
+    funcInterp.functions = functions;
+    funcInterp.variables[func.parameters[0].name] = it->second;
+    for (size_t i = 0; i < argVals.size(); ++i) {
+        funcInterp.variables[func.parameters[i + 1].name] = argVals[i];
+    }
+    out = funcInterp.executeFunction(func);
+    return true;
+}
+
 void Parser::parseFunction() {
     eat(funcLexer, funcCurrentToken, TOKEN_FUNC);
+    Function func = parseFunctionRest();
+    tempFunctions.push_back(func);
+}
+
+Function Parser::parseFunctionRest() {
     std::string funcName = funcCurrentToken.value;
     eat(funcLexer, funcCurrentToken, TOKEN_IDENTIFIER);
     eat(funcLexer, funcCurrentToken, TOKEN_LPAREN);
@@ -539,7 +677,83 @@ void Parser::parseFunction() {
     }
 
     eat(funcLexer, funcCurrentToken, TOKEN_RBRACE);
-    tempFunctions.push_back(func);
+    return func;
+}
+
+void Parser::parseClassDef() {
+    bool isStruct = (funcCurrentToken.type == TOKEN_STRUCT);
+    eat(funcLexer, funcCurrentToken, isStruct ? TOKEN_STRUCT : TOKEN_CLASS);
+    std::string className = funcCurrentToken.value;
+    eat(funcLexer, funcCurrentToken, TOKEN_IDENTIFIER);
+    eat(funcLexer, funcCurrentToken, TOKEN_LBRACE);
+    skipWhitespace(funcLexer, funcCurrentToken);
+
+    ClassDef def;
+    def.name = className;
+    def.isStruct = isStruct;
+
+    while (funcCurrentToken.type != TOKEN_RBRACE && funcCurrentToken.type != TOKEN_EOF) {
+        if (funcCurrentToken.type == TOKEN_NEWLINE || funcCurrentToken.value.empty()) {
+            funcCurrentToken = funcLexer.nextToken();
+            skipWhitespace(funcLexer, funcCurrentToken);
+            continue;
+        }
+
+        if (funcCurrentToken.type == TOKEN_FUNC) {
+            eat(funcLexer, funcCurrentToken, TOKEN_FUNC);
+        }
+
+        // Field declaration: name <- type
+        if (funcCurrentToken.type == TOKEN_IDENTIFIER) {
+            std::string name = funcCurrentToken.value;
+            // The probe below already consumes one token from funcLexer, so
+            // the consumer branch must not re-pull the stream; a pushback
+            // slot is used where the probe must be handed back (methods).
+            Token probe = funcLexer.nextToken();
+            skipWhitespace(funcLexer, probe);
+            if (probe.type == TOKEN_LEFT_ARROW) {
+                funcCurrentToken = funcLexer.nextToken();
+                skipWhitespace(funcLexer, funcCurrentToken);
+                std::string type;
+                if (funcCurrentToken.type == TOKEN_INT) type = "int";
+                else if (funcCurrentToken.type == TOKEN_DOUBLE) type = "double";
+                else if (funcCurrentToken.type == TOKEN_STRING_TYPE) type = "string";
+                else if (funcCurrentToken.type == TOKEN_DICT) type = "dict";
+                else if (funcCurrentToken.type == TOKEN_NEW) type = "bytes";
+                else {
+                    throw std::runtime_error(makeParseError(funcCurrentToken,
+                        "Unsupported field type: " + funcCurrentToken.value));
+                }
+                funcCurrentToken = funcLexer.nextToken();
+                skipWhitespace(funcLexer, funcCurrentToken);
+                def.fields.push_back({ name, type });
+                continue;
+            }
+            // name(...) -> method, or 'init(...)' constructor
+            if (probe.type == TOKEN_LPAREN) {
+                g_classPushbackActive = true;
+                g_classPushbackToken = probe;
+                bool isInit = (name == "init");
+                Function method = parseFunctionRest();
+                if (isInit) {
+                    def.hasInit = true;
+                    def.initFunc = method;
+                } else {
+                    method.name = className + "." + method.name;
+                    def.methods.push_back(method);
+                }
+                continue;
+            }
+            throw std::runtime_error(makeParseError(funcCurrentToken,
+                "Expected '<-' or '(' after identifier in class body, got: " + probe.value));
+        }
+
+        throw std::runtime_error(makeParseError(funcCurrentToken,
+            "Unexpected token in class body: " + funcCurrentToken.value));
+    }
+
+    eat(funcLexer, funcCurrentToken, TOKEN_RBRACE);
+    g_classRegistry[className] = def;
 }
 
 Parser::Parser(const std::string& src, std::unordered_map<std::string, Value>& vars,
@@ -555,7 +769,10 @@ void Parser::parseAllFunctions() {
         if (funcCurrentToken.type == TOKEN_FUNC) {
             parseFunction();
         }
-        else if (funcCurrentToken.type == TOKEN_IMPORT) {
+        else if (funcCurrentToken.type == TOKEN_CLASS || funcCurrentToken.type == TOKEN_STRUCT) {
+            parseClassDef();
+        }
+        else if (funcCurrentToken.type == TOKEN_IMPORT || funcCurrentToken.type == TOKEN_PLUGIN_IMPORT) {
             parseImportStatement(funcLexer, funcCurrentToken, variables, functions);
         }
         else {
@@ -578,7 +795,7 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
     if (currentToken.type == TOKEN_EOF) return;
     if (currentToken.type == TOKEN_SEMICOLON) {
         throw std::runtime_error(makeParseError(currentToken,
-            "FoxLang does not use semicolons. Remove the ';' and start a new line instead."));
+            "FoxVast does not use semicolons. Remove the ';' and start a new line instead."));
     }
 
     if (currentToken.type == TOKEN_IMPORT) {
@@ -784,6 +1001,10 @@ namespace {
         Value onRet(std::unique_ptr<Expr> arg) override {
             if (arg) {
                 retValue = arg->evaluate(variables, functions);
+            } else {
+                // Bare "ret": signal the enclosing executor to stop, like the
+                // compiled-path RetStmt does with the Return marker.
+                retValue = Value::makeReturnMarker();
             }
             return retValue;
         }
@@ -1024,7 +1245,7 @@ IfStatement Parser::parseIfStatement(Lexer& lexer, Token& currentToken) {
             parenDepth--;
         }
         if (currentToken.type == TOKEN_STRING)
-            condStr += "\"" + currentToken.value + "\" ";
+            condStr += "\"" + reEscapeStringLiteral(currentToken.value) + "\" ";
         else
             condStr += currentToken.value + " ";
         currentToken = lexer.nextToken();
@@ -1130,7 +1351,7 @@ WhileStatement Parser::parseWhileStatement(Lexer& lexer, Token& currentToken) {
             parenDepth--;
         }
         if (currentToken.type == TOKEN_STRING)
-            condStr += "\"" + currentToken.value + "\" ";
+            condStr += "\"" + reEscapeStringLiteral(currentToken.value) + "\" ";
         else
             condStr += currentToken.value + " ";
         currentToken = lexer.nextToken();
@@ -1203,7 +1424,7 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
             continue;
         }
         if (currentToken.type == TOKEN_STRING)
-            init += "\"" + currentToken.value + "\" ";
+            init += "\"" + reEscapeStringLiteral(currentToken.value) + "\" ";
         else
             init += currentToken.value + " ";
         currentToken = lexer.nextToken();
@@ -1218,7 +1439,7 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
             continue;
         }
         if (currentToken.type == TOKEN_STRING)
-            condition += "\"" + currentToken.value + "\" ";
+            condition += "\"" + reEscapeStringLiteral(currentToken.value) + "\" ";
         else
             condition += currentToken.value + " ";
         currentToken = lexer.nextToken();
@@ -1239,7 +1460,7 @@ ForStatement Parser::parseForStatement(Lexer& lexer, Token& currentToken) {
             iterParenDepth--;
         }
         if (currentToken.type == TOKEN_STRING)
-            iter += "\"" + currentToken.value + "\" ";
+            iter += "\"" + reEscapeStringLiteral(currentToken.value) + "\" ";
         else
             iter += currentToken.value + " ";
         currentToken = lexer.nextToken();
@@ -1378,6 +1599,42 @@ void Parser::parseImportStatement(Lexer& lexer, Token& currentToken,
     std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     skipWhitespace(lexer, currentToken);
+
+    // Plugin import: !import name  (or  !import "path/to/file.fox")
+    // Bare names resolve to: script directory -> C:\FoxLibs\ -> cwd, with
+    // ".fox" appended. The file is imported like any other source file.
+    if (currentToken.type == TOKEN_PLUGIN_IMPORT) {
+        eat(lexer, currentToken, TOKEN_PLUGIN_IMPORT);
+        if (currentToken.type == TOKEN_STRING) {
+            std::string importPath = currentToken.value;
+            eat(lexer, currentToken, TOKEN_STRING);
+            std::string fullPath = resolveImportPath(importPath);
+            if (!fileExists(fullPath)) {
+                throw std::runtime_error(makeParseError(currentToken,
+                    "Cannot find imported plugin file: " + importPath));
+            }
+            imported_source_files.push_back(fullPath);
+            return;
+        }
+        std::string pluginName = currentToken.value;
+        eat(lexer, currentToken, TOKEN_IDENTIFIER);
+        std::vector<std::string> candidates;
+        if (!import_base_file.empty()) {
+            candidates.push_back(dirOf(import_base_file) + "/" + pluginName + ".fox");
+        }
+        candidates.push_back("C:\\FoxLibs\\" + pluginName + ".fox");
+        candidates.push_back(pluginName + ".fox");
+        for (const auto& candidate : candidates) {
+            if (fileExists(candidate)) {
+                imported_source_files.push_back(candidate);
+                return;
+            }
+        }
+        throw std::runtime_error(makeParseError(currentToken,
+            "Library not found: " + pluginName +
+            " (searched the script directory, C:\\FoxLibs\\, and the working directory)"));
+    }
+
     eat(lexer, currentToken, TOKEN_IMPORT);
 
     // Cross-file import: import "path/to/file.fox"

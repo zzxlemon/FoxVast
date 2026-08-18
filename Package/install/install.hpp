@@ -13,3 +13,5 @@ bool download_package_file(const std::string& url, const std::string& dest);
 bool extract_zip(const std::string& zip_path, const std::string& dest_dir);
 
 void install_package(const std::string &package_name, const std::string &package_dir);
+
+void record_install_package_in_file(const std::string &package_name, const std::string &package_dir);   

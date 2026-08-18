@@ -144,6 +144,17 @@ public:
         std::unordered_map<std::string, Value::Type>& varTypes) const override;
 };
 
+class ObjectNewExpr : public Expr {
+public:
+    std::string className;
+    std::vector<std::unique_ptr<Expr>> args;
+    ObjectNewExpr(const std::string& cn, std::vector<std::unique_ptr<Expr>>&& a);
+    Value evaluate(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+    Value::Type compileBytecode(CompiledFunction& cf,
+        std::unordered_map<std::string, Value::Type>& varTypes) const override;
+};
+
 class UnaryExpr : public Expr {
 public:
     TokenT op;
@@ -354,7 +365,7 @@ public:
 
 // Keep old struct names as aliases for backward-compat during transition
 // (they are no longer used internally, BytecodeCompiler gets updated separately)
-// Parsing intermediates â€” store raw source lines, converted to Stmt nodes later
+// Parsing intermediates ¡ª store raw source lines, converted to Stmt nodes later
 struct IfStatement {
     std::string condition;
     std::vector<std::string> body;

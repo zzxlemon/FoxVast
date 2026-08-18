@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(FoxLang CXX)
+project(FoxVast CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -13,7 +13,7 @@ set(FOX_VERSION_DEFAULT "1.4.2")
 set(FOX_VM_VERSION_DEFAULT "1.3.206+b5")
 
 execute_process(
-    COMMAND git describe --tags --abbrev=0 --match "FoxLang-v*"
+    COMMAND git describe --tags --abbrev=0 --match "FoxVast-v*"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     OUTPUT_VARIABLE FOX_GIT_TAG
     OUTPUT_STRIP_TRAILING_WHITESPACE
@@ -21,14 +21,14 @@ execute_process(
 )
 set(FOX_VERSION_AUTO "${FOX_VERSION_DEFAULT}")
 if(FOX_GIT_TAG)
-    string(REGEX REPLACE "^FoxLang-v" "" FOX_VERSION_AUTO "${FOX_GIT_TAG}")
+    string(REGEX REPLACE "^FoxVast-v" "" FOX_VERSION_AUTO "${FOX_GIT_TAG}")
 endif()
 
 if(NOT DEFINED FOX_VERSION OR FOX_VERSION STREQUAL "${FOX_VERSION_DEFAULT}")
     set(FOX_VERSION "${FOX_VERSION_AUTO}")
 endif()
-set(FOX_VERSION "${FOX_VERSION}" CACHE STRING "FoxLang release version" FORCE)
-set(FOX_VM_VERSION "${FOX_VM_VERSION_DEFAULT}" CACHE STRING "FoxLang VM version")
+set(FOX_VERSION "${FOX_VERSION}" CACHE STRING "FoxVast release version" FORCE)
+set(FOX_VM_VERSION "${FOX_VM_VERSION_DEFAULT}" CACHE STRING "FoxVast VM version")
 
 configure_file(src/util/version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/version.hpp @ONLY)
 
@@ -48,20 +48,17 @@ target_include_directories(fox_rt PUBLIC
 set_target_properties(fox_rt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # ---- Main executable ----
-set(SOURCES
-    src/main.cpp
-    src/frontend/ast.cpp
-    src/frontend/lexer.cpp
-    src/frontend/parser.cpp
-    src/interpreter/interpreter.cpp
-    src/interpreter/library_init.cpp
-    src/util/utils.cpp
-    src/util/dll_loader.cpp
-    src/vm/bytecode.cpp
-    src/vm/far.cpp
+# Sources are discovered automatically (GLOB + CONFIGURE_DEPENDS): adding a
+# new .cpp under src/ does not require editing this file. CONFIGURE_DEPENDS
+# needs CMake >= 3.12; the build re-runs configure when files change.
+file(GLOB_RECURSE FOX_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
 )
+# value.cpp / common.cpp are compiled into fox_rt (shared runtime) and are
+# linked into fox.exe via fox_rt; exclude them from the executable itself.
+list(FILTER FOX_SOURCES EXCLUDE REGEX "/(frontend/value|util/common)\\.cpp$")
 
-add_executable(fox ${SOURCES})
+add_executable(fox ${FOX_SOURCES})
 
 set_target_properties(fox PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/core

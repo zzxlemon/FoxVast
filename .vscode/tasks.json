@@ -3,7 +3,7 @@
 	"tasks": [
 		{
 			"type": "shell",
-			"label": "CMake: 配置",
+			"label": "CMake: ����",
 			"command": "cmake",
 			"args": [
 				"-S",
@@ -12,16 +12,14 @@
 				"${workspaceFolder}/cmake-build",
 				"-G",
 				"MinGW Makefiles",
-				"-DCMAKE_BUILD_TYPE=Release",
-				"-DCMAKE_CXX_COMPILER=D:/mingw64/bin/g++.exe",
-				"-DCMAKE_MAKE_PROGRAM=D:/mingw64/bin/mingw32-make.exe"
+				"-DCMAKE_BUILD_TYPE=Release"
 			],
 			"group": "build",
 			"problemMatcher": []
 		},
 		{
 			"type": "shell",
-			"label": "CMake: 构建",
+			"label": "CMake: ����",
 			"command": "cmake",
 			"args": [
 				"--build",
@@ -34,7 +32,7 @@
 			"problemMatcher": [
 				"$gcc"
 			],
-			"dependsOn": "CMake: 配置"
+			"dependsOn": "CMake: ����"
 		}
 	]
 }

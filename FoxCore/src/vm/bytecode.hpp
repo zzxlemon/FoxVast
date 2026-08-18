@@ -127,6 +127,10 @@ enum class OpCode : uint8_t {
     OP_TRY             = 0x2D,
     OP_END_TRY         = 0x2E,
     OP_THROW           = 0x2F,
+    OP_NEW_OBJ         = 0x30,
+    OP_OBJ_FIELD_GET   = 0x31,
+    OP_OBJ_FIELD_SET   = 0x32,
+    OP_OBJ_CALL        = 0x33,
     OP_HALT            = 0xFF,
 };
 
@@ -189,10 +193,21 @@ struct ImportEntry {
     std::string alias;
 };
 
+struct CompiledClass {
+    std::string name;
+    bool isStruct = false;
+    std::vector<ClassField> fields;
+    bool hasInit = false;
+    std::vector<std::string> methodNames;
+};
+
 struct CompiledProgram {
     std::vector<CompiledFunction> functions;
     std::unordered_map<std::string, size_t> functionIndex;
     std::vector<ImportEntry> imports;
+
+    std::vector<CompiledClass> classes;
+    std::unordered_map<std::string, size_t> classIndex;
 
     std::vector<uint8_t> serialize() const;
     static CompiledProgram deserialize(const std::vector<uint8_t>& data);
@@ -206,10 +221,15 @@ struct CompiledProgram {
 void disassembleProgram(const CompiledProgram& prog, std::ostream& out);
 
 // ============================================================
-// BytecodeCompiler - compiles FoxLang source to bytecode
+// BytecodeCompiler - compiles FoxVast source to bytecode
 // ============================================================
 class BytecodeCompiler {
 public:
+    // When true (default), imported .fox sources are inlined into the output
+    // .fc. When false (multi-file -c / far packaging), each file compiles
+    // standalone and dependencies resolve across loaded programs at runtime.
+    static bool s_expandImports;
+
     CompiledProgram compile(const std::string& source, const std::string& filename = "");
     Value::Type compileExpr(CompiledFunction& cf, Expr* expr);
 
@@ -234,6 +254,7 @@ class VM {
 public:
     VM();
     void loadProgram(const CompiledProgram& prog);
+    void addProgram(const CompiledProgram& prog);
     void run();
 
 private:
@@ -245,9 +266,12 @@ private:
         size_t ip;
         size_t instrStart = 0; // offset of the instruction being executed
         int newAllocBytes = 0; // per-function new() budget (P3-5)
+        bool isCtorFrame = false; // constructor frame: result = locals[0] ('this')
+        Value ctorResult;
     };
 
     CompiledProgram program;
+    std::vector<CompiledProgram> extraPrograms;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
     std::vector<CallFrame> frames;
@@ -283,6 +307,9 @@ private:
 
     void runtimeErr(const std::string& msg);
     bool throwValue(const Value& err);
+
+    const CompiledFunction* findFunction(const std::string& name) const;
+    const CompiledClass* findClass(const std::string& name) const;
 
     bool callFunction(const std::string& name, int argCount);
     bool callSystemFunction(const std::string& name, int argCount);

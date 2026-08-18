@@ -1,5 +1,37 @@
 #include "lexer.hpp"
 
+static int hexDigit(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static void appendUtf8(std::string& out, int cp) {
+    if (cp < 0x80) {
+        out += static_cast<char>(cp);
+    }
+    else if (cp < 0x800) {
+        out += static_cast<char>(0xC0 | (cp >> 6));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else if (cp <= 0xFFFF) {
+        out += static_cast<char>(0xE0 | (cp >> 12));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else if (cp <= 0x10FFFF) {
+        out += static_cast<char>(0xF0 | (cp >> 18));
+        out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+        out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+        out += static_cast<char>(0x80 | (cp & 0x3F));
+    }
+    else {
+        // Outside the Unicode range: emit U+FFFD
+        out += "\xEF\xBF\xBD";
+    }
+}
+
 Lexer::Lexer(const std::string& src) : source(src), pos(0), line(1), col(1) {
     // Skip a UTF-8 BOM so source files saved by Windows editors parse cleanly.
     if (source.size() >= 3 &&
@@ -110,6 +142,8 @@ std::string Lexer::readIdentifier() {
     if (ident == "try") return "try";
     if (ident == "catch") return "catch";
     if (ident == "error") return "error";
+    if (ident == "class") return "class";
+    if (ident == "struct") return "struct";
     return ident;
 }
 
@@ -136,23 +170,97 @@ std::string Lexer::readString() {
     int startCol = col;
     pos++;
     col++;
-    size_t start = pos;
-    while (pos < source.size() && source[pos] != '"') {
-        if (source[pos] == '\n') {
+    std::string result;
+    bool closed = false;
+    while (pos < source.size()) {
+        char c = source[pos];
+        if (c == '"') {
+            pos++;
+            col++;
+            closed = true;
+            break;
+        }
+        if (c == '\n') {
             line++;
             col = 1;
-        } else {
-            col++;
+            pos++;
+            continue;
         }
+        if (c == '\\') {
+            if (pos + 1 >= source.size()) {
+                result += c;
+                pos++;
+                col++;
+                continue;
+            }
+            char e = source[pos + 1];
+            pos += 2;
+            col += 2;
+            switch (e) {
+            case '"': result += '"'; break;
+            case '\\': result += '\\'; break;
+            case '/': result += '/'; break;
+            case 'b': result += '\b'; break;
+            case 'f': result += '\f'; break;
+            case 'n': result += '\n'; break;
+            case 'r': result += '\r'; break;
+            case 't': result += '\t'; break;
+            case 'e': result += '\x1b'; break; // ANSI escape (colors)
+            case 'u': {
+                int cp = 0;
+                bool ok = true;
+                for (int k = 0; k < 4; k++) {
+                    if (pos + k >= source.size()) { ok = false; break; }
+                    int hv = hexDigit(source[pos + k]);
+                    if (hv < 0) { ok = false; break; }
+                    cp = cp * 16 + hv;
+                }
+                if (ok) {
+                    pos += 4;
+                    col += 4;
+                    // Try to combine a surrogate pair (\uD800-\uDBFF followed by
+                    // \uDC00-\uDFFF) into a single code point.
+                    if (cp >= 0xD800 && cp <= 0xDBFF &&
+                        pos + 6 <= source.size() &&
+                        source[pos] == '\\' && source[pos + 1] == 'u') {
+                        int lo = 0;
+                        bool ok2 = true;
+                        for (int k = 2; k < 6; k++) {
+                            int hv = hexDigit(source[pos + k]);
+                            if (hv < 0) { ok2 = false; break; }
+                            lo = lo * 16 + hv;
+                        }
+                        if (ok2 && lo >= 0xDC00 && lo <= 0xDFFF) {
+                            cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
+                            pos += 6;
+                            col += 6;
+                        }
+                    }
+                    appendUtf8(result, cp);
+                }
+                else {
+                    // Malformed \u escape: keep the original text.
+                    result += '\\';
+                    result += 'u';
+                }
+                break;
+            }
+            default:
+                // Unknown escape: keep it verbatim (e.g. Windows paths "C:\temp").
+                result += '\\';
+                result += e;
+                break;
+            }
+            continue;
+        }
+        result += c;
         pos++;
+        col++;
     }
-    if (pos >= source.size()) {
+    if (!closed) {
         throw std::runtime_error("Syntax error: " + std::to_string(line) + ":" + std::to_string(col) + ": unterminated string (missing closing double quote)");
     }
-    std::string str = source.substr(start, pos - start);
-    pos++;
-    col++;
-    return str;
+    return result;
 }
 
 bool Lexer::readArrow() {
@@ -175,6 +283,15 @@ bool Lexer::readLeftArrow() {
 
 Token Lexer::nextToken() {
     skipWhitespaceExceptNewline();
+    if (source.compare(pos, 7, "!import") == 0) {
+        size_t after = pos + 7;
+        if (after >= source.size() || source[after] == ' ' || source[after] == '\t' ||
+            source[after] == '\r' || source[after] == '\n') {
+            pos += 7;
+            col += 7;
+            return makeToken(TOKEN_PLUGIN_IMPORT, "!import", line, col - 7);
+        }
+    }
     skipComments();
     if (pos >= source.size()) {
         return makeToken(TOKEN_EOF, "", line, col);
@@ -337,6 +454,8 @@ Token Lexer::nextToken() {
             if (ident == "try") return makeToken(TOKEN_TRY, "try", tokenLine, tokenCol);
             if (ident == "catch") return makeToken(TOKEN_CATCH, "catch", tokenLine, tokenCol);
             if (ident == "error") return makeToken(TOKEN_ERROR, "error", tokenLine, tokenCol);
+            if (ident == "class") return makeToken(TOKEN_CLASS, "class", tokenLine, tokenCol);
+            if (ident == "struct") return makeToken(TOKEN_STRUCT, "struct", tokenLine, tokenCol);
             return makeToken(TOKEN_IDENTIFIER, ident, tokenLine, tokenCol);
         }
         else if (isdigit(static_cast<unsigned char>(c))) {

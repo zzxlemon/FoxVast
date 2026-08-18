@@ -1,16 +1,22 @@
 #include "tools.hpp"
 #include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+
+// If HANDLE and WORD are from Windows.h, ensure it is included via tools.hpp or here:
+// #include <windows.h>
 
 std::string aaa = "none";
 
 std::string readLine(const std::string& filename, int lineNum) {
     if (lineNum < 1) {
-        throw std::out_of_range("è¡Œå·å¿…é¡»ä» 1 å¼€å§‹");
+        throw std::out_of_range("ĞĞºÅ±ØĞë´Ó 1 ¿ªÊ¼");
     }
 
     std::ifstream file(filename);
     if (!file.is_open()) {
-        throw std::runtime_error("æ— æ³•æ‰“å¼€æ–‡ä»¶: " + filename);
+        throw std::runtime_error("ÎŞ·¨´ò¿ªÎÄ¼ş: " + filename);
     }
 
     std::string line;
@@ -18,25 +24,24 @@ std::string readLine(const std::string& filename, int lineNum) {
     while (std::getline(file, line)) {
         ++currentLine;
         if (currentLine == lineNum) {
-            return line;  // è¿”å›æ­¤è¡Œå†…å®¹
+            return line;
         }
     }
 
-    // å¦‚æœéå†å®Œä»æ²¡æ‰¾åˆ°ï¼Œè¯´æ˜è¡Œå·è¿‡å¤§
-    throw std::out_of_range("æ–‡ä»¶åªæœ‰ " + std::to_string(currentLine) + " è¡Œï¼Œè¯·æ±‚è¡Œå· " + std::to_string(lineNum));
+    throw std::out_of_range("ÎÄ¼şÖ»ÓĞ " + std::to_string(currentLine) + " ĞĞ£¬ÇëÇóĞĞºÅ " + std::to_string(lineNum));
 }
 
 void writeLine(const std::string& filename, int lineNum, const std::string& newContent) {
     if (lineNum < 1) {
-        throw std::out_of_range("è¡Œå·å¿…é¡»ä» 1 å¼€å§‹");
+        throw std::out_of_range("ĞĞºÅ±ØĞë´Ó 1 ¿ªÊ¼");
     }
 
     std::ifstream inFile(filename);
     if (!inFile.is_open()) {
-        throw std::runtime_error("æ— æ³•æ‰“å¼€æ–‡ä»¶: " + filename);
+        throw std::runtime_error("ÎŞ·¨´ò¿ªÎÄ¼ş: " + filename);
     }
 
-    // è¯»å–æ‰€æœ‰è¡Œåˆ° vector
+    // ¶ÁÈ¡ËùÓĞĞĞµ½ vector
     std::vector<std::string> lines;
     std::string line;
     while (std::getline(inFile, line)) {
@@ -44,28 +49,46 @@ void writeLine(const std::string& filename, int lineNum, const std::string& newC
     }
     inFile.close();
 
-    // æ£€æŸ¥è¡Œå·æ˜¯å¦æœ‰æ•ˆ
+    // ¼ì²éĞĞºÅÊÇ·ñÓĞĞ§
     if (lineNum > static_cast<int>(lines.size())) {
-        throw std::out_of_range("æ–‡ä»¶åªæœ‰ " + std::to_string(lines.size()) + " è¡Œï¼Œè¯·æ±‚è¡Œå· " + std::to_string(lineNum));
+        throw std::out_of_range("ÎÄ¼şÖ»ÓĞ " + std::to_string(lines.size()) + " ĞĞ£¬ÇëÇóĞĞºÅ " + std::to_string(lineNum));
     }
 
-    // æ›¿æ¢ç›®æ ‡è¡Œ
+    // Ìæ»»Ä¿±êĞĞ
     lines[lineNum - 1] = newContent;
 
-    // å†™å›æ–‡ä»¶
+    // Ğ´»ØÎÄ¼ş
     std::ofstream outFile(filename);
     if (!outFile.is_open()) {
-        throw std::runtime_error("æ— æ³•å†™å…¥æ–‡ä»¶: " + filename);
+        throw std::runtime_error("ÎŞ·¨Ğ´ÈëÎÄ¼ş: " + filename);
     }
 
     for (size_t i = 0; i < lines.size(); ++i) {
         outFile << lines[i];
-        // é™¤æœ€åä¸€è¡Œå¤–ï¼Œè¡¥å……æ¢è¡Œç¬¦
+        // ³ı×îºóÒ»ĞĞÍâ£¬²¹³ä»»ĞĞ·û
         if (i != lines.size() - 1) {
             outFile << '\n';
         }
     }
     outFile.close();
+}
+
+size_t countLines(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        throw std::runtime_error("ÎŞ·¨´ò¿ªÎÄ¼ş: " + filename);
+    }
+    
+    // Ö±½ÓÔÚÎÄ¼ş»º³åÇøÖĞÍ³¼Æ '\n' µÄÊıÁ¿
+    size_t lines = std::count(
+        std::istreambuf_iterator<char>(file),
+        std::istreambuf_iterator<char>(),
+        '\n'
+    );
+    
+    // ×¢Òâ£ºÈç¹ûÎÄ¼ş²»Îª¿ÕÇÒ×îºóÒ»ĞĞÃ»ÓĞÒÔ '\n' ½áÎ²£¬ĞĞÊıĞèÒª¼Ó 1
+    // ÕâÀï¿ÉÒÔ¼ÓÒ»¸ö¼òµ¥µÄ²¹ÕıÂß¼­£¨¿ÉÑ¡£©
+    return lines;
 }
 
 void set_color(HANDLE h, WORD color) {

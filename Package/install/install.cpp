@@ -5,10 +5,10 @@
 #include <atomic>
 #include "../tools.hpp"
 
-static std::mutex mtx;     // 全局互斥锁
+static std::mutex mtx;   
 static int sharedCounter = 0;
 
-static int isInstalling = 0; // 是否正在安装
+static int isInstalling = 0;
 static int install_result = 0; // 0=unknown, 1=ok, 2=fail
 static std::string download_error_msg = "";
 
@@ -130,6 +130,12 @@ void show_install_progress(int id) {
         frame++;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    if (install_result == 1) {
+        std::cout << "\r" << std::string(60, ' ') << "\r" << std::flush;
+        out_color(11);
+        std::cout << "-- Installing - [" << std::string(bar_max, '#') << "] 100%" << std::flush;
+        out_color(7);
+    }
     std::cout << std::endl;
 }
 
@@ -194,5 +200,28 @@ void install_package(const std::string &package_name, const std::string &package
         }
         std::cerr << "Failed to download package: " << package_name << std::endl;
         err_color(7);
+    }
+    std::string zip_file = package_dest;
+    for (char &c : zip_file) {
+        if (c == '/') c = '\\';
+    }
+    DeleteFileA(zip_file.c_str());
+}
+
+void record_install_package_in_file(const std::string &package_name, const std::string &package_dir) {
+    CreateDirectoryA("./packages/", NULL);
+    std::ofstream namesFile("./packages/installed_packages_name_list.txt", std::ios::app);
+    if (namesFile.is_open()) {
+        namesFile << package_name << "\n";
+        namesFile.close();
+    } else {
+        std::cerr << "Warning: cannot open packages/installed_packages_name_list.txt" << std::endl;
+    }
+    std::ofstream dirsFile("./packages/installed_packages_dir_list.txt", std::ios::app);
+    if (dirsFile.is_open()) {
+        dirsFile << package_dir << "\n";
+        dirsFile.close();
+    } else {
+        std::cerr << "Warning: cannot open packages/installed_packages_dir_list.txt" << std::endl;
     }
 }

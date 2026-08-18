@@ -37,6 +37,39 @@ struct LangErrorException : std::exception {
 extern std::vector<std::string> imported_source_files;
 extern std::string import_base_file;
 
+struct ClassField {
+    std::string name;
+    std::string type;
+};
+
+struct ClassDef {
+    std::string name;
+    bool isStruct = false;
+    std::vector<ClassField> fields;
+    std::vector<Function> methods; // methods with implicit 'this' as first param
+    bool hasInit = false;
+    Function initFunc;             // constructor (this + declared params)
+};
+
+// Class/struct definitions collected while parsing. Cleared by the interpreter
+// and the bytecode compiler before each program parse, then serialized into
+// .fc files for the VM.
+extern std::unordered_map<std::string, ClassDef> g_classRegistry;
+
+// Type-default value for a field declaration ("int" -> 0, etc.)
+Value defaultFieldValue(const std::string& type);
+
+// Object member helpers shared by the interpreter and the AST evaluator.
+// Each returns false when 'dottedName' does NOT refer to an object member
+// (so callers can fall back to library/name resolution).
+bool readObjectMember(const std::unordered_map<std::string, Value>& variables,
+    const std::string& dottedName, Value& out);
+bool assignObjectMember(std::unordered_map<std::string, Value>& variables,
+    const std::string& dottedName, const Value& value);
+bool callObjectMethod(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions,
+    const std::string& dottedName, const std::vector<Value>& argVals, Value& out);
+
 struct StmtHandler {
     virtual ~StmtHandler() = default;
     virtual void onPrint(std::unique_ptr<Expr> arg) = 0;
@@ -103,6 +136,10 @@ private:
     static std::string parseSingleStatement(Lexer& lexer, Token& currentToken);
     
     void parseFunction();
+    // Parses 'name(params) -> type { body }' with the lexer already positioned
+    // after the 'func' keyword. Used by top-level functions and class methods.
+    Function parseFunctionRest();
+    void parseClassDef();
     
     static std::unique_ptr<Expr> parseCompare(Lexer& lexer, Token& currentToken);
     

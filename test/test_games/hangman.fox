@@ -40,7 +40,7 @@ func main() -> void {
         guessed = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         wrongLetters = ""
         wrongCount = 0
-        maxWrong = 6
+        maxWrong = 26
         won = 0
 
         while (won == 0 and wrongCount < maxWrong) {
@@ -74,7 +74,7 @@ func main() -> void {
                 print(wrongLetters)
                 print(" (")
                 print(u.IntChangeString(wrongCount))
-                println("/6)")
+                println("/" + u.IntChangeString(maxWrong) + ")")
             }
 
             print("  Guess: ")

@@ -16,6 +16,7 @@ thread_local std::vector<std::string> interpreter_call_stack;
 void Interpreter::parseCode(const std::string& code, const std::string& filename) {
     if (code.empty()) return;
     parse_failed = false; // reset so a reused instance can recover (P3-6)
+    g_classRegistry.clear(); // fresh class/struct definitions per program
     try {
         std::unordered_map<std::string, std::string> funcOrigins; // func name -> source file
 
@@ -55,6 +56,17 @@ void Interpreter::parseCode(const std::string& code, const std::string& filename
             parseInto(src, path);
         }
         import_base_file.clear();
+
+        // Register class methods (named "<Class>.<method>", implicit 'this'
+        // as first parameter) into the function table for the interpreter path.
+        for (const auto& [className, def] : g_classRegistry) {
+            for (const auto& method : def.methods) {
+                functions[method.name] = method;
+            }
+            if (def.hasInit) {
+                functions[className + ".init"] = def.initFunc;
+            }
+        }
     }
     catch (const std::exception& e) {
         parse_failed = true;
@@ -110,6 +122,10 @@ Value Interpreter::executeFunction(const Function& func) {
     }
 
     if (func.returnType != "void") {
+        if (returnValue.getType() == Value::Type::Return) {
+            throw std::runtime_error("Function " + func.name + " expects to return " + func.returnType
+                + " type, but the bare 'ret' statement returns no value");
+        }
         if (func.returnType == "int" && returnValue.getType() != Value::Type::Int) {
             throw std::runtime_error("Function " + func.name + " expects to return int type, actually returned " +
                 (returnValue.getType() == Value::Type::Void ? "void" : "other type"));
@@ -130,7 +146,11 @@ Value Interpreter::executeFunction(const Function& func) {
             throw std::runtime_error("Function " + func.name + " expects to return bytes type, actually returned other type");
         }
     }
-    // A void function must not return a value (P3-8)
+    // A void function must not return a value (P3-8); a bare 'ret' marker is
+    // fine and is converted to a plain void result.
+    if (func.returnType == "void" && returnValue.getType() == Value::Type::Return) {
+        return Value();
+    }
     if (func.returnType == "void" && returnValue.getType() != Value::Type::Void) {
         throw std::runtime_error("Function " + func.name + " is declared void but returned a value");
     }
@@ -147,7 +167,7 @@ void Interpreter::runMainFunc() {
     }
     if (functions.find("main") == functions.end()) {
         ErrorReporter::reportSimple("RuntimeError", "main function not found",
-            "every FoxLang program must define a 'main' function");
+            "every FoxVast program must define a 'main' function");
         return;
     }
     interpreter_call_stack.clear();
@@ -202,7 +222,7 @@ void RegFunc() {
         initSystemLibraries(); // no-op: system libraries are DLL-only
         if (!LoadFoxLibs(LibraryManager::getInstance())) {
             ErrorReporter::reportSimple("LibraryError",
-                "No FoxLang library DLLs found. Place fox.*.dll next to fox.exe.");
+                "No FoxVast library DLLs found. Place fox.*.dll next to fox.exe.");
             std::exit(1);
         }
         initialized = true;

@@ -1,7 +1,22 @@
-import fox.gl.fg -> g
+!import fjson
+!import flog
+import fox.std.util
+import fox.sys.io.fs
 
 func main() -> void {
-    h = g.create_window("window", 800, 600)
+    c = flog_default_config()
 
+    h = file.file_open("../../test/test.json", "read")
+    txt = file.file_read(h)
+    file.file_close(h) 
     
+    flog_info(c, "'test.json' content: " + txt)
+
+    n = parse(txt) 
+    flog_info(c, "name: " + str_val(get(n, "name")))
+    flog_info(c, "publisher: " + str_val(get(n, "publisher")))
+    flog_info(c, "version: " + str_val(get(n, "version")))
+    flog_info(c, "description: " + str_val(get(n, "description")))
+
+    free_all()
 }

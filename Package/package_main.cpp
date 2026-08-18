@@ -48,6 +48,7 @@ int main(int argc, char** argv) {
             package_name = argv[i + 1];
             i++;
             install_package(package_name, package_dir);
+            record_install_package_in_file(package_name, package_dir);
         }
         else if (std::strcmp(argv[i], "uninstall") == 0 || std::strcmp(argv[i], "-u") == 0) {
             if (i + 1 >= argc) {

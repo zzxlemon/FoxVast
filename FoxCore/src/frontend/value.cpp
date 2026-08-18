@@ -58,6 +58,29 @@ std::unordered_map<std::string, std::shared_ptr<Value>>& Value::asDictRef() {
     return dictVal;
 }
 
+Value Value::makeObject(const std::string& className) {
+    Value v;
+    v.type = Type::Object;
+    v.objectClassName = className;
+    v.objDictVal = std::make_shared<std::unordered_map<std::string, std::shared_ptr<Value>>>();
+    return v;
+}
+
+const std::string& Value::asObjectClass() const {
+    if (type != Type::Object) throw std::runtime_error("Value is not an object type");
+    return objectClassName;
+}
+
+const std::unordered_map<std::string, std::shared_ptr<Value>>& Value::asObjectDict() const {
+    if (type != Type::Object || !objDictVal) throw std::runtime_error("Value is not an object type");
+    return *objDictVal;
+}
+
+std::unordered_map<std::string, std::shared_ptr<Value>>& Value::asObjectDictRef() {
+    if (type != Type::Object || !objDictVal) throw std::runtime_error("Value is not an object type");
+    return *objDictVal;
+}
+
 int Value::getByteSize() const {
     switch (type) {
     case Type::Int: return INT_BYTE_SIZE;
@@ -66,6 +89,7 @@ int Value::getByteSize() const {
     case Type::Array: return STRING_BYTE_SIZE;
     case Type::Bytes: return static_cast<int>(bytesVal.size());
     case Type::Dict: return STRING_BYTE_SIZE;
+    case Type::Object: return STRING_BYTE_SIZE;
     case Type::Void: return VOID_BYTE_SIZE;
     default: return 0;
     }
@@ -79,6 +103,7 @@ std::string Value::toString() const {
     case Type::Array: return "[array]";
     case Type::Bytes: return "[bytes]";
     case Type::Dict: return "[dict]";
+    case Type::Object: return "[class " + objectClassName + "]";
     case Type::Void: return "";
     default: return "<?>";
     }
@@ -110,6 +135,17 @@ bool valuesEqual(const Value& a, const Value& b) {
         return true;
     }
     case Value::Type::Bytes: return a.asBytes() == b.asBytes();
+    case Value::Type::Object: {
+        if (a.asObjectClass() != b.asObjectClass()) return false;
+        const auto& ad = a.asObjectDict();
+        const auto& bd = b.asObjectDict();
+        if (ad.size() != bd.size()) return false;
+        for (const auto& [key, val] : ad) {
+            auto it = bd.find(key);
+            if (it == bd.end() || !valuesEqual(*val, *it->second)) return false;
+        }
+        return true;
+    }
     default: return false;
     }
 }

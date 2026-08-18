@@ -1,0 +1,60 @@
+import fox.std.util
+import "json_get.fox"
+func mk_str(s_ms <- string) -> dict {
+    ret {"t": "str", "v": s_ms}
+}
+func mk_bool(b_mb <- int) -> dict {
+    ret {"t": "bool", "v": b_mb}
+}
+func null() -> dict {
+    ret {"t": "null", "v": 0}
+}
+func mk_num(x_mn <- double) -> dict {
+    xm = util.DoubleChangeInt(x_mn)
+    if (util.IntChangeDouble(xm) == x_mn) {
+        ret {"t": "num", "v": xm, "s": util.IntChangeString(xm)}
+    }
+    sm = util.DoubleChangeString(x_mn)
+    sm = _trim_zero(sm)
+    ret {"t": "num", "v": x_mn, "s": sm}
+}
+func mk_obj() -> dict {
+    ret {"t": "obj", "v": {"keys": [], "vals": {}}}
+}
+func mk_arr() -> dict {
+    ret {"t": "arr", "v": []}
+}
+func obj_set(nd_set <- dict, ky_set <- string, vl_set <- dict) -> dict {
+    vob = nd_set["v"]
+    kbs = vob["keys"]
+    vbs = vob["vals"]
+    nkob = kbs
+    hob = obj_has(nd_set, ky_set)
+    if (hob == 0) { nkob = util.arr_append(nkob, ky_set) }
+    nvob = {}
+    iob = 0
+    lob = util.arr_length(nkob)
+    while (iob < lob) {
+        kbo = nkob[iob]
+        if (kbo == ky_set) { nvob[kbo] = vl_set }
+        else { nvob[kbo] = vbs[kbo] }
+        iob = iob + 1
+    }
+    ret {"t": "obj", "v": {"keys": nkob, "vals": nvob}}
+}
+func arr_push(nd_push <- dict, vl_push <- dict) -> dict {
+    ret {"t": "arr", "v": util.arr_append(nd_push["v"], vl_push)}
+}
+func _trim_zero(stz <- string) -> string {
+    ntz = util.str_length(stz)
+    while (ntz > 0) {
+        ctz = util.str_substring(stz, ntz - 1, ntz)
+        if (ctz == "0") { ntz = ntz - 1 }
+        else { break }
+    }
+    if (ntz == 0) { ret "0" }
+    stz = util.str_substring(stz, 0, ntz)
+    mtz = util.str_length(stz)
+    if (util.str_substring(stz, mtz - 1, mtz) == ".") { stz = util.str_substring(stz, 0, mtz - 1) }
+    ret stz
+}

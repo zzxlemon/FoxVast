@@ -1,1 +1,2 @@
-cmake --build D:\MyCode\FoxLang\cmake-build --target foxpkg
+@echo off
+cmake --build ..\cmake-build --target foxpkg

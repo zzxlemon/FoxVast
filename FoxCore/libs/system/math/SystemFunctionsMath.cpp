@@ -1,7 +1,7 @@
 #include "SystemFunctionsMath.h"
 #include <cmath>
 /**
-* Note: The tan expression in this math library will explode near Ï€/2.
+* Note: The tan expression in this math library will explode near ¦Ð/2.
 */
 static double toDouble(const Value& v) {
     return (v.getType() == Value::Type::Int) ? static_cast<double>(v.asInt()) : v.asDouble();

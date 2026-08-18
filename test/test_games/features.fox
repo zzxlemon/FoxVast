@@ -49,7 +49,7 @@ func main() -> void {
         ok = 0
     }
 
-    if (u.str_contains("foxlang", "fox") != 1 or u.str_replace("a-b-c", "-", "+") != "a+b+c" or u.str_trim("  hi  ") != "hi" or u.str_lower("ABC") != "abc" or u.str_upper("abc") != "ABC" or u.str_substring("foxlang", 0, 3) != "fox" or u.str_length("fox") != 3) {
+    if (u.str_contains("foxvast", "fox") != 1 or u.str_replace("a-b-c", "-", "+") != "a+b+c" or u.str_trim("  hi  ") != "hi" or u.str_lower("ABC") != "abc" or u.str_upper("abc") != "ABC" or u.str_substring("foxvast", 0, 3) != "fox" or u.str_length("fox") != 3) {
         ok = 0
     }
     parts = u.str_split("a,b,c", ",")

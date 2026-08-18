@@ -1,4 +1,4 @@
-// FoxLang runtime library registration - single source of truth.
+// FoxVast runtime library registration - single source of truth.
 // Each library section is guarded by a FOX_LIB_<NAME> macro so that
 // each DLL compiles only its own registration.
 //
@@ -273,6 +273,30 @@ inline void register_graphics(LibraryManager& mgr) {
     mgr.registerSystemFunction("gl_fg", "mouse_pos", [](const std::vector<Value>& args) -> Value {
         FG fg;
         return fg.mouse_pos(args);
+    });
+}
+
+#endif
+
+// ============================================================
+//  fox.sys.time  - epoch seconds, strftime formatting
+// ============================================================
+#ifdef FOX_LIB_TIME
+#include "../../libs/system/time/SystemFunctionsTime.h"
+inline void register_time(LibraryManager& mgr) {
+    mgr.registerLibrary("time");
+    mgr.registerLibraryName("time", "fox.sys.time");
+    mgr.registerSystemFunction("time", "now", [](const std::vector<Value>& args) -> Value {
+        SystemFunctionsTime t;
+        return t.now(args);
+    });
+    mgr.registerSystemFunction("time", "format", [](const std::vector<Value>& args) -> Value {
+        SystemFunctionsTime t;
+        return t.format(args);
+    });
+    mgr.registerSystemFunction("time", "field", [](const std::vector<Value>& args) -> Value {
+        SystemFunctionsTime t;
+        return t.field(args);
     });
 }
 #endif

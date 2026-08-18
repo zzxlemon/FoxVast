@@ -11,10 +11,16 @@
 IdentifierExpr::IdentifierExpr(const std::string& n) : name(n) {}
 Value IdentifierExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
-    if (variables.find(name) == variables.end()) {
-        throw std::runtime_error("Undefined variable: " + name);
+    auto it = variables.find(name);
+    if (it != variables.end()) {
+        return it->second;
     }
-    return variables[name];
+    // Object member read: 'obj.field' (lexer merges dotted identifiers)
+    Value member;
+    if (readObjectMember(variables, name, member)) {
+        return member;
+    }
+    throw std::runtime_error("Undefined variable: " + name);
 }
 
 NumberExpr::NumberExpr(int v) : value(v) {}
@@ -130,6 +136,10 @@ Value CallExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     */
 
     if (functions.find(funcName) == functions.end()) {
+        Value methodResult;
+        if (callObjectMethod(variables, functions, funcName, argVals, methodResult)) {
+            return methodResult;
+        }
         auto& libMgr = LibraryManager::getInstance();
         std::string libName = libMgr.getBlockedLibName(funcName);
         if (!libName.empty()) {
@@ -260,6 +270,56 @@ Value NewExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     return Value(bytes);
 }
 
+ObjectNewExpr::ObjectNewExpr(const std::string& cn, std::vector<std::unique_ptr<Expr>>&& a)
+    : className(cn), args(std::move(a)) {}
+
+Value ObjectNewExpr::evaluate(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    std::vector<Value> argVals;
+    argVals.reserve(args.size());
+    for (const auto& a : args) {
+        argVals.push_back(a->evaluate(variables, functions));
+    }
+
+    auto classIt = g_classRegistry.find(className);
+    if (classIt == g_classRegistry.end()) {
+        throw std::runtime_error("Undefined class: " + className);
+    }
+    const ClassDef& def = classIt->second;
+
+    Value obj = Value::makeObject(className);
+    for (const auto& f : def.fields) {
+        obj.asObjectDictRef()[f.name] = std::make_shared<Value>(defaultFieldValue(f.type));
+    }
+
+    if (def.hasInit) {
+        if (argVals.size() != def.initFunc.parameters.size() - 1) {
+            throw std::runtime_error("Class " + className + " constructor expects " +
+                std::to_string(def.initFunc.parameters.size() - 1) + " arguments, got " +
+                std::to_string(argVals.size()));
+        }
+        Interpreter funcInterp;
+        funcInterp.variables = variables;
+        funcInterp.functions = functions;
+        funcInterp.variables[def.initFunc.parameters[0].name] = obj;
+        for (size_t i = 0; i < argVals.size(); ++i) {
+            funcInterp.variables[def.initFunc.parameters[i + 1].name] = argVals[i];
+        }
+        funcInterp.executeFunction(def.initFunc);
+    }
+    else if (!argVals.empty()) {
+        if (argVals.size() != def.fields.size()) {
+            throw std::runtime_error("Class " + className + " has no constructor; expected " +
+                std::to_string(def.fields.size()) + " positional field arguments, got " +
+                std::to_string(argVals.size()));
+        }
+        for (size_t i = 0; i < def.fields.size(); ++i) {
+            obj.asObjectDictRef()[def.fields[i].name] = std::make_shared<Value>(argVals[i]);
+        }
+    }
+    return obj;
+}
+
 Value CastExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
     Value val = expr->evaluate(variables, functions);
@@ -347,6 +407,7 @@ Value CompareExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     else if (leftVal.getType() == rightVal.getType() &&
              (leftVal.getType() == Value::Type::Array ||
               leftVal.getType() == Value::Type::Dict ||
+              leftVal.getType() == Value::Type::Object ||
               leftVal.getType() == Value::Type::Bytes)) {
         bool equal = valuesEqual(leftVal, rightVal);
         switch (op) {
@@ -387,6 +448,17 @@ Value ConditionExpr::evaluate(std::unordered_map<std::string, Value>& variables,
 // ============================================================
 Value::Type IdentifierExpr::compileBytecode(CompiledFunction& cf,
     std::unordered_map<std::string, Value::Type>& varTypes) const {
+    size_t dot = name.find('.');
+    if (dot != std::string::npos) {
+        // Object member read: OP_GET_GLOBAL obj, OP_OBJ_FIELD_GET member
+        int objIdx = cf.addConstantStringDedup(name.substr(0, dot));
+        cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+        cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
+        int memberIdx = cf.addConstantStringDedup(name.substr(dot + 1));
+        cf.chunk.writeOp(OpCode::OP_OBJ_FIELD_GET);
+        cf.chunk.writeShort(static_cast<uint16_t>(memberIdx));
+        return Value::Type::Object;
+    }
     int nameIdx = cf.addConstantStringDedup(name);
     cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
     cf.chunk.writeShort(static_cast<uint16_t>(nameIdx));
@@ -441,6 +513,27 @@ Value::Type IndexExpr::compileBytecode(CompiledFunction& cf,
 
 Value::Type CallExpr::compileBytecode(CompiledFunction& cf,
     std::unordered_map<std::string, Value::Type>& varTypes) const {
+    size_t dot = funcName.find('.');
+    if (dot != std::string::npos) {
+        std::string prefix = funcName.substr(0, dot);
+        // Library calls keep the OP_CONSTANT+OP_CALL form; every other dotted
+        // name is compiled as an object method call on 'prefix'.
+        auto& libMgr = LibraryManager::getInstance();
+        std::string resolvedLib = libMgr.resolveAlias(prefix);
+        if (!(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
+            int objIdx = cf.addConstantStringDedup(prefix);
+            cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
+            cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
+            for (const auto& arg : args) {
+                arg->compileBytecode(cf, varTypes);
+            }
+            int memberIdx = cf.addConstantStringDedup(funcName.substr(dot + 1));
+            cf.chunk.writeOp(OpCode::OP_OBJ_CALL);
+            cf.chunk.writeShort(static_cast<uint16_t>(memberIdx));
+            cf.chunk.writeByte(static_cast<uint8_t>(args.size()));
+            return Value::Type::Object;
+        }
+    }
     for (const auto& arg : args) {
         arg->compileBytecode(cf, varTypes);
     }
@@ -472,7 +565,8 @@ Value::Type BinaryExpr::compileBytecode(CompiledFunction& cf,
             throw std::runtime_error("TypeError: Cannot " + opName + " int and double without explicit cast");
         }
         if (leftType == Value::Type::String && rightType != Value::Type::String) {
-            throw std::runtime_error("TypeError: Cannot add string and non-string");
+            throw std::runtime_error("TypeError: Cannot add string and non-string (func="
+                + cf.name + " op=" + std::to_string(op) + ")");
         }
         if (leftType != Value::Type::String && rightType == Value::Type::String) {
             throw std::runtime_error("TypeError: Cannot add non-string and string");
@@ -508,6 +602,18 @@ Value::Type NewExpr::compileBytecode(CompiledFunction& cf,
     sizeExpr->compileBytecode(cf, varTypes);
     cf.chunk.writeOp(OpCode::OP_NEW);
     return Value::Type::Bytes;
+}
+
+Value::Type ObjectNewExpr::compileBytecode(CompiledFunction& cf,
+    std::unordered_map<std::string, Value::Type>& varTypes) const {
+    for (const auto& arg : args) {
+        arg->compileBytecode(cf, varTypes);
+    }
+    int classIdx = cf.addConstantStringDedup(className);
+    cf.chunk.writeOp(OpCode::OP_NEW_OBJ);
+    cf.chunk.writeShort(static_cast<uint16_t>(classIdx));
+    cf.chunk.writeByte(static_cast<uint8_t>(args.size()));
+    return Value::Type::Object;
 }
 
 Value::Type UnaryExpr::compileBytecode(CompiledFunction& cf,
@@ -634,7 +740,9 @@ Value RetStmt::execute(std::unordered_map<std::string, Value>& variables,
     if (hasArg) {
         return arg->evaluate(variables, functions);
     }
-    return Value();
+    // Bare "ret" in a void function must still stop execution; the Return
+    // marker signals "function is returning" without carrying a value.
+    return Value::makeReturnMarker();
 }
 
 Value EndlStmt::execute(std::unordered_map<std::string, Value>& variables,
@@ -670,6 +778,10 @@ Value CallStmt::execute(std::unordered_map<std::string, Value>& variables,
         return Value();
     }
     if (functions.find(funcName) == functions.end()) {
+        Value methodResult;
+        if (callObjectMethod(variables, functions, funcName, argVals, methodResult)) {
+            return Value();
+        }
         auto& libMgr = LibraryManager::getInstance();
         std::string libName = libMgr.getBlockedLibName(funcName);
         if (!libName.empty()) {
@@ -710,7 +822,11 @@ AssignStmt::AssignStmt(const std::string& name, std::unique_ptr<Expr> e)
     : varName(name), expr(std::move(e)) {}
 Value AssignStmt::execute(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
-    variables[varName] = expr->evaluate(variables, functions);
+    Value val = expr->evaluate(variables, functions);
+    if (assignObjectMember(variables, varName, val)) {
+        return Value();
+    }
+    variables[varName] = val;
     if (variables[varName].getType() == Value::Type::Bytes) {
         int sz = static_cast<int>(variables[varName].asBytes().size());
         Parser::checkNewAllocBytes(sz); // same limit as the interpreter path (P3-5)
@@ -725,6 +841,39 @@ Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables
     Value idxVal = index->evaluate(variables, functions);
     Value val = value->evaluate(variables, functions);
     if (variables.find(varName) == variables.end()) {
+        // Object field index write: 'obj.field[idx] = value'
+        size_t dot = varName.find('.');
+        if (dot != std::string::npos) {
+            std::string objName = varName.substr(0, dot);
+            std::string fieldName = varName.substr(dot + 1);
+            auto varIt = variables.find(objName);
+            if (varIt != variables.end() && varIt->second.getType() == Value::Type::Object) {
+                std::shared_ptr<Value> member;
+                {
+                    const auto& members = varIt->second.asObjectDict();
+                    auto it = members.find(fieldName);
+                    if (it == members.end()) {
+                        throw std::runtime_error("Undefined field '" + fieldName + "' in class '" +
+                            varIt->second.asObjectClass() + "'");
+                    }
+                    member = it->second;
+                }
+                if (member->getType() == Value::Type::Dict) {
+                    if (idxVal.getType() != Value::Type::String) {
+                        throw std::runtime_error("Dict index must be a string");
+                    }
+                    member->asDictRef()[idxVal.asString()] = std::make_shared<Value>(val);
+                    return Value();
+                }
+                std::vector<Value>& arr = member->asArrayRef();
+                int idx = idxVal.asInt();
+                if (idx < 0 || idx >= static_cast<int>(arr.size())) {
+                    throw std::runtime_error("Array index out of bounds: " + std::to_string(idx));
+                }
+                arr[idx] = val;
+                return Value();
+            }
+        }
         throw std::runtime_error("Undefined array or dict variable: " + varName);
     }
     if (variables[varName].getType() == Value::Type::Dict) {
