@@ -196,6 +196,6 @@ FoxVast/
 
 本项目基于 **MIT** 许可证开源 - 详情请参阅 [LICENSE](LICENSE) 文件。
 
-© 2026 **[Lemon Studio](https://lemdev.top)**. 保留所有权利。
+2026 **[Lemon Studio](https://lemdev.top)**. 保留所有权利。
 
 **(此信息在未来的版本变更可能会有所变化)**
