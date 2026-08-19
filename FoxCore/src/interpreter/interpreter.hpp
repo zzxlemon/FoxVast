@@ -16,6 +16,11 @@ public:
     std::unordered_map<std::string, Function> functions;
     bool parse_failed = false;
     int funcNewBytes = 0;
+    int gcRootId_ = -1;
+
+    // Register 'variables' as a GC root while active; removes on destruction.
+    void registerGcRoot();
+    void unregisterGcRoot();
 
     void parseCode(const std::string& code, const std::string& filename = "");
     Value execute(const std::string& line);

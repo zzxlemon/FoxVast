@@ -10,7 +10,7 @@ endif()
 
 # ---- Version (single source of truth, overridable with -DFOX_VERSION=...) ----
 set(FOX_VERSION_DEFAULT "1.4.2")
-set(FOX_VM_VERSION_DEFAULT "1.3.206+b5")
+set(FOX_VM_VERSION_DEFAULT "1.3.210+b1")
 
 execute_process(
     COMMAND git describe --tags --abbrev=0 --match "FoxVast-v*"

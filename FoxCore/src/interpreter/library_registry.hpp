@@ -274,6 +274,78 @@ inline void register_graphics(LibraryManager& mgr) {
         FG fg;
         return fg.mouse_pos(args);
     });
+    mgr.registerSystemFunction("gl_fg", "key_down", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.key_down(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "key_pressed", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.key_pressed(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "key_released", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.key_released(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "mouse_wheel", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.mouse_wheel(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "window_size", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.window_size(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "time", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.time(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "frame_time", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.frame_time(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "key_any_pressed", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.key_any_pressed(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "load_texture", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.load_texture(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "draw_image", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.draw_image(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "draw_image_rotated", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.draw_image_rotated(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "draw_image_tinted", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.draw_image_tinted(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "image_size", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.image_size(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "set_scale", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.set_scale(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "set_scale_anchor", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.set_scale_anchor(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "button", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.button(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "text_input", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.text_input(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "simulate_click", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.simulate_click(args);
+    });
 }
 
 #endif

@@ -1,0 +1,117 @@
+/* FoxLang documentation - minimal, clean, professional */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+    color: #1f2328;
+    background: #fafafa;
+    line-height: 1.65;
+}
+
+header {
+    background: #1f2430;
+    color: #e8eaf0;
+    padding: 2.4rem 1.2rem;
+}
+
+header .inner { max-width: 860px; margin: 0 auto; }
+
+header h1 { font-size: 1.7rem; font-weight: 600; }
+header .ver { color: #9aa4b8; font-size: 0.85rem; margin-top: .4rem; }
+
+nav.links {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: .9rem 0 0;
+    font-size: .9rem;
+}
+
+nav.links a {
+    color: #8ec5ff;
+    text-decoration: none;
+    margin-right: 1.2rem;
+}
+nav.links a:hover { text-decoration: underline; }
+
+main { max-width: 860px; margin: 2rem auto 4rem; padding: 0 1.2rem; }
+
+h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 2.6rem 0 .8rem;
+    padding-bottom: .35rem;
+    border-bottom: 1px solid #d9dde3;
+}
+
+h3 { font-size: 1.02rem; font-weight: 600; margin: 1.5rem 0 .5rem; }
+
+p { margin: .55rem 0; }
+ul, ol { margin: .55rem 0 .55rem 1.4rem; }
+li { margin: .25rem 0; }
+
+code {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: .9em;
+    background: #eef0f3;
+    border: 1px solid #e2e5ea;
+    border-radius: 3px;
+    padding: .08em .3em;
+}
+
+pre {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: .86rem;
+    background: #10141d;
+    color: #d7dce6;
+    border-radius: 6px;
+    padding: .9rem 1.1rem;
+    overflow-x: auto;
+    margin: .8rem 0;
+}
+
+pre code { background: none; border: none; padding: 0; color: inherit; font-size: 1em; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: .8rem 0 1.2rem;
+    font-size: .88rem;
+    background: #fff;
+}
+
+th, td {
+    border: 1px solid #dfe3e8;
+    padding: .45rem .65rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+th { background: #f2f4f7; font-weight: 600; white-space: nowrap; }
+td code { font-size: .88em; }
+
+.note {
+    background: #fff8e6;
+    border-left: 3px solid #e0a93a;
+    padding: .55rem .9rem;
+    margin: .8rem 0;
+    font-size: .9rem;
+}
+
+.warn {
+    background: #fdeeee;
+    border-left: 3px solid #c9403a;
+    padding: .55rem .9rem;
+    margin: .8rem 0;
+    font-size: .9rem;
+}
+
+footer {
+    max-width: 860px;
+    margin: 0 auto 3rem;
+    padding: 0 1.2rem;
+    font-size: .82rem;
+    color: #8a919c;
+    border-top: 1px solid #e3e6ea;
+    padding-top: 1rem;
+}

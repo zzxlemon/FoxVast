@@ -3,11 +3,11 @@
 #include <stdexcept>
 #include <vector>
 #include <unordered_map>
-#include <memory>
+#include "gc.hpp"
 
 class Value {
 public:
-    enum class Type { Int, String, Double, Void, Array, Bytes, Dict, Object, Return, Unknown };
+    enum class Type { Int, String, Double, Void, Array, Bytes, Dict, Object, Coroutine, Return, Unknown };
 
     Value();
     Value(int v);
@@ -16,7 +16,7 @@ public:
     Value(const char* v);
     Value(const std::vector<Value>& v);
     Value(const std::vector<uint8_t>& bytes);
-    Value(const std::unordered_map<std::string, std::shared_ptr<Value>>& dict);
+    Value(const std::unordered_map<std::string, GcHandle>& dict);
 
     // Marker returned by a bare "ret" (void return). Executors treat it as
     // "exit the current function" while still reporting no value. Never
@@ -26,6 +26,16 @@ public:
         v.type = Type::Return;
         return v;
     }
+
+    // Coroutine handle: index into the VM's coroutine registry. Runtime-only
+    // value; never serialized.
+    static Value makeCoroutine(int coroId) {
+        Value v;
+        v.type = Type::Coroutine;
+        v.coroId = coroId;
+        return v;
+    }
+    int asCoroutineId() const { return coroId; }
 
     Type getType() const;
 
@@ -37,15 +47,20 @@ public:
     const std::vector<Value>& asArray() const;
     const std::vector<uint8_t>& asBytes() const;
     std::vector<uint8_t>& asBytesRef();
-    const std::unordered_map<std::string, std::shared_ptr<Value>>& asDict() const;
-    std::unordered_map<std::string, std::shared_ptr<Value>>& asDictRef();
+    const std::unordered_map<std::string, GcHandle>& asDict() const;
+    std::unordered_map<std::string, GcHandle>& asDictRef();
 
-    // Object (class/struct instance): members are held in a shared map so that
-    // copying an object Value keeps reference semantics (this binding works).
+    // Object (class/struct instance): members are held in a GC'd member table
+    // so that copying an object Value keeps reference semantics (this binding
+    // works). objDictVal is a handle to a Dict-typed heap slot.
     static Value makeObject(const std::string& className);
     const std::string& asObjectClass() const;
-    const std::unordered_map<std::string, std::shared_ptr<Value>>& asObjectDict() const;
-    std::unordered_map<std::string, std::shared_ptr<Value>>& asObjectDictRef();
+    GcHandle asObjectDictHandle() const;
+    const std::unordered_map<std::string, GcHandle>& asObjectDict() const;
+    std::unordered_map<std::string, GcHandle>& asObjectDictRef();
+
+    // GC support: mark every heap handle reachable from this value.
+    void traceGC() const;
 
     int getByteSize() const;
 
@@ -70,9 +85,10 @@ private:
     std::string strVal;
     std::vector<Value> arrVal;
     std::vector<uint8_t> bytesVal;
-    std::unordered_map<std::string, std::shared_ptr<Value>> dictVal;
+    std::unordered_map<std::string, GcHandle> dictVal;
     std::string objectClassName = "";
-    std::shared_ptr<std::unordered_map<std::string, std::shared_ptr<Value>>> objDictVal;
+    GcHandle objDictVal = kNoGcHandle; // handle to a Dict-typed slot
+    int coroId = -1;                   // Coroutine: VM registry index
 };
 
 bool valuesEqual(const Value& a, const Value& b);

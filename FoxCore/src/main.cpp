@@ -221,6 +221,16 @@ int main(int argc, char** argv) {
                     xor_crypt(fcData, FC_XOR_KEY);
                     CompiledProgram prog = CompiledProgram::deserialize(fcData);
                     if (first) {
+                        // Attach the matching .fox source (if present) so runtime
+                        // errors can highlight the offending source line.
+                        std::string srcPath = fcFile;
+                        size_t dotPos = srcPath.rfind('.');
+                        if (dotPos != std::string::npos) srcPath = srcPath.substr(0, dotPos);
+                        srcPath += ".fox";
+                        std::string srcCode = read_file(srcPath);
+                        if (!srcCode.empty()) {
+                            ErrorReporter::setSource(srcPath, srcCode);
+                        }
                         vm.loadProgram(prog);
                         first = false;
                     } else {

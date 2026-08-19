@@ -18,6 +18,7 @@
 #include <stdexcept>
 #include <cstring>
 #include <cmath>
+#include <algorithm>
 
 // ============================================================
 // Serialization helpers
@@ -131,6 +132,7 @@ enum class OpCode : uint8_t {
     OP_OBJ_FIELD_GET   = 0x31,
     OP_OBJ_FIELD_SET   = 0x32,
     OP_OBJ_CALL        = 0x33,
+    OP_YIELD           = 0x34,
     OP_HALT            = 0xFF,
 };
 
@@ -140,6 +142,12 @@ enum class OpCode : uint8_t {
 struct Chunk {
     std::vector<uint8_t> code;
     std::vector<Value> constants;
+
+    // Source-line metadata: instructionOffsets[i] is the code offset of the
+    // i-th instruction start, instructionLines[i] its source line.
+    std::vector<size_t> instructionOffsets;
+    std::vector<int> instructionLines;
+    int currentLine = 1; // compile-time only: line of the statement being compiled
 
     void write(uint8_t byte);
     void writeOp(OpCode op);
@@ -159,6 +167,9 @@ struct Chunk {
     void patchJump(size_t offset, size_t target);
     void patchJumpOffset(size_t jumpInstrOffset, int32_t offset);
 
+    // Source line of the instruction whose start is closest to (and <=) ip.
+    int lineAt(size_t ip) const;
+
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t>& data);
     bool deserialize(const uint8_t* data, size_t size, size_t& offset);
@@ -171,6 +182,7 @@ struct Chunk {
 struct CompiledFunction {
     std::string name;
     std::string returnType;
+    std::string sourceFile; // file this function was compiled from (for errors)
     std::vector<Parameter> parameters;
     Chunk chunk;
     int localCount = 0;
@@ -243,7 +255,7 @@ private:
     static std::string typeStr(Value::Type t);
     static void typeError(const std::string& msg);
 
-    void compileFunctionBody(CompiledFunction& cf, const std::vector<std::string>& body);
+    void compileFunctionBody(CompiledFunction& cf, const std::vector<std::string>& body, const std::vector<int>& bodyLines = {});
     static void skipWhitespace(Lexer& lexer, Token& token);
 };
 
@@ -253,9 +265,14 @@ private:
 class VM {
 public:
     VM();
+    ~VM();
     void loadProgram(const CompiledProgram& prog);
     void addProgram(const CompiledProgram& prog);
     void run();
+
+    // Drives the instruction loop for the currently-swapped execution
+    // context (host frames, or a coroutine's after co.resume).
+    void runLoop();
 
 private:
     struct CallFrame {
@@ -274,6 +291,22 @@ private:
     std::vector<CompiledProgram> extraPrograms;
     std::vector<Value> stack;
     std::unordered_map<std::string, Value> globals;
+    // Hot-path mirror of globals: a slot-indexed array so OP_GET_GLOBAL /
+    // OP_SET_GLOBAL avoid the string hash on every access. globals (the
+    // name-keyed map) stays the slow-path truth for libraries and error
+    // reporting; the vector is flushed into it at call boundaries
+    // (flushGlobals), so hot assignments never touch the unordered_map.
+    std::vector<Value> globalVector_;
+    std::vector<std::string> globalNames_;
+    std::unordered_map<std::string, size_t> globalSlots_;
+    // Per-function cache: constant index -> global slot (built lazily)
+    std::unordered_map<const CompiledFunction*, std::vector<size_t>> globalConstCache_;
+
+    size_t getOrCreateSlot(const std::string& name);
+    void dropGlobal(const std::string& name);
+    bool setGlobalSync(const std::string& name, const Value& v);
+    void flushGlobals();
+    size_t slotForConst(const CompiledFunction* fn, size_t nameIdx);
     std::vector<CallFrame> frames;
     struct TryHandler {
         size_t stackDepth;
@@ -283,6 +316,35 @@ private:
     };
     std::vector<TryHandler> tryHandlers;
     bool runtimeError;
+    int gcRootId_ = -1;
+
+    // ============================================================
+    // Coroutines: cooperative scheduling on the single execution
+    // thread. A coroutine is a frozen execution context (frames +
+    // stack + try handlers). co.resume swaps the VM's active context
+    // with the coroutine's, runs it until the next yield (or finish),
+    // then swaps back. Nested resume (a coroutine resuming another)
+    // is rejected.
+    // ============================================================
+    struct Coroutine {
+        std::vector<CallFrame> frames;
+        std::vector<Value> stack;
+        std::vector<TryHandler> tryHandlers;
+        bool dead = false;
+        Value result;
+        Value lastYield;   // value handed to the host at the last yield
+        size_t yieldInstrStart = 0; // for error attribution while suspended
+    };
+    std::vector<Coroutine> coroutines_;
+    int activeCoro_ = -1;      // index of the running coroutine (-1 = host)
+    bool coroYieldRequested_ = false;
+
+    Value coroCreate(const std::string& fnName, const std::vector<Value>& args);
+    Value coroResume(int coroId, const Value& arg);
+    Value coroStatus(int coroId) const;
+    Value coroResult(int coroId) const;
+
+    void traceGC(Gc& gc);
 
     Value peek(int distance = 0) {
         if (stack.empty()) {

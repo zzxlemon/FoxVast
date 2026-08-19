@@ -191,9 +191,12 @@ inline void reportSimple(const std::string& tag,
 // Runtime error with a call-stack traceback.
 // trace[0] = outermost frame (main), last = innermost. offsets are optional
 // bytecode offsets (per frame) matching the addresses printed by 'fox -d'.
+// lines[i] is the source line of offsets[i] (0 if unknown).
 inline void reportRuntimeError(const std::string& message,
                                const std::vector<std::string>& trace,
-                               const std::vector<size_t>& offsets = {}) {
+                               const std::vector<size_t>& offsets = {},
+                               const std::vector<int>& lines = {},
+                               const std::vector<std::string>& files = {}) {
     auto& st = _ErrState::get();
     st.hasError() = true;
 
@@ -205,12 +208,28 @@ inline void reportRuntimeError(const std::string& message,
         std::cerr << DIM << "Stack trace:" << RST << std::endl;
         for (size_t i = trace.size(); i-- > 0;) {
             std::cerr << "  " << CYN << "at " << RST << trace[i];
-            if (i < offsets.size()) {
+            int line = (i < lines.size()) ? lines[i] : 0;
+            std::string file = (i < files.size()) ? files[i] : "";
+            if (line > 0 && !file.empty()) {
+                std::cerr << DIM << " (" << file << ":" << line << ")" << RST;
+            } else if (line > 0) {
+                std::cerr << DIM << " (line " << line << ")" << RST;
+            } else if (i < offsets.size()) {
                 char buf[32];
                 snprintf(buf, sizeof(buf), " (bytecode 0x%04zX)", offsets[i]);
                 std::cerr << DIM << buf << RST;
             }
             std::cerr << std::endl;
+        }
+        int topLine = !lines.empty() ? lines.back() : 0;
+        if (topLine > 0) {
+            std::string sl = st.getLine(topLine);
+            if (!sl.empty()) {
+                for (auto& c : sl) if (c == '\t') c = ' ';
+                std::cerr << DIM << "   |" << RST << std::endl;
+                std::cerr << BLU << " " << topLine << BLU << " | " << RST << sl << std::endl;
+                std::cerr << DIM << "   |" << RST << std::endl;
+            }
         }
     }
     std::cerr << std::endl;

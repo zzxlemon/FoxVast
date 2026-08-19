@@ -352,6 +352,14 @@ public:
         std::unordered_map<std::string, Function>& functions) override;
 };
 
+class YieldStmt : public Stmt {
+public:
+    std::unique_ptr<Expr> value; // may be null for bare "yield"
+    explicit YieldStmt(std::unique_ptr<Expr> v);
+    Value execute(std::unordered_map<std::string, Value>& variables,
+        std::unordered_map<std::string, Function>& functions) override;
+};
+
 class TryStmt : public Stmt {
 public:
     std::string errorVar;
@@ -365,7 +373,7 @@ public:
 
 // Keep old struct names as aliases for backward-compat during transition
 // (they are no longer used internally, BytecodeCompiler gets updated separately)
-// Parsing intermediates ¡ª store raw source lines, converted to Stmt nodes later
+// Parsing intermediates ï¿½ï¿½ store raw source lines, converted to Stmt nodes later
 struct IfStatement {
     std::string condition;
     std::vector<std::string> body;

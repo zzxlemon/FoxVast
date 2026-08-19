@@ -57,9 +57,9 @@ DictExpr::DictExpr(std::vector<std::pair<std::string, std::unique_ptr<Expr>>>&& 
 
 Value DictExpr::evaluate(std::unordered_map<std::string, Value>& variables,
     std::unordered_map<std::string, Function>& functions) {
-    std::unordered_map<std::string, std::shared_ptr<Value>> result;
+    std::unordered_map<std::string, GcHandle> result;
     for (const auto& entry : entries) {
-        result[entry.first] = std::make_shared<Value>(entry.second->evaluate(variables, functions));
+        result[entry.first] = Gc::instance().alloc(entry.second->evaluate(variables, functions));
     }
     return Value(result);
 }
@@ -101,7 +101,9 @@ Value IndexExpr::evaluate(std::unordered_map<std::string, Value>& variables,
         if (it == dict.end()) {
             throw std::runtime_error("Undefined dict key: " + keyValue.asString());
         }
-        return *it->second;
+        const Value* elem = Gc::instance().deref(it->second);
+        if (!elem) throw std::runtime_error("Dangling dict element: " + keyValue.asString());
+        return *elem;
     }
     throw std::runtime_error("Index target is not an array or dict type");
 }
@@ -289,7 +291,7 @@ Value ObjectNewExpr::evaluate(std::unordered_map<std::string, Value>& variables,
 
     Value obj = Value::makeObject(className);
     for (const auto& f : def.fields) {
-        obj.asObjectDictRef()[f.name] = std::make_shared<Value>(defaultFieldValue(f.type));
+        obj.asObjectDictRef()[f.name] = Gc::instance().alloc(defaultFieldValue(f.type));
     }
 
     if (def.hasInit) {
@@ -314,7 +316,7 @@ Value ObjectNewExpr::evaluate(std::unordered_map<std::string, Value>& variables,
                 std::to_string(argVals.size()));
         }
         for (size_t i = 0; i < def.fields.size(); ++i) {
-            obj.asObjectDictRef()[def.fields[i].name] = std::make_shared<Value>(argVals[i]);
+            obj.asObjectDictRef()[def.fields[i].name] = Gc::instance().alloc(argVals[i]);
         }
     }
     return obj;
@@ -520,7 +522,8 @@ Value::Type CallExpr::compileBytecode(CompiledFunction& cf,
         // name is compiled as an object method call on 'prefix'.
         auto& libMgr = LibraryManager::getInstance();
         std::string resolvedLib = libMgr.resolveAlias(prefix);
-        if (!(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
+        if (prefix != "co" &&
+            !(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
             int objIdx = cf.addConstantStringDedup(prefix);
             cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
             cf.chunk.writeShort(static_cast<uint16_t>(objIdx));
@@ -848,7 +851,8 @@ Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables
             std::string fieldName = varName.substr(dot + 1);
             auto varIt = variables.find(objName);
             if (varIt != variables.end() && varIt->second.getType() == Value::Type::Object) {
-                std::shared_ptr<Value> member;
+                GcHandle memberHandle;
+                Value* memberVal = nullptr;
                 {
                     const auto& members = varIt->second.asObjectDict();
                     auto it = members.find(fieldName);
@@ -856,16 +860,21 @@ Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables
                         throw std::runtime_error("Undefined field '" + fieldName + "' in class '" +
                             varIt->second.asObjectClass() + "'");
                     }
-                    member = it->second;
+                    memberHandle = it->second;
+                    memberVal = Gc::instance().deref(memberHandle);
+                    if (!memberVal) {
+                        throw std::runtime_error("Dangling field '" + fieldName + "' in class '" +
+                            varIt->second.asObjectClass() + "'");
+                    }
                 }
-                if (member->getType() == Value::Type::Dict) {
+                if (memberVal->getType() == Value::Type::Dict) {
                     if (idxVal.getType() != Value::Type::String) {
                         throw std::runtime_error("Dict index must be a string");
                     }
-                    member->asDictRef()[idxVal.asString()] = std::make_shared<Value>(val);
+                    memberVal->asDictRef()[idxVal.asString()] = Gc::instance().alloc(val);
                     return Value();
                 }
-                std::vector<Value>& arr = member->asArrayRef();
+                std::vector<Value>& arr = memberVal->asArrayRef();
                 int idx = idxVal.asInt();
                 if (idx < 0 || idx >= static_cast<int>(arr.size())) {
                     throw std::runtime_error("Array index out of bounds: " + std::to_string(idx));
@@ -880,7 +889,7 @@ Value IndexAssignStmt::execute(std::unordered_map<std::string, Value>& variables
         if (idxVal.getType() != Value::Type::String) {
             throw std::runtime_error("Dict index must be a string");
         }
-        variables[varName].asDictRef()[idxVal.asString()] = std::make_shared<Value>(val);
+        variables[varName].asDictRef()[idxVal.asString()] = Gc::instance().alloc(val);
         return Value();
     }
     std::vector<Value>& arr = variables[varName].asArrayRef();
@@ -1024,6 +1033,12 @@ Value ErrorStmt::execute(std::unordered_map<std::string, Value>& variables,
         throw std::runtime_error("error() message must be a string");
     }
     throw LangErrorException(msg.asString());
+}
+
+YieldStmt::YieldStmt(std::unique_ptr<Expr> v) : value(std::move(v)) {}
+Value YieldStmt::execute(std::unordered_map<std::string, Value>& variables,
+    std::unordered_map<std::string, Function>& functions) {
+    throw std::runtime_error("yield is only supported by the bytecode VM");
 }
 
 TryStmt::TryStmt(const std::string& var, std::vector<std::unique_ptr<Stmt>>&& b,

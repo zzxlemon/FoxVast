@@ -90,6 +90,7 @@ struct StmtHandler {
     virtual void onBreak() = 0;
     virtual void onContinue() = 0;
     virtual void onError(std::unique_ptr<Expr> message) = 0;
+    virtual void onYield(std::unique_ptr<Expr> value) = 0;
     virtual void onFnLabel(const std::string& name) = 0;
     virtual void onGoto(const std::string& name) = 0;
 };

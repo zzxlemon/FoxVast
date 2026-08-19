@@ -79,9 +79,23 @@ Value Interpreter::execute(const std::string& line) {
     return Parser::parseLine(line, variables, functions);
 }
 
+void Interpreter::registerGcRoot() {
+    if (gcRootId_ >= 0) return;
+    gcRootId_ = Gc::instance().addRoot([this](Gc& gc) {
+        for (const auto& [name, v] : variables) v.traceGC();
+    });
+}
+
+void Interpreter::unregisterGcRoot() {
+    if (gcRootId_ < 0) return;
+    Gc::instance().removeRoot(gcRootId_);
+    gcRootId_ = -1;
+}
+
 Value Interpreter::executeFunction(const Function& func) {
     Value returnValue;
     Parser::resetNewAllocBytes();
+    registerGcRoot();
 
     interpreter_call_stack.push_back(func.name);
     // Pre-scan labels for goto
@@ -94,6 +108,7 @@ Value Interpreter::executeFunction(const Function& func) {
 
     size_t i = 0;
     while (i < func.compiledBody.size()) {
+        Gc::instance().checkpoint();
         try {
             const auto& stmt = func.compiledBody[i];
             if (!stmt) {
@@ -155,6 +170,7 @@ Value Interpreter::executeFunction(const Function& func) {
         throw std::runtime_error("Function " + func.name + " is declared void but returned a value");
     }
 
+    unregisterGcRoot();
     return returnValue;
 }
 

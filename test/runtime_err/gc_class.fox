@@ -1,0 +1,30 @@
+class Point {
+    x <- int
+    y <- int
+    tag <- string
+}
+
+func main() -> void {
+    i = 0
+    while (i < 100000) {
+        p = new Point(i, i * 2, "tag")
+        if (p.x != i or p.y != i * 2 or p.tag != "tag") {
+            println("FIELD FAIL")
+            exit(1)
+        }
+        i = i + 1
+    }
+    println("class loop ok")
+    j = 0
+    while (j < 50000) {
+        q = new Point(j, j, "q")
+        q.tag = "mod"
+        if (q.tag != "mod" or q.x != j) {
+            println("MOD FAIL")
+            exit(1)
+        }
+        j = j + 1
+    }
+    println("field write ok")
+    exit(0)
+}

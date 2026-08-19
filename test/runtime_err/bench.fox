@@ -1,0 +1,19 @@
+func fib(n <- int) -> int {
+    if (n < 2) {
+        ret n
+    }
+    ret fib(n - 1) + fib(n - 2)
+}
+
+func main() -> void {
+    s = 0
+    i = 0
+    while (i < 50000000) {
+        s = s + i % 7
+        i = i + 1
+    }
+    println(s)
+    f = fib(24)
+    println(f)
+    exit(0)
+}

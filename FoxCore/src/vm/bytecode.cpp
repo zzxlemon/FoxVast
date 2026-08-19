@@ -14,7 +14,17 @@ void Chunk::write(uint8_t byte) {
 }
 
 void Chunk::writeOp(OpCode op) {
+    instructionOffsets.push_back(code.size());
+    instructionLines.push_back(currentLine);
     write(static_cast<uint8_t>(op));
+}
+
+int Chunk::lineAt(size_t ip) const {
+    // Upper bound: first instruction start > ip
+    auto it = std::upper_bound(instructionOffsets.begin(), instructionOffsets.end(), ip);
+    if (it == instructionOffsets.begin()) return 0;
+    size_t idx = static_cast<size_t>(it - instructionOffsets.begin()) - 1;
+    return idx < instructionLines.size() ? instructionLines[idx] : 0;
 }
 
 void Chunk::writeInt(uint32_t val) {
@@ -132,9 +142,11 @@ void writeValue(std::vector<uint8_t>& data, const Value& v) {
         data.push_back(6);
         const auto& dict = v.asDict();
         writeVarint(data, static_cast<uint32_t>(dict.size()));
-        for (const auto& [key, val] : dict) {
+        for (const auto& [key, h] : dict) {
             writeString(data, key);
-            writeValue(data, *val);
+            const Value* elem = Gc::instance().deref(h);
+            if (elem) writeValue(data, *elem);
+            else writeValue(data, Value());
         }
         break;
     }
@@ -143,9 +155,11 @@ void writeValue(std::vector<uint8_t>& data, const Value& v) {
         writeString(data, v.asObjectClass());
         const auto& members = v.asObjectDict();
         writeVarint(data, static_cast<uint32_t>(members.size()));
-        for (const auto& [key, val] : members) {
+        for (const auto& [key, h] : members) {
             writeString(data, key);
-            writeValue(data, *val);
+            const Value* elem = Gc::instance().deref(h);
+            if (elem) writeValue(data, *elem);
+            else writeValue(data, Value());
         }
         break;
     }
@@ -205,12 +219,12 @@ bool readValue(const uint8_t* data, size_t size, size_t& offset, Value& out) {
     }
     case 6: { // dict
         uint32_t dictLen = readVarint(data, size, offset);
-        std::unordered_map<std::string, std::shared_ptr<Value>> dict;
+        std::unordered_map<std::string, GcHandle> dict;
         for (uint32_t j = 0; j < dictLen; j++) {
             std::string key = readString(data, size, offset);
             Value elem;
             if (!readValue(data, size, offset, elem)) return false;
-            dict[key] = std::make_shared<Value>(std::move(elem));
+            dict[key] = Gc::instance().alloc(elem);
         }
         out = Value(dict);
         return true;
@@ -224,7 +238,7 @@ bool readValue(const uint8_t* data, size_t size, size_t& offset, Value& out) {
             std::string key = readString(data, size, offset);
             Value elem;
             if (!readValue(data, size, offset, elem)) return false;
-            members[key] = std::make_shared<Value>(std::move(elem));
+            members[key] = Gc::instance().alloc(elem);
         }
         return true;
     }
@@ -247,6 +261,17 @@ std::vector<uint8_t> Chunk::serialize() const {
     // Code
     writeVarint(data, static_cast<uint32_t>(code.size()));
     data.insert(data.end(), code.begin(), code.end());
+
+    // Instruction line table
+    writeVarint(data, static_cast<uint32_t>(instructionOffsets.size()));
+    int prevLine = 0;
+    for (size_t i = 0; i < instructionOffsets.size(); i++) {
+        writeVarint(data, static_cast<uint32_t>(instructionOffsets[i]));
+        // Delta-encode lines: source lines are non-decreasing, so deltas are >= 0
+        int delta = instructionLines[i] - prevLine;
+        writeVarint(data, static_cast<uint32_t>(delta));
+        prevLine = instructionLines[i];
+    }
 
     return data;
 }
@@ -273,6 +298,21 @@ bool Chunk::deserialize(const uint8_t* data, size_t size, size_t& offset) {
     code.insert(code.end(), data + offset, data + offset + codeSize);
     offset += codeSize;
 
+    // Instruction line table
+    uint32_t instrCount = readVarint(data, size, offset);
+    instructionOffsets.clear();
+    instructionLines.clear();
+    instructionOffsets.reserve(instrCount);
+    instructionLines.reserve(instrCount);
+    int prevLine = 0;
+    for (uint32_t i = 0; i < instrCount; i++) {
+        uint32_t off = readVarint(data, size, offset);
+        int line = prevLine + static_cast<int>(readVarint(data, size, offset));
+        instructionOffsets.push_back(off);
+        instructionLines.push_back(line);
+        prevLine = line;
+    }
+
     return true;
 }
 
@@ -284,6 +324,13 @@ size_t Chunk::serializedSize() const {
     }
     writeVarint(dummy, static_cast<uint32_t>(code.size()));
     dummy.insert(dummy.end(), code.begin(), code.end());
+    writeVarint(dummy, static_cast<uint32_t>(instructionOffsets.size()));
+    int prevLine = 0;
+    for (size_t i = 0; i < instructionOffsets.size(); i++) {
+        writeVarint(dummy, static_cast<uint32_t>(instructionOffsets[i]));
+        writeVarint(dummy, static_cast<uint32_t>(instructionLines[i] - prevLine));
+        prevLine = instructionLines[i];
+    }
     return dummy.size();
 }
 
@@ -295,8 +342,8 @@ std::vector<uint8_t> CompiledProgram::serialize() const {
 
     // Magic "FOXC"
     data.push_back('F'); data.push_back('O'); data.push_back('X'); data.push_back('C');
-    // Version
-    writeUint32(data, 2);
+    // Version (3: source-line table per chunk)
+    writeUint32(data, 3);
 
     // Import entries
     writeVarint(data, static_cast<uint32_t>(imports.size()));
@@ -328,6 +375,7 @@ std::vector<uint8_t> CompiledProgram::serialize() const {
     for (const auto& func : functions) {
         writeString(data, func.name);
         writeString(data, func.returnType);
+        writeString(data, func.sourceFile);
 
         // Parameters
         writeVarint(data, static_cast<uint32_t>(func.parameters.size()));
@@ -360,7 +408,7 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
     offset += 4;
 
     uint32_t version = readUint32(data, size, offset);
-    if (version != 2) {
+    if (version != 3) {
         throw std::runtime_error("Unsupported .fc version: " + std::to_string(version));
     }
 
@@ -400,6 +448,7 @@ static CompiledProgram deserializeRaw(const uint8_t* data, size_t size) {
         CompiledFunction cf;
         cf.name = readString(data, size, offset);
         cf.returnType = readString(data, size, offset);
+        cf.sourceFile = readString(data, size, offset);
 
         uint32_t paramCount = readVarint(data, size, offset);
         for (uint32_t j = 0; j < paramCount; j++) {
@@ -523,6 +572,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
         CompiledFunction cf;
         cf.name = func.name;
         cf.returnType = func.returnType;
+        cf.sourceFile = funcOrigins[funcName];
         cf.parameters = func.parameters;
         cf.localCount = static_cast<int>(func.parameters.size()); // params are locals
 
@@ -531,7 +581,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
             // Opcodes for locals use slot indices 0..N-1
         }
 
-        compileFunctionBody(cf, func.body);
+        compileFunctionBody(cf, func.body, func.bodyLines);
 
         // Ensure every function ends with a return instruction.
         // NOTE: cannot use code.back() here: the operand byte of a 0-arg OP_CALL
@@ -562,7 +612,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
             cf.returnType = method.returnType;
             cf.parameters = method.parameters;
             cf.localCount = static_cast<int>(method.parameters.size());
-            compileFunctionBody(cf, method.body);
+            compileFunctionBody(cf, method.body, method.bodyLines);
             cf.chunk.writeOp(OpCode::OP_RETURN);
             program.functions.push_back(cf);
             program.functionIndex[cf.name] = program.functions.size() - 1;
@@ -583,7 +633,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
     return program;
 }
 
-void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vector<std::string>& body) {
+void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vector<std::string>& body, const std::vector<int>& bodyLines) {
     std::unordered_map<std::string, size_t> labelAddresses;
     std::vector<std::pair<std::string, size_t>> gotoFixups;
 
@@ -663,7 +713,8 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
                 std::string prefix = name.substr(0, dot);
                 auto& libMgr = LibraryManager::getInstance();
                 std::string resolvedLib = libMgr.resolveAlias(prefix);
-                if (!(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
+                if (prefix != "co" &&
+                    !(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
                     // Object method call statement: obj.method(args)
                     int objIdx = cf.addConstantStringDedup(prefix);
                     cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
@@ -939,6 +990,10 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
             message->compileBytecode(cf, varTypes);
             cf.chunk.writeOp(OpCode::OP_THROW);
         }
+        void onYield(std::unique_ptr<Expr> value) override {
+            if (value) value->compileBytecode(cf, varTypes);
+            cf.chunk.writeOp(OpCode::OP_YIELD);
+        }
         void onFnLabel(const std::string& name) override {
             labelAddresses[name] = cf.chunk.code.size();
         }
@@ -952,8 +1007,12 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
 
     BytecodeStmtHandler handler(cf, varTypes, *this, labelAddresses, gotoFixups);
 
-    for (const auto& line : body) {
+    for (size_t lineIdx = 0; lineIdx < body.size(); lineIdx++) {
+        const std::string& line = body[lineIdx];
         if (line.empty()) continue;
+        if (lineIdx < bodyLines.size()) {
+            cf.chunk.currentLine = bodyLines[lineIdx];
+        }
 
         // Check for type declaration (int/double/string var = expr)
         // These are not handled by parseLine (interpreter ignores them)
@@ -1100,16 +1159,117 @@ Value::Type BytecodeCompiler::compileExpr(CompiledFunction& cf, Expr* expr) {
 // VM implementation
 // ============================================================
 
-VM::VM() : runtimeError(false) {}
+VM::VM() : runtimeError(false) {
+    gcRootId_ = Gc::instance().addRoot([this](Gc& gc) { this->traceGC(gc); });
+}
+
+VM::~VM() {
+    Gc::instance().removeRoot(gcRootId_);
+}
+
+void VM::traceGC(Gc& gc) {
+    for (const auto& v : stack) v.traceGC();
+    for (const auto& [name, v] : globals) v.traceGC();
+    for (const auto& v : globalVector_) v.traceGC();
+    for (const auto& frame : frames) {
+        for (const auto& v : frame.locals) v.traceGC();
+        for (const auto& [name, v] : frame.savedGlobals) v.traceGC();
+        frame.ctorResult.traceGC();
+    }
+    for (const auto& c : program.functions) {
+        for (const auto& v : c.chunk.constants) v.traceGC();
+    }
+    for (const auto& extra : extraPrograms) {
+        for (const auto& c : extra.functions) {
+            for (const auto& v : c.chunk.constants) v.traceGC();
+        }
+    }
+    // Frozen coroutine contexts are roots while suspended
+    for (const auto& coro : coroutines_) {
+        for (const auto& v : coro.stack) v.traceGC();
+        for (const auto& frame : coro.frames) {
+            for (const auto& v : frame.locals) v.traceGC();
+            for (const auto& [name, v] : frame.savedGlobals) v.traceGC();
+            frame.ctorResult.traceGC();
+        }
+        coro.result.traceGC();
+        coro.lastYield.traceGC();
+    }
+}
 
 void VM::loadProgram(const CompiledProgram& prog) {
     program = prog;
     extraPrograms.clear();
     globals.clear();
+    globalVector_.clear();
+    globalNames_.clear();
+    globalSlots_.clear();
+    globalConstCache_.clear();
     stack.clear();
     frames.clear();
     tryHandlers.clear();
+    coroutines_.clear();
     runtimeError = false;
+}
+
+// ---- global slot fast-path helpers -------------------------------------
+// Global reads/writes go through a slot-indexed vector (no per-access string
+// hash). `globals` (the name-keyed map) stays available for libraries and
+// error paths; flushGlobals() pushes vector state back into it at call
+// boundaries, which are rare compared to instructions.
+size_t VM::getOrCreateSlot(const std::string& name) {
+    auto it = globalSlots_.find(name);
+    if (it != globalSlots_.end()) {
+        return it->second;
+    }
+    size_t slot = globalVector_.size();
+    globalSlots_[name] = slot;
+    globalVector_.push_back(Value());
+    globalNames_.push_back(name);
+    return slot;
+}
+
+void VM::dropGlobal(const std::string& name) {
+    auto it = globalSlots_.find(name);
+    if (it != globalSlots_.end()) {
+        globalVector_[it->second] = Value();
+        globalSlots_.erase(it);
+    }
+    globals.erase(name);
+    // Slots may be recycled later by getOrCreateSlot; cached constant->slot
+    // bindings become stale, so invalidate every function's cache.
+    globalConstCache_.clear();
+}
+
+bool VM::setGlobalSync(const std::string& name, const Value& v) {
+    auto it = globalSlots_.find(name);
+    if (it == globalSlots_.end()) return false;
+    globalVector_[it->second] = v;
+    globals[name] = v;
+    return true;
+}
+
+void VM::flushGlobals() {
+    for (size_t i = 0; i < globalVector_.size(); i++) {
+        globals[globalNames_[i]] = globalVector_[i];
+    }
+}
+
+size_t VM::slotForConst(const CompiledFunction* fn, size_t nameIdx) {
+    auto& cache = globalConstCache_[fn];
+    if (cache.empty()) {
+        cache.assign(fn->chunk.constants.size(), SIZE_MAX);
+    }
+    if (nameIdx < cache.size() && cache[nameIdx] != SIZE_MAX) {
+        return cache[nameIdx];
+    }
+    const Value& cv = fn->chunk.constants[nameIdx];
+    if (cv.getType() != Value::Type::String) return SIZE_MAX;
+    auto it = globalSlots_.find(cv.asString());
+    if (it == globalSlots_.end()) return SIZE_MAX;
+    size_t slot = it->second;
+    if (nameIdx < cache.size()) cache[nameIdx] = slot;
+    return slot;
 }
 
 void VM::addProgram(const CompiledProgram& prog) {
@@ -1152,13 +1312,18 @@ void VM::runtimeErr(const std::string& msg) {
     if (!runtimeError) {
         std::vector<std::string> trace;
         std::vector<size_t> offsets;
+        std::vector<int> lines;
+        std::vector<std::string> files;
         for (const auto& f : frames) {
             trace.push_back(f.function->name);
             // Suspended frames are paused at their OP_CALL instruction; the
             // innermost frame points at the instruction that raised the error.
             offsets.push_back(f.instrStart);
+            int ln = f.function->chunk.lineAt(f.instrStart);
+            lines.push_back(ln);
+            files.push_back(f.function->sourceFile);
         }
-        ErrorReporter::reportRuntimeError(msg, trace, offsets);
+        ErrorReporter::reportRuntimeError(msg, trace, offsets, lines, files);
         runtimeError = true;
     }
 }
@@ -1175,17 +1340,23 @@ bool VM::throwValue(const Value& err) {
     while (frames.size() > handler.frameIndex + 1) {
         CallFrame& cur = frames.back();
         for (const auto& [name, val] : cur.savedGlobals) {
+            size_t slot = getOrCreateSlot(name);
+            globalVector_[slot] = val;
             globals[name] = val;
         }
         for (const auto& name : cur.newGlobals) {
-            globals.erase(name);
+            dropGlobal(name);
         }
         frames.pop_back();
     }
     if (stack.size() > handler.stackDepth) {
         stack.resize(handler.stackDepth);
     }
-    globals[handler.varName] = err;
+    {
+        size_t slot = getOrCreateSlot(handler.varName);
+        globalVector_[slot] = err;
+        globals[handler.varName] = err;
+    }
     if (!frames.empty()) {
         frames.back().ip = handler.catchAddr;
     }
@@ -1211,6 +1382,47 @@ bool VM::callSystemFunction(const std::string& name, int argCount) {
 }
 
 Value VM::executeSystemCall(const std::string& funcName, const std::vector<Value>& args) {
+    // System libraries observe globals through Interpreter::currentVariables,
+    // so push the slot array state into the name-keyed map before dispatch.
+    flushGlobals();
+    // Coroutine control functions are VM-resident (they need the execution
+    // context), so they are intercepted before library dispatch.
+    if (funcName == "co.create") {
+        if (args.empty() || args[0].getType() != Value::Type::String) {
+            runtimeErr("co.create expects a function name string as first argument");
+            return Value();
+        }
+        std::vector<Value> cargs(args.begin() + 1, args.end());
+        return coroCreate(args[0].asString(), cargs);
+    }
+    if (funcName == "co.resume") {
+        if (args.empty() || args[0].getType() != Value::Type::Coroutine) {
+            runtimeErr("co.resume expects a coroutine value");
+            return Value();
+        }
+        if (args.size() > 2) {
+            runtimeErr("co.resume expects (coroutine[, value])");
+            return Value();
+        }
+        Value arg = args.size() == 2 ? args[1] : Value();
+        // Returns the value produced by the suspended yield statement.
+        return coroResume(args[0].asCoroutineId(), arg);
+    }
+    if (funcName == "co.status") {
+        if (args.size() != 1 || args[0].getType() != Value::Type::Coroutine) {
+            runtimeErr("co.status expects a coroutine value");
+            return Value();
+        }
+        return coroStatus(args[0].asCoroutineId());
+    }
+    if (funcName == "co.result") {
+        if (args.size() != 1 || args[0].getType() != Value::Type::Coroutine) {
+            runtimeErr("co.result expects a coroutine value");
+            return Value();
+        }
+        return coroResult(args[0].asCoroutineId());
+    }
+
     Interpreter::currentVariables = &globals;
     Interpreter sys;
     if (sys.isSystemFunction(funcName)) {
@@ -1257,6 +1469,8 @@ bool VM::callFunction(const std::string& name, int argCount) {
         } else {
             frame.newGlobals.push_back(func.parameters[i].name);
         }
+        size_t slot = getOrCreateSlot(func.parameters[i].name);
+        globalVector_[slot] = frame.locals[i];
         globals[func.parameters[i].name] = frame.locals[i];
     }
 
@@ -1293,6 +1507,7 @@ void VM::run() {
     frames.clear();
     tryHandlers.clear();
     runtimeError = false;
+    coroYieldRequested_ = false;
 
     // Initialize system libraries
     RegFunc();
@@ -1304,25 +1519,46 @@ void VM::run() {
     frame.locals.resize(mainFunc->localCount);
     frames.push_back(frame);
 
+    runLoop();
+}
+
+// Drives the instruction loop for the currently-swapped execution context.
+// Used both for the main program (frames == host context) and for resumed
+// coroutines (frames == the coroutine's frozen context). Returns when the
+// frame stack empties, a runtime error fires, or the coroutine yields.
+void VM::runLoop() {
     // Execution loop
     bool resumed = false;
     do {
         resumed = false;
         try {
-        while (!frames.empty() && !runtimeError) {
+        while (!frames.empty() && !runtimeError && !coroYieldRequested_) {
         CallFrame& cf = frames.back();
         const Chunk& chunk = cf.function->chunk;
 
         if (cf.ip >= chunk.code.size()) {
+            CallFrame doneFrame = frames.back();
             frames.pop_back();
+            if (activeCoro_ >= 0 && frames.empty()) {
+                // Coroutine fell off the end: mark finished with a void result
+                coroutines_[activeCoro_].dead = true;
+                coroutines_[activeCoro_].result = Value();
+                coroYieldRequested_ = true;
+                continue;
+            }
             if (!frames.empty()) {
-                push(Value()); // void return value
+                if (doneFrame.isCtorFrame) {
+                    push(doneFrame.ctorResult);
+                } else {
+                    push(Value()); // void return value
+                }
             }
             continue;
         }
 
         uint8_t instruction = chunk.code[cf.ip++];
         cf.instrStart = cf.ip - 1;
+        Gc::instance().checkpoint();
 
         switch (static_cast<OpCode>(instruction)) {
         case OpCode::OP_RETURN: {
@@ -1359,14 +1595,24 @@ void VM::run() {
             if (!frames.empty()) {
                 CallFrame& curFrame = frames.back();
                 for (const auto& [name, val] : curFrame.savedGlobals) {
+                    size_t slot = getOrCreateSlot(name);
+                    globalVector_[slot] = val;
                     globals[name] = val;
                 }
                 for (const auto& name : curFrame.newGlobals) {
-                    globals.erase(name);
+                    dropGlobal(name);
                 }
             }
             CallFrame poppedFrame = frames.back();
             frames.pop_back();
+            if (activeCoro_ >= 0 && frames.empty()) {
+                // Coroutine returned: mark finished with this frame's result
+                coroutines_[activeCoro_].dead = true;
+                coroutines_[activeCoro_].result =
+                    poppedFrame.isCtorFrame ? poppedFrame.ctorResult : retVal;
+                coroYieldRequested_ = true;
+                break;
+            }
             if (!frames.empty()) {
                 if (poppedFrame.isCtorFrame) {
                     push(poppedFrame.ctorResult);
@@ -1595,6 +1841,8 @@ void VM::run() {
             }
             std::string name = chunk.constants[nameIdx].asString();
             Value val = pop();
+            size_t slot = getOrCreateSlot(name);
+            globalVector_[slot] = val;
             globals[name] = val;
             break;
         }
@@ -1606,13 +1854,12 @@ void VM::run() {
                 runtimeErr("Invalid global variable name constant");
                 break;
             }
-            std::string name = chunk.constants[nameIdx].asString();
-            auto it = globals.find(name);
-            if (it == globals.end()) {
-                runtimeErr("Undefined variable: " + name);
+            size_t slot = slotForConst(cf.function, nameIdx);
+            if (slot == SIZE_MAX) {
+                runtimeErr("Undefined variable: " + chunk.constants[nameIdx].asString());
                 break;
             }
-            push(it->second);
+            push(globalVector_[slot]);
             break;
         }
         case OpCode::OP_SET_GLOBAL: {
@@ -1625,12 +1872,12 @@ void VM::run() {
             }
             std::string name = chunk.constants[nameIdx].asString();
             Value val = peek();
-            auto it = globals.find(name);
-            if (it == globals.end()) {
+            size_t slot = slotForConst(cf.function, nameIdx);
+            if (slot == SIZE_MAX) {
                 runtimeErr("Undefined variable: " + name);
                 break;
             }
-            it->second = val;
+            globalVector_[slot] = val;
             break;
         }
         case OpCode::OP_UNSET_GLOBAL: {
@@ -1642,11 +1889,15 @@ void VM::run() {
                 break;
             }
             std::string name = chunk.constants[nameIdx].asString();
-            globals.erase(name);
+            dropGlobal(name);
             break;
         }
         case OpCode::OP_CLEAR_GLOBALS: {
             globals.clear();
+            globalVector_.clear();
+            globalNames_.clear();
+            globalSlots_.clear();
+            globalConstCache_.clear();
             break;
         }
         case OpCode::OP_GET_LOCAL: {
@@ -1737,6 +1988,8 @@ void VM::run() {
                     } else {
                         newFrame.newGlobals.push_back(func.parameters[i].name);
                     }
+                    size_t slot = getOrCreateSlot(func.parameters[i].name);
+                    globalVector_[slot] = args[i];
                     globals[func.parameters[i].name] = args[i];
                 }
             } else {
@@ -1796,7 +2049,7 @@ void VM::run() {
         case OpCode::OP_DICT: {
             uint8_t entryCount = chunk.readByte(cf.ip);
             cf.ip++;
-            std::unordered_map<std::string, std::shared_ptr<Value>> dict;
+            std::unordered_map<std::string, GcHandle> dict;
             for (int i = 0; i < entryCount; i++) {
                 Value keyVal = pop();
                 Value value = pop();
@@ -1804,7 +2057,7 @@ void VM::run() {
                     runtimeErr("Dict key must be a string");
                     break;
                 }
-                dict[keyVal.asString()] = std::make_shared<Value>(value);
+                dict[keyVal.asString()] = Gc::instance().alloc(value);
             }
             if (!runtimeError) push(Value(dict));
             break;
@@ -1835,7 +2088,12 @@ void VM::run() {
                     runtimeErr("Undefined dict key: " + index.asString());
                     break;
                 }
-                push(*it->second);
+                const Value* elem = Gc::instance().deref(it->second);
+                if (!elem) {
+                    runtimeErr("Dangling dict element");
+                    break;
+                }
+                push(*elem);
             } else {
                 runtimeErr("Index target is not an array or dict");
             }
@@ -1863,7 +2121,7 @@ void VM::run() {
                     runtimeErr("Dict index must be a string");
                     break;
                 }
-                arr.asDictRef()[index.asString()] = std::make_shared<Value>(value);
+                arr.asDictRef()[index.asString()] = Gc::instance().alloc(value);
                 push(arr);
             } else {
                 runtimeErr("Index target is not an array or dict");
@@ -1954,7 +2212,7 @@ void VM::run() {
             }
             Value obj = Value::makeObject(className);
             for (const auto& f : cls.fields) {
-                obj.asObjectDictRef()[f.name] = std::make_shared<Value>(defaultFieldValue(f.type));
+                obj.asObjectDictRef()[f.name] = Gc::instance().alloc(defaultFieldValue(f.type));
             }
             std::string initName = className + ".init";
             if (cls.hasInit) {
@@ -1985,7 +2243,7 @@ void VM::run() {
                     }
                     for (size_t i = 0; i < cls.fields.size(); i++) {
                         obj.asObjectDictRef()[cls.fields[i].name] =
-                            std::make_shared<Value>(args[i]);
+                            Gc::instance().alloc(args[i]);
                     }
                 }
                 push(obj);
@@ -2027,7 +2285,12 @@ void VM::run() {
                 runtimeErr("Field '" + fieldName + "' of class '" + className + "' is not initialized");
                 break;
             }
-            push(*it->second);
+            const Value* fieldVal = Gc::instance().deref(it->second);
+            if (!fieldVal) {
+                runtimeErr("Dangling field '" + fieldName + "' in class '" + className + "'");
+                break;
+            }
+            push(*fieldVal);
             break;
         }
         case OpCode::OP_OBJ_FIELD_SET: {
@@ -2060,7 +2323,7 @@ void VM::run() {
                 runtimeErr("Undefined field '" + fieldName + "' in class '" + className + "'");
                 break;
             }
-            obj.asObjectDictRef()[fieldName] = std::make_shared<Value>(val);
+            obj.asObjectDictRef()[fieldName] = Gc::instance().alloc(val);
             push(obj);
             break;
         }
@@ -2139,6 +2402,22 @@ void VM::run() {
         }
         case OpCode::OP_HALT: {
             frames.clear();
+            if (activeCoro_ >= 0) {
+                coroutines_[activeCoro_].dead = true;
+                coroutines_[activeCoro_].result = Value();
+                coroYieldRequested_ = true;
+            }
+            break;
+        }
+        case OpCode::OP_YIELD: {
+            if (activeCoro_ < 0) {
+                runtimeErr("yield is only allowed inside a coroutine");
+                break;
+            }
+            coroutines_[activeCoro_].lastYield =
+                stack.empty() ? Value() : pop();
+            coroutines_[activeCoro_].yieldInstrStart = cf.instrStart;
+            coroYieldRequested_ = true;
             break;
         }
         default:
@@ -2154,6 +2433,125 @@ void VM::run() {
             }
         }
     } while (resumed);
+}
+
+// ============================================================
+// Coroutine operations (co.create / co.resume / co.status /
+// co.result). Context switching is done by swapping the VM's
+// active frames/stack/tryHandlers with the coroutine's frozen
+// copies. The execution loop is re-entered via runLoop(); the
+// host's loop is still live on the C++ call stack (OP_CALL ->
+// callSystemFunction -> executeSystemCall -> coroResume).
+// ============================================================
+Value VM::coroCreate(const std::string& fnName, const std::vector<Value>& args) {
+    const CompiledFunction* funcPtr = findFunction(fnName);
+    if (funcPtr == nullptr) {
+        runtimeErr("Coroutine function not found: " + fnName);
+        return Value();
+    }
+    const CompiledFunction& func = *funcPtr;
+    if (static_cast<int>(args.size()) != static_cast<int>(func.parameters.size())) {
+        runtimeErr("Function " + fnName + " expects " + std::to_string(func.parameters.size())
+            + " arguments, got " + std::to_string(args.size()));
+        return Value();
+    }
+
+    Coroutine coro;
+    CallFrame frame;
+    frame.function = &func;
+    frame.ip = 0;
+    frame.locals.resize(func.localCount);
+    for (size_t i = 0; i < args.size(); i++) {
+        frame.locals[i] = args[i];
+    }
+    // Parameter globals are NOT bound here: binding happens per resume
+    // segment (see coroResume), so concurrent coroutines never clobber
+    // each other's parameters through the shared globals table.
+    coro.frames.push_back(frame);
+    coroutines_.push_back(std::move(coro));
+    return Value::makeCoroutine(static_cast<int>(coroutines_.size()) - 1);
+}
+
+Value VM::coroResume(int coroId, const Value& arg) {
+    if (coroId < 0 || coroId >= static_cast<int>(coroutines_.size())) {
+        runtimeErr("Invalid coroutine handle");
+        return Value();
+    }
+    Coroutine& coro = coroutines_[coroId];
+    if (activeCoro_ >= 0) {
+        runtimeErr("co.resume cannot be called from inside a coroutine");
+        return Value();
+    }
+if (coro.dead) {
+        runtimeErr("Cannot resume a finished coroutine");
+        return Value();
+    }
+    flushGlobals();
+
+    // Bind this coroutine's parameter globals for the segment (shadowing the
+    // current values, restored when the segment suspends or finishes). Every
+    // other global stays shared across the whole VM by design.
+    struct ParamShadow { std::string name; bool existed; Value old; };
+    std::vector<ParamShadow> paramShadow;
+    if (!coro.frames.empty()) {
+        const CompiledFunction& fn = *coro.frames.back().function;
+        for (size_t i = 0; i < fn.parameters.size() &&
+             i < coro.frames.back().locals.size(); i++) {
+auto gIt = globals.find(fn.parameters[i].name);
+            paramShadow.push_back({ fn.parameters[i].name,
+                gIt != globals.end(),
+                gIt != globals.end() ? gIt->second : Value() });
+            size_t slot = getOrCreateSlot(fn.parameters[i].name);
+            globalVector_[slot] = coro.frames.back().locals[i];
+            globals[fn.parameters[i].name] = coro.frames.back().locals[i];
+        }
+    }
+
+    // Swap the coroutine context in and run until it yields or finishes
+    std::swap(frames, coro.frames);
+    std::swap(stack, coro.stack);
+    std::swap(tryHandlers, coro.tryHandlers);
+    activeCoro_ = coroId;
+    coroYieldRequested_ = false;
+    runLoop();
+    coro.dead = frames.empty();
+    coroYieldRequested_ = false; // host loop must keep running
+    std::swap(frames, coro.frames);
+    std::swap(stack, coro.stack);
+    std::swap(tryHandlers, coro.tryHandlers);
+    activeCoro_ = -1;
+
+// Restore the parameter globals shadowed for this segment
+    for (const auto& sh : paramShadow) {
+        if (sh.existed) {
+            size_t slot = getOrCreateSlot(sh.name);
+            globalVector_[slot] = sh.old;
+            globals[sh.name] = sh.old;
+        } else {
+            dropGlobal(sh.name);
+        }
+    }
+    flushGlobals();
+
+    return coro.dead ? coro.result : coro.lastYield;
+}
+
+Value VM::coroStatus(int coroId) const {
+    if (coroId < 0 || coroId >= static_cast<int>(coroutines_.size())) {
+        return Value("invalid");
+    }
+    const Coroutine& coro = coroutines_[coroId];
+    if (coro.dead) return Value("dead");
+    if (activeCoro_ == coroId) return Value("running");
+    return Value("suspended");
+}
+
+Value VM::coroResult(int coroId) const {
+    if (coroId < 0 || coroId >= static_cast<int>(coroutines_.size())) {
+        return Value();
+    }
+    const Coroutine& coro = coroutines_[coroId];
+    return coro.dead ? coro.result : Value();
 }
 
 // ============================================================
@@ -2214,6 +2612,7 @@ const char* opcodeName(uint8_t byte) {
     case OpCode::OP_OBJ_FIELD_GET: return "OP_OBJ_FIELD_GET";
     case OpCode::OP_OBJ_FIELD_SET: return "OP_OBJ_FIELD_SET";
     case OpCode::OP_OBJ_CALL: return "OP_OBJ_CALL";
+    case OpCode::OP_YIELD: return "OP_YIELD";
     case OpCode::OP_HALT: return "OP_HALT";
     default: return "OP_UNKNOWN";
     }
@@ -2435,3 +2834,4 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
         out << std::endl;
     }
 }
+

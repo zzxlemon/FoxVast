@@ -15,5 +15,6 @@ struct Function {
     std::string returnType;        
     std::vector<Parameter> parameters; 
     std::vector<std::string> body;              // raw source lines (used by bytecode compiler)
+    std::vector<int> bodyLines;                 // file-absolute line number of each body entry
     std::vector<std::shared_ptr<Stmt>> compiledBody; // pre-compiled AST (used by interpreter)
 };

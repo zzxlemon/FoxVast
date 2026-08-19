@@ -456,6 +456,7 @@ Token Lexer::nextToken() {
             if (ident == "error") return makeToken(TOKEN_ERROR, "error", tokenLine, tokenCol);
             if (ident == "class") return makeToken(TOKEN_CLASS, "class", tokenLine, tokenCol);
             if (ident == "struct") return makeToken(TOKEN_STRUCT, "struct", tokenLine, tokenCol);
+            if (ident == "yield") return makeToken(TOKEN_YIELD, "yield", tokenLine, tokenCol);
             return makeToken(TOKEN_IDENTIFIER, ident, tokenLine, tokenCol);
         }
         else if (isdigit(static_cast<unsigned char>(c))) {

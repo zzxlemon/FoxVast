@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoxLang 语言参考</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <div class="inner">
+        <h1>FoxLang 语言参考</h1>
+        <div class="ver">FoxVast VM 1.3.210+b1 &middot; 64 位字节码虚拟机</div>
+    </div>
+</header>
+
+<nav class="links">
+    <a href="index.html">语言参考</a>
+    <a href="libraries.html">函数库参考</a>
+</nav>
+
+<main>
+
+<h2>1. 运行程序</h2>
+<p>FoxLang 先把 <code>.fox</code> 源代码编译为 <code>.fc</code> 字节码,再执行字节码。每个程序必须定义顶层函数 <code>main</code>,它是程序入口。</p>
+
+<table>
+<tr><th>命令</th><th>说明</th></tr>
+<tr><td><code>fox -c prog.fox</code></td><td>编译为 <code>prog.fc</code>(生成在源码旁边)。</td></tr>
+<tr><td><code>fox -fc prog.fc</code></td><td>运行字节码(第一个文件是入口,其余文件作为模块加载)。</td></tr>
+<tr><td><code>fox -d prog.fc</code></td><td>反汇编字节码。</td></tr>
+<tr><td><code>fox -p out.far a.fox b.fox</code></td><td>打包程序为 <code>.far</code> 归档(第一个文件是入口)。</td></tr>
+<tr><td><code>fox -u arch.far [目录]</code></td><td>解包 <code>.far</code> 归档(默认输出到 <code>output/</code>)。</td></tr>
+<tr><td><code>fox -far arch.far</code></td><td>运行归档中的入口程序。</td></tr>
+<tr><td><code>fox -s utf-8|gbk</code></td><td>设置控制台编码。</td></tr>
+<tr><td><code>fox -version</code></td><td>显示版本信息。</td></tr>
+</table>
+
+<p class="note"><code>.far</code> 是普通 ZIP(仅存储、不压缩),其中包含编译好的 <code>.fc</code> 文件(位于 <code>src/</code> 下)。</p>
+
+<pre><code>func main() -&gt; void {
+    println("Hello, FoxLang")
+    exit(0)
+}</code></pre>
+
+<h2>2. 词法结构</h2>
+
+<h3>注释</h3>
+<ul>
+<li><code>#</code> — 行注释,到行尾结束。</li>
+<li><code>#* ... *#</code> — 块注释(不可嵌套)。</li>
+</ul>
+
+<h3>字面量</h3>
+<table>
+<tr><th>字面量</th><th>示例</th><th>说明</th></tr>
+<tr><td>整数 int</td><td><code>42</code></td><td>仅十进制数字;32 位范围。不支持十六进制/下划线/指数。负数用 <code>-</code>。</td></tr>
+<tr><td>浮点 double</td><td><code>3.14</code></td><td>数字最多带一个 <code>.</code>。</td></tr>
+<tr><td>字符串</td><td><code>"hi"</code></td><td>只能用双引号(不能用单引号)。允许跨多行。</td></tr>
+<tr><td>数组</td><td><code>[1, 2, 3]</code></td><td>允许末尾逗号。</td></tr>
+<tr><td>字典</td><td><code>{"k": 1, "n": 2}</code></td><td>键必须是字符串字面量或裸标识符。允许末尾逗号。</td></tr>
+<tr><td>字节串 bytes</td><td><code>new(1024)</code></td><td>零填充的字节缓冲区;没有字节串字面量。</td></tr>
+</table>
+
+<h3>字符串转义</h3>
+<p><code>\"</code> <code>\\</code> <code>\/</code> <code>\b</code> <code>\f</code> <code>\n</code> <code>\r</code> <code>\t</code> <code>\e</code>(ESC,可用于 ANSI 颜色),<code>\uXXXX</code>(Unicode 码点,编码为 UTF-8)。未知转义原样保留。</p>
+
+<h3>关键字</h3>
+<p><code>func</code> <code>void</code> <code>int</code> <code>double</code> <code>string</code> <code>print</code> <code>println</code> <code>ret</code> <code>if</code> <code>else</code> <code>while</code> <code>for</code> <code>break</code> <code>continue</code> <code>and</code> <code>or</code> <code>!</code>(逻辑非) <code>new</code> <code>class</code> <code>struct</code> <code>dict</code> <code>try</code> <code>catch</code> <code>error</code> <code>exit</code> <code>import</code> <code>!import</code> <code>yield</code> <code>input</code> <code>goto</code> <code>free</code> <code>free_all</code> <code>endl</code></p>
+
+<p class="warn">以 <code>;</code> 结尾的语句是错误:FoxLang 用换行作为语句结束符。<code>;</code> 只出现在 <code>for</code> 头部。</p>
+
+<h3>签名类型 vs 运行时类型</h3>
+<table>
+<tr><th>签名中可声明的类型</th><th>运行时值类型</th></tr>
+<tr><td><code>int</code>、<code>double</code>、<code>string</code>、<code>dict</code>、<code>void</code>;字段还可用 <code>new</code>(即 bytes)</td><td>Int、Double、String、Void、Array、Bytes、Dict、Object、Coroutine</td></tr>
+</table>
+<p>变量本身是动态类型的:运行时在 <code>ret</code> 处检查声明的返回类型,运算按实际值类型在编译期/运行期检查。</p>
+
+<h2>3. 变量与赋值</h2>
+<p>语言没有变量声明。<code>name = expr</code> 会创建或覆盖一个变量。所有变量位于同一个扁平命名空间中,整个程序共享(函数体不引入作用域),因此参数名与顶层名字不能冲突。</p>
+
+<table>
+<tr><th>形式</th><th>含义</th></tr>
+<tr><td><code>a = expr</code></td><td>创建或覆盖变量 <code>a</code>。赋值是语句,不是表达式。</td></tr>
+<tr><td><code>a[i] = expr</code></td><td>对数组/字典/字节串值按下标写入。</td></tr>
+<tr><td><code>obj.field = expr</code></td><td>对象字段写入。</td></tr>
+<tr><td><code>obj.field[i] = expr</code></td><td>对象字段按下标写入。</td></tr>
+<tr><td><code>int x = 5</code></td><td>带类型声明(int/double/string/dict),创建一个全局变量,仅字节码模式支持。<code>int x</code> 单独写是无操作。</td></tr>
+<tr><td><code>free(name)</code></td><td>删除一个变量。</td></tr>
+<tr><td><code>free_all()</code></td><td>删除所有变量。</td></tr>
+</table>
+
+<h2>4. 运算符与优先级</h2>
+<table>
+<tr><th>优先级</th><th>运算符</th><th>结合性</th></tr>
+<tr><td>最高</td><td><code>-x</code> 取负、<code>!x</code> 逻辑非(结果为 int 1/0)</td><td>—</td></tr>
+<tr><td></td><td><code>*</code> <code>/</code> <code>%</code></td><td>左</td></tr>
+<tr><td></td><td><code>+</code> <code>-</code></td><td>左</td></tr>
+<tr><td></td><td><code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code></td><td>左</td></tr>
+<tr><td>最低</td><td><code>and</code>、<code>or</code>(短路求值)</td><td>左</td></tr>
+</table>
+
+<ul>
+<li>没有 <code>+=</code>/<code>++</code>/复合赋值,没有三元运算符。</li>
+<li><code>int</code> 与 <code>double</code> 混用做算术或比较是编译错误,需用 <code>double(x)</code>/<code>int(x)</code> 显式转换。</li>
+<li><code>string + string</code> 拼接;<code>string + int</code> 是编译错误,数字用 <code>util.IntChangeString</code> 或 <code>util.DoubleChangeString</code> 转换。</li>
+<li>比较产生 int 1/0。字符串只支持 <code>==</code>/<code>!=</code>,用 <code>&lt;</code>/<code>&gt;</code> 等会比较会报错。</li>
+<li><code>==</code>/<code>!=</code> 对数组、字典、字节串、对象做深比较。</li>
+</ul>
+
+<p>下标 <code>arr[i]</code>(数组、字典、字节串)与成员访问 <code>obj.field</code> 的绑定比算术运算符更紧。</p>
+
+<h2>5. 语句</h2>
+
+<h3>条件判断</h3>
+<pre><code>if (score &gt; 100) {
+    println("high")
+} else {
+    println("low")
+}</code></pre>
+<p>单个语句可以省略花括号。<code>else if</code> 通过嵌套实现。条件接受 int(0 为假)、double,以及非空数组/字典/字节串;字符串不能作为条件。</p>
+
+<h3>循环</h3>
+<pre><code>while (i &lt; 10) {
+    i = i + 1
+}
+
+for (k = 0; k &lt; 5; k = k + 1) {
+    if (k == 2) continue
+    println(k)
+}</code></pre>
+<p>支持 <code>break</code> 和 <code>continue</code>;for 条件留空表示无限循环。</p>
+
+<h3>函数</h3>
+<pre><code>func add(a &lt;- int, b &lt;- int) -&gt; int {
+    ret a + b
+}
+
+func log(msg &lt;- string) -&gt; void {
+    println(msg)
+}</code></pre>
+<ul>
+<li>参数类型: <code>int</code>、<code>double</code>、<code>string</code>、<code>dict</code>。</li>
+<li>返回类型写在 <code>-&gt;</code> 后;允许 <code>void</code>、<code>int</code>、<code>double</code>、<code>string</code>、<code>dict</code>。省略 <code>-&gt; 类型</code> 即 <code>void</code>。类型后可加冒号:<code>func f() -&gt; int : { ... }</code>。</li>
+<li><code>ret expr</code> 返回值;裸 <code>ret</code> 只在 void 函数中合法。非 void 函数的每条路径都必须产生返回类型的值。</li>
+<li>调用期间参数会作为全局变量绑定,返回后自动恢复。</li>
+</ul>
+
+<h3>输入输出</h3>
+<table>
+<tr><th>语句</th><th>含义</th></tr>
+<tr><td><code>print(x)</code></td><td>输出,不换行。</td></tr>
+<tr><td><code>println(x)</code></td><td>输出并换行。</td></tr>
+<tr><td><code>endl</code></td><td>只输出一个换行。</td></tr>
+<tr><td><code>input() -&gt; var</code></td><td>从标准输入读取一行(字符串)存入 <code>var</code>。</td></tr>
+<tr><td><code>exit(code)</code></td><td>以整数退出码结束进程。</td></tr>
+</table>
+
+<h3>错误与异常</h3>
+<pre><code>try {
+    error("something went wrong")
+} catch (e) {
+    println(e)    # 输出 something went wrong
+}</code></pre>
+<p><code>error(msg)</code> 要求字符串参数,抛出可捕获的错误。函数库在参数非法时也会抛错,同样可以捕获。没有 <code>finally</code>。未被 try/catch 捕获的运行时错误会终止程序,并打印带源码行号的调用栈。</p>
+
+<h3>跳转</h3>
+<pre><code>fn skip:
+goto skip</code></pre>
+<p><code>goto label</code> 在当前函数内跳转;标签(<code>fn name:</code>)按函数作用域。</p>
+
+<h2>6. 类与对象</h2>
+<pre><code>class Point {
+    x &lt;- int
+    y &lt;- int
+    tag &lt;- string
+
+    init(x0 &lt;- int, y0 &lt;- int, t &lt;- string) -&gt; void {
+        x = x0
+        y = y0
+        tag = t
+    }
+
+    func describe() -&gt; string {
+        ret tag
+    }
+}
+
+p = new Point(3, 4, "origin")
+println(p.x)          # 3,字段读取
+p.tag = "moved"       # 字段写入
+println(p.describe()) # 方法调用</code></pre>
+<ul>
+<li>字段类型: <code>int</code>、<code>double</code>、<code>string</code>、<code>dict</code>,以及 <code>new</code>(即 bytes 缓冲区)。</li>
+<li><code>init</code> 是构造函数。<code>new ClassName(args)</code> 把参数映射到 <code>init</code> 的参数(不含隐式 <code>this</code>);没有 <code>init</code> 时,参数按声明顺序映射到字段。</li>
+<li>方法带隐式 <code>this</code>;调用形式为 <code>obj.method()</code>。</li>
+<li><code>struct</code> 与 <code>class</code> 等价。</li>
+<li>成员访问使用点分标识符(<code>obj.field</code>、<code>obj.method(...)</code>),按最后一个点解析。</li>
+</ul>
+
+<h2>7. 类型转换</h2>
+<table>
+<tr><th>转换</th><th>结果</th></tr>
+<tr><td><code>int(x)</code></td><td>由 int/double(截断)或 string 得到 int。</td></tr>
+<tr><td><code>double(x)</code></td><td>由 int/double 或 string 得到 double。</td></tr>
+</table>
+<p>也可用函数库:<code>util.IntChangeString</code>、<code>util.StringChangeInt</code>、<code>util.StringChangeDouble</code>、<code>util.DoubleChangeString</code>、<code>util.DoubleChangeInt</code>、<code>util.IntChangeDouble</code>。int 与 double 之间没有自动转换。</p>
+
+<h2 id="coroutines">8. 协程</h2>
+<p>协程是字节码虚拟机的特性;<code>yield</code> 在旧解释器中不支持。协程与调用方共享全局变量(参数全局量按每次 resume 段绑定)。</p>
+
+<pre><code>func task(id &lt;- int) -&gt; void {
+    n = 0
+    while (n &lt; 3) {
+        yield(n + 100 * id)
+        n = n + 1
+    }
+}
+
+func main() -&gt; void {
+    c = co.create("task", 1)      # 协程句柄
+    v = co.resume(c)              # 运行到第一次 yield;v = 100
+    v = co.resume(c)              # v = 101
+    if (co.status(c) != "suspended") { ... }
+    # 函数执行完后:
+    if (co.status(c) != "dead") { ... }
+    println(co.result(c))         # 最终返回值
+    exit(0)
+}</code></pre>
+
+<table>
+<tr><th>函数</th><th>说明</th></tr>
+<tr><td><code>co.create("fn", 参数...)</code></td><td>由函数创建协程;<code>参数</code>绑定到它的形参。</td></tr>
+<tr><td><code>co.resume(coro [, 值])</code></td><td>运行到下一个 <code>yield</code>;返回 yield 产生的值,函数结束时返回最终返回值。<code>值</code> 会成为 yield 表达式的结果。</td></tr>
+<tr><td><code>co.status(coro)</code></td><td><code>"suspended"</code>(挂起)、<code>"running"</code>(运行中)或 <code>"dead"</code>(已结束)。</td></tr>
+<tr><td><code>co.result(coro)</code></td><td>已结束协程的最终返回值。</td></tr>
+<tr><td><code>yield(expr)</code> / <code>yield</code></td><td>挂起当前协程。在协程之外或 <code>co.resume</code> 内部调用均为非法。</td></tr>
+</table>
+
+<h2>9. 导入</h2>
+<pre><code>import fox.std.util -&gt; u        # 系统库,带别名
+import fox.gl.fg                # 系统库,以 gl_fg.func(...) 调用
+import "other.fox"              # 跨文件源码导入(相对当前文件)
+!import myplugin                # 插件(脚本目录,然后 C:\FoxLibs,再当前目录)
+!import "plugin.fox"</code></pre>
+<p>系统库以 DLL 形式提供(<code>fox.&lt;lib&gt;.dll</code>,位于可执行文件旁或 <code>dlls/</code>),使用前必须先 import。完整清单见<a href="libraries.html">函数库参考</a>。</p>
+
+<h2>10. 限制与注意事项</h2>
+<ul>
+<li>整数为 32 位(秒级时间戳在 2038 年前后会溢出)。</li>
+<li>字符串是字节序列:<code>str_length</code>/下标按字节计算;大小写转换仅支持 ASCII;核心不解析字符串中的 UTF-8。</li>
+<li>每次函数调用通过 <code>new()</code> 最多分配 512 字节(运行时上限)。</li>
+<li>没有布尔、null、switch 结构;假值包括 0、空集合、空字节串。</li>
+<li>没有运算符重载;所有运算按内置值类型分派。</li>
+<li>垃圾回收在指令/语句安全点执行;协程、对象、字典都受 GC 管理。</li>
+</ul>
+
+</main>
+
+<footer>FoxLang 文档 &middot; 作者:Lemon_Chicken</footer>
+
+</body>
+</html>

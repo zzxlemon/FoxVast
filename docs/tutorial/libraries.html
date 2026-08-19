@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FoxLang 函数库参考</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header>
+    <div class="inner">
+        <h1>FoxLang 函数库参考</h1>
+        <div class="ver">FoxVast VM 1.3.210+b1 &middot; 系统函数库</div>
+    </div>
+</header>
+
+<nav class="links">
+    <a href="index.html">语言参考</a>
+    <a href="libraries.html">函数库参考</a>
+</nav>
+
+<main>
+
+<h2>1. 导入函数库</h2>
+<p>系统库以 DLL 形式提供(<code>fox.&lt;lib&gt;.dll</code>,位于可执行文件旁或 <code>dlls/</code>)。使用前必须先 import,并且所有调用都使用点号写法:</p>
+
+<pre><code>import fox.std.util -&gt; u
+import fox.gl.fg -&gt; fg
+
+println(u.length("hello"))     # 5
+fg.create_window("Demo", 800, 600)</code></pre>
+
+<p class="note">所有函数库在参数非法或参数个数不对时会抛错,可用 <code>try/catch</code> 捕获。</p>
+
+<h2>2. math &mdash; <code>import fox.std.math</code></h2>
+<p>三角函数,参数为<b>弧度</b>;参数须为 int 或 double,返回 double。</p>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>math.sin(x)</code></td><td>正弦。</td></tr>
+<tr><td><code>math.cos(x)</code></td><td>余弦。</td></tr>
+<tr><td><code>math.tan(x)</code></td><td>正切(&pi;/2 附近会发散)。</td></tr>
+</table>
+
+<h3>示例</h3>
+<pre><code>import fox.std.math -&gt; m
+println(m.sin(1.5707963))   # 约 1.0</code></pre>
+
+<h2>3. random &mdash; <code>import fox.std.random</code></h2>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>random.random("int", min, max)</code></td><td>[min, max] 闭区间内的随机整数。</td></tr>
+<tr><td><code>random.random("double", min, max)</code></td><td>[min, max) 区间内的随机浮点数。</td></tr>
+</table>
+<p><code>min &gt; max</code> 会抛错。首次使用时以系统时钟为种子。</p>
+
+<h3>示例</h3>
+<pre><code>import fox.std.random -&gt; r
+d = r.random("int", 1, 6)     # 掷骰子,1..6</code></pre>
+
+<h2>4. util &mdash; <code>import fox.std.util</code></h2>
+
+<h3>通用</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>util.length(x)</code></td><td>数组元素个数 / 字符串字节数 / 字典键数。</td></tr>
+</table>
+
+<h3>类型转换</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>util.IntChangeString(i)</code></td><td>字符串。</td></tr>
+<tr><td><code>util.StringChangeInt(s)</code></td><td>整数(输入非法时抛错)。</td></tr>
+<tr><td><code>util.StringChangeDouble(s)</code></td><td>浮点数(输入非法时抛错)。</td></tr>
+<tr><td><code>util.DoubleChangeString(d)</code></td><td>字符串(固定 6 位小数,如 <code>"1.000000"</code>)。</td></tr>
+<tr><td><code>util.DoubleChangeInt(d)</code></td><td>整数,向零截断。</td></tr>
+<tr><td><code>util.IntChangeDouble(i)</code></td><td>浮点数。</td></tr>
+</table>
+
+<h3>数组操作(都返回新数组,不修改原数组)</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>util.arr_append(arr, v)</code></td><td>尾部追加 <code>v</code> 后的数组。</td></tr>
+<tr><td><code>util.arr_pop(arr)</code></td><td>去掉最后一个元素的数组(空数组抛错)。</td></tr>
+<tr><td><code>util.arr_contains(arr, v)</code></td><td>包含返回 1,否则 0(深比较)。</td></tr>
+<tr><td><code>util.arr_slice(arr, start, end)</code></td><td>子数组;下标自动夹取,end 不包含。</td></tr>
+<tr><td><code>util.arr_sort(arr)</code></td><td>升序排序的数组(元素须全为数字或全为字符串)。</td></tr>
+<tr><td><code>util.arr_length(arr)</code></td><td>元素个数。</td></tr>
+</table>
+
+<h3>字符串操作(按字节处理,不支持 UTF-8 语义)</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>util.str_contains(s, sub)</code></td><td>包含 <code>sub</code> 返回 1,否则 0。</td></tr>
+<tr><td><code>util.str_replace(s, old, new)</code></td><td>替换所有出现;<code>old</code> 为空时原样返回 <code>s</code>。</td></tr>
+<tr><td><code>util.str_split(s, sep)</code></td><td>字符串数组;分隔符为空时按单个字符拆分。</td></tr>
+<tr><td><code>util.str_trim(s)</code></td><td>去掉首尾空格、制表符、CR、LF。</td></tr>
+<tr><td><code>util.str_lower(s)</code></td><td>转小写(仅 ASCII)。</td></tr>
+<tr><td><code>util.str_upper(s)</code></td><td>转大写(仅 ASCII)。</td></tr>
+<tr><td><code>util.str_substring(s, start, end)</code></td><td>按字节取子串,end 不包含,下标自动夹取。</td></tr>
+<tr><td><code>util.str_length(s)</code></td><td>字节数。</td></tr>
+</table>
+
+<h3>示例</h3>
+<pre><code>import fox.std.util -&gt; u
+arr = [3, 1, 2]
+arr = u.arr_sort(arr)                    # [1, 2, 3]
+println(u.arr_length(arr))               # 3
+println(u.str_replace("a-b-c", "-", "+"))# a+b+c</code></pre>
+
+<h2>5. file &mdash; <code>import fox.sys.io.fs</code></h2>
+<p>文件句柄是不透明的整数,从 1 开始。同一文件不能重复打开。所有访问均为二进制模式。</p>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>file.file_open(name, mode)</code></td><td>整数句柄。模式:<code>"read"</code>(读)、<code>"write"</code>(写,截断)、<code>"append"</code>(追加)。</td></tr>
+<tr><td><code>file.file_read(handle)</code></td><td>整个文件的字符串内容(仅读模式)。</td></tr>
+<tr><td><code>file.file_write(handle, txt [, 换行])</code></td><td>写入文本;第三个参数为 1 时追加换行。</td></tr>
+<tr><td><code>file.file_close(handle)</code></td><td>关闭文件。</td></tr>
+<tr><td><code>file.file_remove(name)</code></td><td>删除文件(必须先关闭)。</td></tr>
+</table>
+
+<h3>示例</h3>
+<pre><code>import fox.sys.io.fs -&gt; file
+h = file.file_open("data.txt", "write")
+file.file_write(h, "hello", 1)
+file.file_close(h)</code></pre>
+
+<h2>6. socket &mdash; <code>import fox.std.socket</code></h2>
+<p>仅 TCP 客户端、阻塞式、IPv4。句柄是不透明的整数,从 1 开始。</p>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>socket.socket_create()</code></td><td>整数句柄。</td></tr>
+<tr><td><code>socket.socket_connect(h, ip, port)</code></td><td>成功返回 1;连接建立前会阻塞。</td></tr>
+<tr><td><code>socket.socket_send(h, data)</code></td><td>整数:实际发送的字节数。</td></tr>
+<tr><td><code>socket.socket_recv(h, size)</code></td><td>收到的字节串(可能短于 <code>size</code>;对端关闭时返回空串)。有数据前会阻塞。</td></tr>
+<tr><td><code>socket.socket_close(h)</code></td><td>关闭连接。</td></tr>
+</table>
+
+<h3>示例</h3>
+<pre><code>import fox.std.socket -&gt; s
+h = s.socket_create()
+s.socket_connect(h, "127.0.0.1", 8080)
+s.socket_send(h, "GET / HTTP/1.0\r\n\r\n")
+reply = s.socket_recv(h, 4096)
+s.socket_close(h)</code></pre>
+
+<h2>7. time &mdash; <code>import fox.sys.time</code></h2>
+<p>单位都是整秒(32 位整数,2038 年前后溢出)。使用本地时间。</p>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>time.now()</code></td><td>整数:自 1970-01-01 00:00 UTC 起的秒数。</td></tr>
+<tr><td><code>time.format([格式])</code></td><td>strftime 格式化的当前本地时间,默认 <code>"%Y-%m-%d %H:%M:%S"</code>。</td></tr>
+<tr><td><code>time.field("名称")</code></td><td>整数分量:<code>year</code>(年)、<code>month</code>(1&ndash;12)、<code>day</code>、<code>hour</code>、<code>minute</code>、<code>second</code>、<code>weekday</code>(0&ndash;6,周日为 0)、<code>dayofyear</code>/<code>yearday</code>(0&ndash;365)。</td></tr>
+</table>
+
+<h3>示例</h3>
+<pre><code>import fox.sys.time -&gt; t
+println(t.format())            # 2026-08-19 12:00:00
+println(t.field("year"))       # 2026</code></pre>
+
+<h2>8. gl_fg &mdash; <code>import fox.gl.fg</code>(OpenGL 图形)</h2>
+<p>单窗口 OpenGL 3.3 / GLFW 渲染库。坐标以像素为单位,原点在<b>左上角</b>,y 轴向下。颜色为 0&ndash;1 的浮点数。</p>
+
+<h3>窗口生命周期与计时</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>gl_fg.create_window(title, w, h)</code></td><td>窗口索引(0)。同一时间只允许一个窗口。</td></tr>
+<tr><td><code>gl_fg.close()</code></td><td>释放窗口、纹理和 GLFW。</td></tr>
+<tr><td><code>gl_fg.window_should_close(win)</code></td><td>窗口关闭标志置位时返回 1。</td></tr>
+<tr><td><code>gl_fg.swap_buffers(win)</code></td><td>交换前后缓冲。</td></tr>
+<tr><td><code>gl_fg.poll_events()</code></td><td>处理窗口与输入事件。</td></tr>
+<tr><td><code>gl_fg.update(win)</code></td><td>swap_buffers + poll_events,并更新 <code>frame_time</code>。</td></tr>
+<tr><td><code>gl_fg.time()</code></td><td>double:GLFW 初始化以来的秒数。</td></tr>
+<tr><td><code>gl_fg.frame_time(win)</code></td><td>double:上一帧耗时(秒),由 <code>update</code> 更新。</td></tr>
+<tr><td><code>gl_fg.window_size(win)</code></td><td>数组 <code>[w, h]</code>(像素),随窗口缩放实时变化。</td></tr>
+</table>
+
+<h3>绘图</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>gl_fg.clear_color(r, g, b, a)</code></td><td>设置清屏颜色(0&ndash;1 浮点)。</td></tr>
+<tr><td><code>gl_fg.clear()</code></td><td>清空颜色缓冲。</td></tr>
+<tr><td><code>gl_fg.draw_triangle(x1,y1,r1,g1,b1, x2,y2,r2,g2,b2, x3,y3,r3,g3,b3)</code></td><td>实心三角形;每个顶点可以有不同的颜色。</td></tr>
+<tr><td><code>gl_fg.draw_rect([x,y,r,g,b], [..], [..], [..])</code></td><td>由 4 个五元素数组(左上、右上、右下、左下)绘制的实心四边形;每顶点独立颜色。</td></tr>
+<tr><td><code>gl_fg.draw_line(x1, y1, x2, y2, 粗细, r, g, b)</code></td><td>单色直线。</td></tr>
+<tr><td><code>gl_fg.draw_circle(cx, cy, radius, r, g, b)</code></td><td>实心圆(64 段扇面)。</td></tr>
+<tr><td><code>gl_fg.draw_text(字体文件, 文本, x, y, 字号, r, g, b)</code></td><td>用 TTF 字体绘制文本;仅 ASCII 32&ndash;127。字体按给定路径、<code>$FGFONT_DIR</code>、exe 旁的 <code>fonts/</code>、当前目录依次查找。</td></tr>
+<tr><td><code>gl_fg.load_texture(win, 文件)</code></td><td>由 PNG/JPG/BMP/GIF 加载纹理,返回整数 id;按路径缓存(最多 256 个)。</td></tr>
+<tr><td><code>gl_fg.draw_image(win, tex, x, y, w, h)</code></td><td>绘制纹理,左上角在 (x, y)。</td></tr>
+<tr><td><code>gl_fg.draw_image_rotated(win, tex, x, y, w, h, 角度)</code></td><td>绕中心旋转绘制;角度单位度,顺时针(y 向下坐标系)。</td></tr>
+<tr><td><code>gl_fg.draw_image_tinted(win, tex, x, y, w, h, r, g, b, a)</code></td><td>着色绘制;(1,1,1,1) 为原样,alpha 可做淡出。</td></tr>
+<tr><td><code>gl_fg.image_size(win, tex)</code></td><td>数组 <code>[w, h]</code>(像素)。</td></tr>
+</table>
+
+<h3>逻辑分辨率缩放(可选)</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>gl_fg.set_scale(win, 逻辑宽, 逻辑高)</code></td><td>按逻辑分辨率缩放绘制,保持宽高比完整适配,锚点在左上。<code>(0, 0)</code> 关闭缩放。</td></tr>
+<tr><td><code>gl_fg.set_scale_anchor(win, 逻辑宽, 逻辑高, ax, ay)</code></td><td>同上,可自定义锚点,取值 [0, 1]:0 = 左/上,0.5 = 居中,1 = 右/下。</td></tr>
+</table>
+<p>开启缩放后,鼠标坐标会映射回逻辑坐标。关闭缩放时,一个逻辑单位等于一个像素。</p>
+
+<h3>输入</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>gl_fg.mouse_down(win, 按键)</code></td><td>按住时返回 1。按键:0 = 左键,1 = 右键,2 = 中键。</td></tr>
+<tr><td><code>gl_fg.mouse_pos(win)</code></td><td>数组 <code>[x, y]</code>;(0,0) 在左上角。</td></tr>
+<tr><td><code>gl_fg.mouse_wheel(win)</code></td><td>double:距上次查询累计的垂直滚轮量;读取后清零。</td></tr>
+<tr><td><code>gl_fg.key_down(win, 键名)</code></td><td>按住期间返回 1。</td></tr>
+<tr><td><code>gl_fg.key_pressed(win, 键名)</code></td><td>每次物理按下触发一次 1;查询后被消费。</td></tr>
+<tr><td><code>gl_fg.key_released(win, 键名)</code></td><td>每次松开触发一次 1;查询后被消费。</td></tr>
+<tr><td><code>gl_fg.key_any_pressed(win)</code></td><td>自上次查询起有任意键按下返回 1,并清空所有待处理按键。</td></tr>
+</table>
+<p>键名:单个可打印字符(<code>"p"</code>、<code>"="</code>、<code>"-"</code> ...)、数字,或 <code>space enter escape tab backspace up down left right home end pageup pagedown insert delete shift ctrl alt f1..f12</code>。</p>
+
+<h3>UI 控件</h3>
+<table>
+<tr><th>函数</th><th>结果</th></tr>
+<tr><td><code>gl_fg.button(win, x, y, w, h, 字体, 文本)</code></td><td>绘制灰色按钮(悬停/按下变暗),文本白色居中;悬停时每次点击返回 1。</td></tr>
+<tr><td><code>gl_fg.text_input(win, x, y, w, h, 字体, 字号)</code></td><td>绘制文本框并返回其内容。点击聚焦,输入编辑,Backspace 删除,Enter 提交整行并清空。</td></tr>
+<tr><td><code>gl_fg.simulate_click(win [, 次数])</code></td><td>排队模拟左键点击(默认 1 次),由下一次 <code>mouse_down(win, 0)</code> 或悬停的按钮消费。</td></tr>
+</table>
+
+<h3>示例 &mdash; 最小游戏循环</h3>
+<pre><code>import fox.gl.fg -&gt; fg
+
+fg.create_window("Demo", 800, 600)
+while (fg.window_should_close(0) == 0) {
+    fg.clear_color(0.10, 0.10, 0.16, 1.0)
+    fg.clear()
+    if (fg.key_down(0, "escape") == 1) { exit(0) }
+    fg.draw_rect([100, 100, 1.0, 0.4, 0.4],
+                 [200, 100, 1.0, 0.4, 0.4],
+                 [200, 200, 1.0, 0.4, 0.4],
+                 [100, 200, 1.0, 0.4, 0.4])
+    fg.update(0)
+}
+fg.close()</code></pre>
+
+<h2>9. 协程(虚拟机内置)</h2>
+<p><code>co.*</code> 不需要 import,直接由字节码虚拟机提供。参见<a href="index.html#coroutines">语言参考的协程一节</a>。</p>
+
+<h2>10. 插件</h2>
+<p>外部 <code>.fox</code>/<code>.foxlib</code> 脚本可用 <code>!import 名称</code> 引入(依次在脚本目录、<code>C:\FoxLibs</code>、当前目录查找)。系统库也会从 <code>C:\FoxLibs</code>、<code>C:\Program Files\FoxVast\Libs</code>、<code>./libs</code> 和当前目录解析。</p>
+
+</main>
+
+<footer>FoxLang 文档 &middot; 作者:Lemon_Chicken</footer>
+
+</body>
+</html>

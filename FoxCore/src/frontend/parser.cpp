@@ -498,7 +498,7 @@ Value defaultFieldValue(const std::string& type) {
     if (type == "int") return Value(0);
     if (type == "double") return Value(0.0);
     if (type == "string") return Value(std::string(""));
-    if (type == "dict") return Value(std::unordered_map<std::string, std::shared_ptr<Value>>());
+    if (type == "dict") return Value(std::unordered_map<std::string, GcHandle>());
     if (type == "array") return Value(std::vector<Value>());
     if (type == "bytes") return Value(std::vector<uint8_t>());
     return Value();
@@ -518,7 +518,12 @@ bool readObjectMember(const std::unordered_map<std::string, Value>& variables,
         throw std::runtime_error("Undefined field '" + memberName + "' in class '" +
             it->second.asObjectClass() + "'");
     }
-    out = *mIt->second;
+    const Value* memberVal = Gc::instance().deref(mIt->second);
+    if (!memberVal) {
+        throw std::runtime_error("Dangling field '" + memberName + "' in class '" +
+            it->second.asObjectClass() + "'");
+    }
+    out = *memberVal;
     return true;
 }
 
@@ -530,7 +535,7 @@ bool assignObjectMember(std::unordered_map<std::string, Value>& variables,
     std::string memberName = dottedName.substr(dot + 1);
     auto it = variables.find(objName);
     if (it == variables.end() || it->second.getType() != Value::Type::Object) return false;
-    it->second.asObjectDictRef()[memberName] = std::make_shared<Value>(value);
+    it->second.asObjectDictRef()[memberName] = Gc::instance().alloc(value);
     return true;
 }
 
@@ -666,9 +671,11 @@ Function Parser::parseFunctionRest() {
     skipWhitespace(funcLexer, funcCurrentToken);
 
     while (funcCurrentToken.type != TOKEN_RBRACE && funcCurrentToken.type != TOKEN_EOF) {
+        int stmtLine = funcCurrentToken.line;
         std::string line = parseSingleStatement(funcLexer, funcCurrentToken);
         if (!line.empty()) {
             func.body.push_back(line);
+            func.bodyLines.push_back(stmtLine);
             // Type declarations (int x = 5) return nullptr from parseLineToStmt;
             // real syntax errors propagate so they are reported (P2-2).
             func.compiledBody.push_back(std::move(parseLineToStmt(line)));
@@ -837,6 +844,17 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
         auto message = parseExpr(lineLexer, currentToken);
         eat(lineLexer, currentToken, TOKEN_RPAREN);
         handler.onError(std::move(message));
+        return;
+    }
+    if (currentToken.type == TOKEN_YIELD) {
+        eat(lineLexer, currentToken, TOKEN_YIELD);
+        std::unique_ptr<Expr> value;
+        if (currentToken.type == TOKEN_LPAREN) {
+            eat(lineLexer, currentToken, TOKEN_LPAREN);
+            value = parseExpr(lineLexer, currentToken);
+            eat(lineLexer, currentToken, TOKEN_RPAREN);
+        }
+        handler.onYield(std::move(value));
         return;
     }
     if (currentToken.type == TOKEN_FN) {
@@ -1063,6 +1081,9 @@ namespace {
             ErrorStmt stmt(std::move(message));
             stmt.execute(variables, functions);
         }
+        void onYield(std::unique_ptr<Expr> value) override {
+            throw std::runtime_error("yield is only supported by the bytecode VM");
+        }
         void onFnLabel(const std::string& name) override {}
         void onGoto(const std::string& name) override {
             throw GotoException(name);
@@ -1136,6 +1157,9 @@ namespace {
         }
         void onError(std::unique_ptr<Expr> message) override {
             stmt = std::make_unique<ErrorStmt>(std::move(message));
+        }
+        void onYield(std::unique_ptr<Expr> value) override {
+            stmt = std::make_unique<YieldStmt>(std::move(value));
         }
         void onFnLabel(const std::string& name) override {
             stmt = std::make_unique<LabelStmt>(name);
