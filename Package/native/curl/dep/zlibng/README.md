@@ -9,7 +9,7 @@
 *zlib data compression library for the next generation systems*
 
 Maintained by Hans Kristian Rosbach
-          aka Dead2 (zlib-ng Ã t circlestorm dÃ³t org)
+          aka Dead2 (zlib-ng ¨¤t circlestorm d¨®t org)
 
 Features
 --------
@@ -17,7 +17,7 @@ Features
 * Zlib compatible API with support for dual-linking
 * Modernized native API based on zlib API for ease of porting
 * Modern C11 syntax and a clean code layout
-* Deflate medium and quick algorithms based on Intelâ€™s zlib fork
+* Deflate medium and quick algorithms based on Intel¡¯s zlib fork
 * Support for CPU intrinsics when available
   * Adler32 implementation using SSSE3, SSE4.2, AVX2, AVX512, AVX512-VNNI, Neon, VMX & VSX, LSX, LASX, RVV
   * CRC32-B implementation using SSE2, SSE4.1, (V)PCLMULQDQ, ARMv8, Power8, IBM Z, LoongArch, ZBC

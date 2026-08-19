@@ -1,93 +1,93 @@
-# flog â€” FoxVast çš„æ—¥å¿—æ’ä»¶æ¨¡å—
+# flog ¡ª FoxVast µÄÈÕÖ¾²å¼şÄ£¿é
 
-çº¯ FoxVast å®ç°çš„æ—¥å¿—åº“,æ”¯æŒçº§åˆ«è¿‡æ»¤ã€è‡ªå®šä¹‰è¾“å‡ºæ¨¡æ¿(strftime æ—¶é—´æ ¼å¼)ã€console / file / both è¾“å‡ºä¸ä»»æ„ç›®æ ‡æ–‡ä»¶è½ç›˜ã€‚ä»…ä¾èµ–ä¸‰ä¸ªæ ¸å¿ƒåŸç”Ÿåº“:`fox.std.util`ã€`fox.sys.time`(fox.time.dll)ã€`fox.sys.io.fs`ã€‚
+´¿ FoxVast ÊµÏÖµÄÈÕÖ¾¿â,Ö§³Ö¼¶±ğ¹ıÂË¡¢×Ô¶¨ÒåÊä³öÄ£°å(strftime Ê±¼ä¸ñÊ½)¡¢console / file / both Êä³öÓëÈÎÒâÄ¿±êÎÄ¼şÂäÅÌ¡£½öÒÀÀµÈı¸öºËĞÄÔ­Éú¿â:`fox.std.util`¡¢`fox.sys.time`(fox.time.dll)¡¢`fox.sys.io.fs`¡£
 
-## æ¨¡å—ç»“æ„
+## Ä£¿é½á¹¹
 
-| æ–‡ä»¶ | èŒè´£ |
+| ÎÄ¼ş | Ö°Ôğ |
 |---|---|
-| `flog.fox` | èšåˆå…¥å£,ä»… import å…¶ä½™å››æ¨¡å— |
-| `flog_cfg.fox` | é»˜è®¤é…ç½®ã€`flog_level_num` / `flog_level_name`ã€å…¨éƒ¨ `flog_set_*` setter |
-| `flog_render.fox` | `flog_render`(é…ç½® + çº§åˆ« + æ¶ˆæ¯ â†’ æ ¼å¼åŒ–ä¸€è¡Œ)ã€å ä½ç¬¦æ›¿æ¢ |
-| `flog_output.fox` | åº•å±‚è½ç›˜ä¸åˆ†å‘:`_flog_file_write` / `_flog_emit` / `_flog_emit_to`ã€æ–‡ä»¶å·¥å…·å‡½æ•° |
-| `flog_api.fox` | å…¬å…± API:`flog_log` / `flog_render_line` / `flog_log_to` / çº§åˆ«ä¾¿æ·å‡½æ•° |
+| `flog.fox` | ¾ÛºÏÈë¿Ú,½ö import ÆäÓàËÄÄ£¿é |
+| `flog_cfg.fox` | Ä¬ÈÏÅäÖÃ¡¢`flog_level_num` / `flog_level_name`¡¢È«²¿ `flog_set_*` setter |
+| `flog_render.fox` | `flog_render`(ÅäÖÃ + ¼¶±ğ + ÏûÏ¢ ¡ú ¸ñÊ½»¯Ò»ĞĞ)¡¢Õ¼Î»·ûÌæ»» |
+| `flog_output.fox` | µ×²ãÂäÅÌÓë·Ö·¢:`_flog_file_write` / `_flog_emit` / `_flog_emit_to`¡¢ÎÄ¼ş¹¤¾ßº¯Êı |
+| `flog_api.fox` | ¹«¹² API:`flog_log` / `flog_render_line` / `flog_log_to` / ¼¶±ğ±ã½İº¯Êı |
 
-## ä½¿ç”¨
+## Ê¹ÓÃ
 
-è„šæœ¬é‡Œ `!import flog`(`!import` æŸ¥æ‰¾é¡ºåº:è„šæœ¬æ‰€åœ¨ç›®å½• â†’ `C:\FoxLibs` â†’ å½“å‰å·¥ä½œç›®å½•,è£¸åè‡ªåŠ¨è¡¥ `.fox`)ã€‚è¿è¡ŒæœŸéœ€è¦ `fox.time.dll` åœ¨ fox.exe æ—(æˆ–åº“è·¯å¾„)å¯ç”¨ã€‚
+½Å±¾Àï `!import flog`(`!import` ²éÕÒË³Ğò:½Å±¾ËùÔÚÄ¿Â¼ ¡ú `C:\FoxLibs` ¡ú µ±Ç°¹¤×÷Ä¿Â¼,ÂãÃû×Ô¶¯²¹ `.fox`)¡£ÔËĞĞÆÚĞèÒª `fox.time.dll` ÔÚ fox.exe ÅÔ(»ò¿âÂ·¾¶)¿ÉÓÃ¡£
 
 ```fox
 !import flog
 
 func main() -> void {
-    c = flog_default_config()              # level=0(å…¨é‡), console è¾“å‡º
+    c = flog_default_config()              # level=0(È«Á¿), console Êä³ö
     flog_debug(c, "starting up")
     flog_info(c, "config loaded")
 
-    c2 = flog_set_level(c, 2)              # å‡åˆ° warn,debug/info è¢«è¿‡æ»¤
+    c2 = flog_set_level(c, 2)              # Éıµ½ warn,debug/info ±»¹ıÂË
     flog_warn(c2, "this one shows")
 
     c3 = flog_set_format(c2, "[{time}] [{level}] <{name}> {msg}")
     c3 = flog_set_name(c3, "game")
     c3 = flog_set_path(c3, "game.log")
-    c3 = flog_set_output(c3, "both")       # æ§åˆ¶å° + æ–‡ä»¶
+    c3 = flog_set_output(c3, "both")       # ¿ØÖÆÌ¨ + ÎÄ¼ş
     flog_error(c3, "connection lost")
 
-    flog_log_to(c, 1, "audit trail", "audit.log")   # ç›´æ¥å†™æ–‡ä»¶,ä¸æ”¹é…ç½®
-    line = flog_render_line(c, 3, "custom")          # è‡ªå·±æ¸²æŸ“,è‡ªç”¨
+    flog_log_to(c, 1, "audit trail", "audit.log")   # Ö±½ÓĞ´ÎÄ¼ş,²»¸ÄÅäÖÃ
+    line = flog_render_line(c, 3, "custom")          # ×Ô¼ºäÖÈ¾,×ÔÓÃ
     println("DIY: " + line)
 }
 ```
 
-è¿è¡Œ `fox -f demo.fox` å³å¯çœ‹åˆ°å®Œæ•´æ¼”ç¤º(çº§åˆ«è¿‡æ»¤ã€æ¨¡æ¿ã€æ–‡ä»¶è¾“å‡ºã€log_toã€render_line)ã€‚
+ÔËĞĞ `fox -f demo.fox` ¼´¿É¿´µ½ÍêÕûÑİÊ¾(¼¶±ğ¹ıÂË¡¢Ä£°å¡¢ÎÄ¼şÊä³ö¡¢log_to¡¢render_line)¡£
 
-é¢œè‰²ä¸é«˜äº®çš„è¯¦ç»†ç”¨æ³•(è‡ªå®šä¹‰æ¯çº§é¢œè‰²ã€åŒºé—´é«˜äº®ã€å¤šæ®µé«˜äº®ã€æ–‡ä»¶è¾“å‡ºæ³¨æ„äº‹é¡¹)è§ [colors.md](colors.md)ã€‚
+ÑÕÉ«Óë¸ßÁÁµÄÏêÏ¸ÓÃ·¨(×Ô¶¨ÒåÃ¿¼¶ÑÕÉ«¡¢Çø¼ä¸ßÁÁ¡¢¶à¶Î¸ßÁÁ¡¢ÎÄ¼şÊä³ö×¢ÒâÊÂÏî)¼û [colors.md](colors.md)¡£
 
 ## API
 
-| å‡½æ•° | è¯´æ˜ |
+| º¯Êı | ËµÃ÷ |
 |---|---|
-| `flog_default_config()` | é»˜è®¤é…ç½®:`level 0`ã€`{color}{time} [{level}] {msg}{reset}`ã€`%Y-%m-%d %H:%M:%S`ã€`name ""`ã€`output "console"`ã€`file_path "log.txt"`ã€`append 1`ã€`color 0`ã€`color_map {"0":90,"1":32,"2":33,"3":31,"4":35}` |
-| `flog_log(c, l, msg)` | æŒ‰æ•°å­—çº§åˆ«(0..4)è®°ä¸€æ¡æ—¥å¿— |
-| `flog_debug/info/warn/error/fatal(c, msg)` | çº§åˆ«ä¾¿æ·å‡½æ•° |
-| `flog_log_to(c, l, msg, path)` | æ¸²æŸ“åç›´æ¥å†™å…¥æŒ‡å®šæ–‡ä»¶,é…ç½®ä¸å˜ |
-| `flog_debug_to/.../fatal_to(c, msg, path)` | å¯¹åº”çº§åˆ«çš„ `_to` å˜ä½“ |
-| `flog_render_line(c, l, msg)` | åªæ¸²æŸ“ä¸è¾“å‡º,ä¾›è‡ªå®šä¹‰æ¶ˆè´¹ |
-| `flog_set_level(c, l)` / `flog_set_level_name(c, "warn")` | è®¾æœ€ä½çº§åˆ«(è¶Šç•Œè‡ªåŠ¨é’³åˆ¶åˆ° 0..4) |
-| `flog_set_format(c, fmt)` / `flog_set_time_fmt(c, fmt)` / `flog_set_name(c, n)` | æ¨¡æ¿ / strftime / æ¨¡å—å |
-| `flog_set_output(c, o)` | `"console"` / `"file"` / `"both"`(éæ³•å€¼å›é€€ console) |
-| `flog_set_path(c, p)` / `flog_set_append(c, a)` | æ—¥å¿—æ–‡ä»¶è·¯å¾„ / 1 è¿½åŠ (é»˜è®¤)ã€0 è¦†ç›– |
-| `flog_set_color(c, v)` | 1 å¼€å¯æ§åˆ¶å° ANSI é¢œè‰²,0 å…³é—­(é»˜è®¤);æ–‡ä»¶è¾“å‡ºå§‹ç»ˆæ— é¢œè‰² |
-| `flog_set_color_code(c, l, code)` | è‡ªå®šä¹‰æŸä¸ªçº§åˆ«(0..4)çš„ ANSI é¢œè‰²ç (å¦‚ `flog_set_color_code(c, 3, 91)` è®© error å˜äº®çº¢);å¸¸ç”¨ç  30-37 åŸºç¡€è‰²ã€90-97 äº®è‰² |
-| `flog_highlight(c, msg, a, b, code)` | æŠŠ msg ä» a åˆ° b(**å«ä¸¤ç«¯**,0 èµ·)çš„å­—ç¬¦åŒ…ä¸ŠæŒ‡å®šé¢œè‰²;åŒºé—´è¶Šç•Œ/ä¸ºç©ºæ—¶åŸæ ·è¿”å›,å¦‚ `flog_highlight(c, "disk 92% full", 6, 7, 33)` |
-| `flog_append_file(path, line)` / `flog_write_file(path, line)` | ç›´æ¥å‘ä»»æ„æ–‡ä»¶è¿½åŠ  / è¦†ç›–ä¸€è¡Œ |
-| `flog_clear_file(c)` | åˆ é™¤é…ç½®é‡Œçš„æ—¥å¿—æ–‡ä»¶ |
+| `flog_default_config()` | Ä¬ÈÏÅäÖÃ:`level 0`¡¢`{color}{time} [{level}] {msg}{reset}`¡¢`%Y-%m-%d %H:%M:%S`¡¢`name ""`¡¢`output "console"`¡¢`file_path "log.txt"`¡¢`append 1`¡¢`color 0`¡¢`color_map {"0":90,"1":32,"2":33,"3":31,"4":35}` |
+| `flog_log(c, l, msg)` | °´Êı×Ö¼¶±ğ(0..4)¼ÇÒ»ÌõÈÕÖ¾ |
+| `flog_debug/info/warn/error/fatal(c, msg)` | ¼¶±ğ±ã½İº¯Êı |
+| `flog_log_to(c, l, msg, path)` | äÖÈ¾ºóÖ±½ÓĞ´ÈëÖ¸¶¨ÎÄ¼ş,ÅäÖÃ²»±ä |
+| `flog_debug_to/.../fatal_to(c, msg, path)` | ¶ÔÓ¦¼¶±ğµÄ `_to` ±äÌå |
+| `flog_render_line(c, l, msg)` | Ö»äÖÈ¾²»Êä³ö,¹©×Ô¶¨ÒåÏû·Ñ |
+| `flog_set_level(c, l)` / `flog_set_level_name(c, "warn")` | Éè×îµÍ¼¶±ğ(Ô½½ç×Ô¶¯Ç¯ÖÆµ½ 0..4) |
+| `flog_set_format(c, fmt)` / `flog_set_time_fmt(c, fmt)` / `flog_set_name(c, n)` | Ä£°å / strftime / Ä£¿éÃû |
+| `flog_set_output(c, o)` | `"console"` / `"file"` / `"both"`(·Ç·¨Öµ»ØÍË console) |
+| `flog_set_path(c, p)` / `flog_set_append(c, a)` | ÈÕÖ¾ÎÄ¼şÂ·¾¶ / 1 ×·¼Ó(Ä¬ÈÏ)¡¢0 ¸²¸Ç |
+| `flog_set_color(c, v)` | 1 ¿ªÆô¿ØÖÆÌ¨ ANSI ÑÕÉ«,0 ¹Ø±Õ(Ä¬ÈÏ);ÎÄ¼şÊä³öÊ¼ÖÕÎŞÑÕÉ« |
+| `flog_set_color_code(c, l, code)` | ×Ô¶¨ÒåÄ³¸ö¼¶±ğ(0..4)µÄ ANSI ÑÕÉ«Âë(Èç `flog_set_color_code(c, 3, 91)` ÈÃ error ±äÁÁºì);³£ÓÃÂë 30-37 »ù´¡É«¡¢90-97 ÁÁÉ« |
+| `flog_highlight(c, msg, a, b, code)` | °Ñ msg ´Ó a µ½ b(**º¬Á½¶Ë**,0 Æğ)µÄ×Ö·û°üÉÏÖ¸¶¨ÑÕÉ«;Çø¼äÔ½½ç/Îª¿ÕÊ±Ô­Ñù·µ»Ø,Èç `flog_highlight(c, "disk 92% full", 6, 7, 33)` |
+| `flog_append_file(path, line)` / `flog_write_file(path, line)` | Ö±½ÓÏòÈÎÒâÎÄ¼ş×·¼Ó / ¸²¸ÇÒ»ĞĞ |
+| `flog_clear_file(c)` | É¾³ıÅäÖÃÀïµÄÈÕÖ¾ÎÄ¼ş |
 
-æ‰€æœ‰ `flog_set_*` è¿”å›**æ–°çš„**é…ç½® dict,**å¿…é¡»æ¥ä½è¿”å›å€¼**,å¦åˆ™ä¿®æ”¹ä¸ç”Ÿæ•ˆã€‚
+ËùÓĞ `flog_set_*` ·µ»Ø**ĞÂµÄ**ÅäÖÃ dict,**±ØĞë½Ó×¡·µ»ØÖµ**,·ñÔòĞŞ¸Ä²»ÉúĞ§¡£
 
-## æ¨¡æ¿å ä½ç¬¦
+## Ä£°åÕ¼Î»·û
 
-| å ä½ç¬¦ | å«ä¹‰ |
+| Õ¼Î»·û | º¬Òå |
 |---|---|
-| `{time}` | å½“å‰æ—¶é—´,æŒ‰ `time_fmt`(strftime)æ ¼å¼åŒ–,é»˜è®¤ `%Y-%m-%d %H:%M:%S` |
-| `{level}` | çº§åˆ«åå¤§å†™:`DEBUG/INFO/WARN/ERROR/FATAL` |
-| `{level_num}` | çº§åˆ«æ•°å­— `0..4` |
-| `{name}` | æ¨¡å—å(å¯ä¸ºç©ºä¸²) |
-| `{msg}` | æ¶ˆæ¯æ–‡æœ¬ |
-| `{nl}` | æ¢è¡Œç¬¦ |
-| `{esc_q}` | åŒå¼•å·å­—ç¬¦(ä¾¿äºå¼•å·åŒ…è£¹æ—¥å¿—) |
-| `{color}` | å½“å‰çº§åˆ«çš„ ANSI é¢œè‰²ç (`color=0` æ—¶ä¸ºç©ºä¸²):debug ç° / info ç»¿ / warn é»„ / error çº¢ / fatal ç´« |
-| `{reset}` | ANSI å¤ä½ç (`color=0` æ—¶ä¸ºç©ºä¸²) |
+| `{time}` | µ±Ç°Ê±¼ä,°´ `time_fmt`(strftime)¸ñÊ½»¯,Ä¬ÈÏ `%Y-%m-%d %H:%M:%S` |
+| `{level}` | ¼¶±ğÃû´óĞ´:`DEBUG/INFO/WARN/ERROR/FATAL` |
+| `{level_num}` | ¼¶±ğÊı×Ö `0..4` |
+| `{name}` | Ä£¿éÃû(¿ÉÎª¿Õ´®) |
+| `{msg}` | ÏûÏ¢ÎÄ±¾ |
+| `{nl}` | »»ĞĞ·û |
+| `{esc_q}` | Ë«ÒıºÅ×Ö·û(±ãÓÚÒıºÅ°ü¹üÈÕÖ¾) |
+| `{color}` | µ±Ç°¼¶±ğµÄ ANSI ÑÕÉ«Âë(`color=0` Ê±Îª¿Õ´®):debug »Ò / info ÂÌ / warn »Æ / error ºì / fatal ×Ï |
+| `{reset}` | ANSI ¸´Î»Âë(`color=0` Ê±Îª¿Õ´®) |
 
-æœªçŸ¥å ä½ç¬¦åŸæ ·ä¿ç•™,å¯æ··å…¥è‡ªå®šä¹‰ token åç”¨ `util.str_replace` è‡ªè¡Œæ›¿æ¢ã€‚æ›¿æ¢æŒ‰æœ€é•¿ token ä¼˜å…ˆ,é¿å…éƒ¨åˆ†åŒ¹é…æ±¡æŸ“ã€‚
+Î´ÖªÕ¼Î»·ûÔ­Ñù±£Áô,¿É»ìÈë×Ô¶¨Òå token ºóÓÃ `util.str_replace` ×ÔĞĞÌæ»»¡£Ìæ»»°´×î³¤ token ÓÅÏÈ,±ÜÃâ²¿·ÖÆ¥ÅäÎÛÈ¾¡£
 
-## æ³¨æ„
+## ×¢Òâ
 
-1. **çº¯å‡½æ•°å¼**:å‡½æ•°å†…çœ‹ä¸åˆ°å…¨å±€å˜é‡ã€dict æ˜¯å€¼ä¼ é€’,é…ç½®å¿…é¡»ä½œä¸ºå‚æ•°ä¼ é€’ã€setter è¿”å›å€¼å¿…é¡»æ¥ä½;`append` ç­‰å­—æ®µè¯­ä¹‰è§ä¸Šè¡¨ã€‚
-2. **é¢œè‰²åªåœ¨æ§åˆ¶å°**:`color=1` æ—¶æ¨¡æ¿é‡Œçš„ `{color}/{reset}` å˜ä¸º ANSI ç ,æ–‡ä»¶è¾“å‡ºæ°¸è¿œç”¨ `flog_render_plain` æ¸²æŸ“(æ—  ANSI)ã€‚ç»ˆç«¯éœ€æ”¯æŒ ANSI(Windows Terminalã€VS Code ç»ˆç«¯é»˜è®¤æ”¯æŒ;è€å¼ cmd å¯èƒ½éœ€å¼€å¯ VT å¤„ç†)ã€‚
-3. **highlight ä¼šæŠŠ ANSI å¸¦è¿›æ–‡ä»¶**:`flog_highlight` æŠŠé¢œè‰²ç ç›´æ¥åµŒè¿›æ¶ˆæ¯æ–‡æœ¬,å› æ­¤è¯¥è¡Œåœ¨æ–‡ä»¶è¾“å‡ºé‡Œä¹Ÿä¼šå¸¦ ANSI ç ;éœ€è¦æ–‡ä»¶ä¿æŒçº¯å‡€æ—¶,æŠŠè¿™æ¡æ—¥å¿—çš„ `output` è®¾ä¸º `"console"`,æˆ–åªç”¨ `flog_highlight` åšæ§åˆ¶å°å±•ç¤ºã€‚
-4. **å˜é‡åéš”ç¦»(é‡è¦)**:æ¨¡å—å†…éƒ¨ä½¿ç”¨äº† `c` / `l` / `msg` / `path` / `line` / `h` / `mode` ç­‰é€šç”¨å,ä¸è°ƒç”¨æ–¹å±€éƒ¨å˜é‡é‡åæ—¶ä¼šè¦†ç›–ä¸”ä¸æ¢å¤;å»ºè®®ä½ çš„å±€éƒ¨å˜é‡ç”¨ `c1/c2/log_cfg` è¿™ç±»å‰ç¼€å‘½å(å¦‚ demo.fox)ã€‚
-5. **æ–‡ä»¶æŒ‰è¡Œå¼€å…³**:æ— å…¨å±€å¥æŸ„,æ¯è¡Œ openâ†’writeâ†’close,å¯é ä½†é«˜é¢‘åœºæ™¯æœ‰å¼€é”€ã€‚
-6. **æ—¶é—´ç²¾åº¦**:`fox.sys.time` æä¾›ç§’çº§æ—¶é—´(Value æ—  int64),æ¯«ç§’çº§ä¸ä¿è¯ã€‚
-7. **ç¼–è¯‘æµç¨‹**:`-fc` åˆå¹¶ç¼–è¯‘éœ€è¦æŠŠå…¨éƒ¨ 6 ä¸ªæ–‡ä»¶ä¸€èµ·ä¼ å…¥(`demo.fox flog.fox flog_cfg.fox flog_render.fox flog_output.fox flog_api.fox`),æˆ–å…ˆå„è‡ª `-c` ç”Ÿæˆ `.fc`;æ”¹è¿‡æºæ–‡ä»¶åè¦é‡æ–°ç¼–è¯‘ã€‚
-8. **dict å­—é¢é‡å•è¡Œ**:é…ç½® dict å¿…é¡»å†™æˆä¸€è¡Œ(è§£æå™¨åœ¨æ¢è¡Œå¤„æˆªæ–­è¯­å¥),å‚è§ demoã€‚
+1. **´¿º¯ÊıÊ½**:º¯ÊıÄÚ¿´²»µ½È«¾Ö±äÁ¿¡¢dict ÊÇÖµ´«µİ,ÅäÖÃ±ØĞë×÷Îª²ÎÊı´«µİ¡¢setter ·µ»ØÖµ±ØĞë½Ó×¡;`append` µÈ×Ö¶ÎÓïÒå¼ûÉÏ±í¡£
+2. **ÑÕÉ«Ö»ÔÚ¿ØÖÆÌ¨**:`color=1` Ê±Ä£°åÀïµÄ `{color}/{reset}` ±äÎª ANSI Âë,ÎÄ¼şÊä³öÓÀÔ¶ÓÃ `flog_render_plain` äÖÈ¾(ÎŞ ANSI)¡£ÖÕ¶ËĞèÖ§³Ö ANSI(Windows Terminal¡¢VS Code ÖÕ¶ËÄ¬ÈÏÖ§³Ö;ÀÏÊ½ cmd ¿ÉÄÜĞè¿ªÆô VT ´¦Àí)¡£
+3. **highlight »á°Ñ ANSI ´ø½øÎÄ¼ş**:`flog_highlight` °ÑÑÕÉ«ÂëÖ±½ÓÇ¶½øÏûÏ¢ÎÄ±¾,Òò´Ë¸ÃĞĞÔÚÎÄ¼şÊä³öÀïÒ²»á´ø ANSI Âë;ĞèÒªÎÄ¼ş±£³Ö´¿¾»Ê±,°ÑÕâÌõÈÕÖ¾µÄ `output` ÉèÎª `"console"`,»òÖ»ÓÃ `flog_highlight` ×ö¿ØÖÆÌ¨Õ¹Ê¾¡£
+4. **±äÁ¿Ãû¸ôÀë(ÖØÒª)**:Ä£¿éÄÚ²¿Ê¹ÓÃÁË `c` / `l` / `msg` / `path` / `line` / `h` / `mode` µÈÍ¨ÓÃÃû,Óëµ÷ÓÃ·½¾Ö²¿±äÁ¿ÖØÃûÊ±»á¸²¸ÇÇÒ²»»Ö¸´;½¨ÒéÄãµÄ¾Ö²¿±äÁ¿ÓÃ `c1/c2/log_cfg` ÕâÀàÇ°×ºÃüÃû(Èç demo.fox)¡£
+5. **ÎÄ¼ş°´ĞĞ¿ª¹Ø**:ÎŞÈ«¾Ö¾ä±ú,Ã¿ĞĞ open¡úwrite¡úclose,¿É¿¿µ«¸ßÆµ³¡¾°ÓĞ¿ªÏú¡£
+6. **Ê±¼ä¾«¶È**:`fox.sys.time` Ìá¹©Ãë¼¶Ê±¼ä(Value ÎŞ int64),ºÁÃë¼¶²»±£Ö¤¡£
+7. **±àÒëÁ÷³Ì**:`-fc` ºÏ²¢±àÒëĞèÒª°ÑÈ«²¿ 6 ¸öÎÄ¼şÒ»Æğ´«Èë(`demo.fox flog.fox flog_cfg.fox flog_render.fox flog_output.fox flog_api.fox`),»òÏÈ¸÷×Ô `-c` Éú³É `.fc`;¸Ä¹ıÔ´ÎÄ¼şºóÒªÖØĞÂ±àÒë¡£
+8. **dict ×ÖÃæÁ¿µ¥ĞĞ**:ÅäÖÃ dict ±ØĞëĞ´³ÉÒ»ĞĞ(½âÎöÆ÷ÔÚ»»ĞĞ´¦½Ø¶ÏÓï¾ä),²Î¼û demo¡£

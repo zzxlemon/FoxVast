@@ -12,7 +12,7 @@
 #include <vector>
 
 // ============================================================
-//  fox.std.math  â€” sin, cos, tan
+//  fox.std.math  ¡ª sin, cos, tan
 // ============================================================
 #ifdef FOX_LIB_MATH
 #include "../../libs/system/math/SystemFunctionsMath.h"
@@ -50,7 +50,7 @@ inline void register_random(LibraryManager& mgr) {
 #endif
 
 // ============================================================
-//  fox.sys.io.fs  â€” file I/O
+//  fox.sys.io.fs  ¡ª file I/O
 // ============================================================
 #ifdef FOX_LIB_FILE
 #include "../../libs/system/fs/SystemFunctionsFile.h"
@@ -81,7 +81,7 @@ inline void register_file(LibraryManager& mgr) {
 #endif
 
 // ============================================================
-//  fox.std.util  â€” length, type conversions
+//  fox.std.util  ¡ª length, type conversions
 // ============================================================
 #ifdef FOX_LIB_UTIL
 #include "../../libs/system/io/util/SystemFunctionUtil.h"
@@ -207,7 +207,7 @@ inline void register_socket(LibraryManager& mgr) {
 #endif
 
 // ============================================================
-//  fox.gl.fg  â€” OpenGL / GLFW graphics
+//  fox.gl.fg  ¡ª OpenGL / GLFW graphics
 // ============================================================
 #ifdef FOX_LIB_GRAPHICS
 #include "../../libs/graphics/SystemFunctionsGraphics.h"

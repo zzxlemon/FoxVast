@@ -1,29 +1,29 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
+<meta charset="GBK">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FoxLang å‡½æ•°åº“å‚è€ƒ</title>
+<title>FoxLang º¯Êı¿â²Î¿¼</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
     <div class="inner">
-        <h1>FoxLang å‡½æ•°åº“å‚è€ƒ</h1>
-        <div class="ver">FoxVast VM 1.3.210+b1 &middot; ç³»ç»Ÿå‡½æ•°åº“</div>
+        <h1>FoxLang º¯Êı¿â²Î¿¼</h1>
+        <div class="ver">FoxVast VM 1.3.210+b1 &middot; ÏµÍ³º¯Êı¿â</div>
     </div>
 </header>
 
 <nav class="links">
-    <a href="index.html">è¯­è¨€å‚è€ƒ</a>
-    <a href="libraries.html">å‡½æ•°åº“å‚è€ƒ</a>
+    <a href="index.html">ÓïÑÔ²Î¿¼</a>
+    <a href="libraries.html">º¯Êı¿â²Î¿¼</a>
 </nav>
 
 <main>
 
-<h2>1. å¯¼å…¥å‡½æ•°åº“</h2>
-<p>ç³»ç»Ÿåº“ä»¥ DLL å½¢å¼æä¾›(<code>fox.&lt;lib&gt;.dll</code>,ä½äºå¯æ‰§è¡Œæ–‡ä»¶æ—æˆ– <code>dlls/</code>)ã€‚ä½¿ç”¨å‰å¿…é¡»å…ˆ import,å¹¶ä¸”æ‰€æœ‰è°ƒç”¨éƒ½ä½¿ç”¨ç‚¹å·å†™æ³•:</p>
+<h2>1. µ¼Èëº¯Êı¿â</h2>
+<p>ÏµÍ³¿âÒÔ DLL ĞÎÊ½Ìá¹©(<code>fox.&lt;lib&gt;.dll</code>,Î»ÓÚ¿ÉÖ´ĞĞÎÄ¼şÅÔ»ò <code>dlls/</code>)¡£Ê¹ÓÃÇ°±ØĞëÏÈ import,²¢ÇÒËùÓĞµ÷ÓÃ¶¼Ê¹ÓÃµãºÅĞ´·¨:</p>
 
 <pre><code>import fox.std.util -&gt; u
 import fox.gl.fg -&gt; fg
@@ -31,77 +31,77 @@ import fox.gl.fg -&gt; fg
 println(u.length("hello"))     # 5
 fg.create_window("Demo", 800, 600)</code></pre>
 
-<p class="note">æ‰€æœ‰å‡½æ•°åº“åœ¨å‚æ•°éæ³•æˆ–å‚æ•°ä¸ªæ•°ä¸å¯¹æ—¶ä¼šæŠ›é”™,å¯ç”¨ <code>try/catch</code> æ•è·ã€‚</p>
+<p class="note">ËùÓĞº¯Êı¿âÔÚ²ÎÊı·Ç·¨»ò²ÎÊı¸öÊı²»¶ÔÊ±»áÅ×´í,¿ÉÓÃ <code>try/catch</code> ²¶»ñ¡£</p>
 
 <h2>2. math &mdash; <code>import fox.std.math</code></h2>
-<p>ä¸‰è§’å‡½æ•°,å‚æ•°ä¸º<b>å¼§åº¦</b>;å‚æ•°é¡»ä¸º int æˆ– double,è¿”å› doubleã€‚</p>
+<p>Èı½Çº¯Êı,²ÎÊıÎª<b>»¡¶È</b>;²ÎÊıĞëÎª int »ò double,·µ»Ø double¡£</p>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>math.sin(x)</code></td><td>æ­£å¼¦ã€‚</td></tr>
-<tr><td><code>math.cos(x)</code></td><td>ä½™å¼¦ã€‚</td></tr>
-<tr><td><code>math.tan(x)</code></td><td>æ­£åˆ‡(&pi;/2 é™„è¿‘ä¼šå‘æ•£)ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>math.sin(x)</code></td><td>ÕıÏÒ¡£</td></tr>
+<tr><td><code>math.cos(x)</code></td><td>ÓàÏÒ¡£</td></tr>
+<tr><td><code>math.tan(x)</code></td><td>ÕıÇĞ(&pi;/2 ¸½½ü»á·¢É¢)¡£</td></tr>
 </table>
 
-<h3>ç¤ºä¾‹</h3>
+<h3>Ê¾Àı</h3>
 <pre><code>import fox.std.math -&gt; m
-println(m.sin(1.5707963))   # çº¦ 1.0</code></pre>
+println(m.sin(1.5707963))   # Ô¼ 1.0</code></pre>
 
 <h2>3. random &mdash; <code>import fox.std.random</code></h2>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>random.random("int", min, max)</code></td><td>[min, max] é—­åŒºé—´å†…çš„éšæœºæ•´æ•°ã€‚</td></tr>
-<tr><td><code>random.random("double", min, max)</code></td><td>[min, max) åŒºé—´å†…çš„éšæœºæµ®ç‚¹æ•°ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>random.random("int", min, max)</code></td><td>[min, max] ±ÕÇø¼äÄÚµÄËæ»úÕûÊı¡£</td></tr>
+<tr><td><code>random.random("double", min, max)</code></td><td>[min, max) Çø¼äÄÚµÄËæ»ú¸¡µãÊı¡£</td></tr>
 </table>
-<p><code>min &gt; max</code> ä¼šæŠ›é”™ã€‚é¦–æ¬¡ä½¿ç”¨æ—¶ä»¥ç³»ç»Ÿæ—¶é’Ÿä¸ºç§å­ã€‚</p>
+<p><code>min &gt; max</code> »áÅ×´í¡£Ê×´ÎÊ¹ÓÃÊ±ÒÔÏµÍ³Ê±ÖÓÎªÖÖ×Ó¡£</p>
 
-<h3>ç¤ºä¾‹</h3>
+<h3>Ê¾Àı</h3>
 <pre><code>import fox.std.random -&gt; r
-d = r.random("int", 1, 6)     # æ·éª°å­,1..6</code></pre>
+d = r.random("int", 1, 6)     # ÖÀ÷»×Ó,1..6</code></pre>
 
 <h2>4. util &mdash; <code>import fox.std.util</code></h2>
 
-<h3>é€šç”¨</h3>
+<h3>Í¨ÓÃ</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>util.length(x)</code></td><td>æ•°ç»„å…ƒç´ ä¸ªæ•° / å­—ç¬¦ä¸²å­—èŠ‚æ•° / å­—å…¸é”®æ•°ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>util.length(x)</code></td><td>Êı×éÔªËØ¸öÊı / ×Ö·û´®×Ö½ÚÊı / ×Öµä¼üÊı¡£</td></tr>
 </table>
 
-<h3>ç±»å‹è½¬æ¢</h3>
+<h3>ÀàĞÍ×ª»»</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>util.IntChangeString(i)</code></td><td>å­—ç¬¦ä¸²ã€‚</td></tr>
-<tr><td><code>util.StringChangeInt(s)</code></td><td>æ•´æ•°(è¾“å…¥éæ³•æ—¶æŠ›é”™)ã€‚</td></tr>
-<tr><td><code>util.StringChangeDouble(s)</code></td><td>æµ®ç‚¹æ•°(è¾“å…¥éæ³•æ—¶æŠ›é”™)ã€‚</td></tr>
-<tr><td><code>util.DoubleChangeString(d)</code></td><td>å­—ç¬¦ä¸²(å›ºå®š 6 ä½å°æ•°,å¦‚ <code>"1.000000"</code>)ã€‚</td></tr>
-<tr><td><code>util.DoubleChangeInt(d)</code></td><td>æ•´æ•°,å‘é›¶æˆªæ–­ã€‚</td></tr>
-<tr><td><code>util.IntChangeDouble(i)</code></td><td>æµ®ç‚¹æ•°ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>util.IntChangeString(i)</code></td><td>×Ö·û´®¡£</td></tr>
+<tr><td><code>util.StringChangeInt(s)</code></td><td>ÕûÊı(ÊäÈë·Ç·¨Ê±Å×´í)¡£</td></tr>
+<tr><td><code>util.StringChangeDouble(s)</code></td><td>¸¡µãÊı(ÊäÈë·Ç·¨Ê±Å×´í)¡£</td></tr>
+<tr><td><code>util.DoubleChangeString(d)</code></td><td>×Ö·û´®(¹Ì¶¨ 6 Î»Ğ¡Êı,Èç <code>"1.000000"</code>)¡£</td></tr>
+<tr><td><code>util.DoubleChangeInt(d)</code></td><td>ÕûÊı,ÏòÁã½Ø¶Ï¡£</td></tr>
+<tr><td><code>util.IntChangeDouble(i)</code></td><td>¸¡µãÊı¡£</td></tr>
 </table>
 
-<h3>æ•°ç»„æ“ä½œ(éƒ½è¿”å›æ–°æ•°ç»„,ä¸ä¿®æ”¹åŸæ•°ç»„)</h3>
+<h3>Êı×é²Ù×÷(¶¼·µ»ØĞÂÊı×é,²»ĞŞ¸ÄÔ­Êı×é)</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>util.arr_append(arr, v)</code></td><td>å°¾éƒ¨è¿½åŠ  <code>v</code> åçš„æ•°ç»„ã€‚</td></tr>
-<tr><td><code>util.arr_pop(arr)</code></td><td>å»æ‰æœ€åä¸€ä¸ªå…ƒç´ çš„æ•°ç»„(ç©ºæ•°ç»„æŠ›é”™)ã€‚</td></tr>
-<tr><td><code>util.arr_contains(arr, v)</code></td><td>åŒ…å«è¿”å› 1,å¦åˆ™ 0(æ·±æ¯”è¾ƒ)ã€‚</td></tr>
-<tr><td><code>util.arr_slice(arr, start, end)</code></td><td>å­æ•°ç»„;ä¸‹æ ‡è‡ªåŠ¨å¤¹å–,end ä¸åŒ…å«ã€‚</td></tr>
-<tr><td><code>util.arr_sort(arr)</code></td><td>å‡åºæ’åºçš„æ•°ç»„(å…ƒç´ é¡»å…¨ä¸ºæ•°å­—æˆ–å…¨ä¸ºå­—ç¬¦ä¸²)ã€‚</td></tr>
-<tr><td><code>util.arr_length(arr)</code></td><td>å…ƒç´ ä¸ªæ•°ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>util.arr_append(arr, v)</code></td><td>Î²²¿×·¼Ó <code>v</code> ºóµÄÊı×é¡£</td></tr>
+<tr><td><code>util.arr_pop(arr)</code></td><td>È¥µô×îºóÒ»¸öÔªËØµÄÊı×é(¿ÕÊı×éÅ×´í)¡£</td></tr>
+<tr><td><code>util.arr_contains(arr, v)</code></td><td>°üº¬·µ»Ø 1,·ñÔò 0(Éî±È½Ï)¡£</td></tr>
+<tr><td><code>util.arr_slice(arr, start, end)</code></td><td>×ÓÊı×é;ÏÂ±ê×Ô¶¯¼ĞÈ¡,end ²»°üº¬¡£</td></tr>
+<tr><td><code>util.arr_sort(arr)</code></td><td>ÉıĞòÅÅĞòµÄÊı×é(ÔªËØĞëÈ«ÎªÊı×Ö»òÈ«Îª×Ö·û´®)¡£</td></tr>
+<tr><td><code>util.arr_length(arr)</code></td><td>ÔªËØ¸öÊı¡£</td></tr>
 </table>
 
-<h3>å­—ç¬¦ä¸²æ“ä½œ(æŒ‰å­—èŠ‚å¤„ç†,ä¸æ”¯æŒ UTF-8 è¯­ä¹‰)</h3>
+<h3>×Ö·û´®²Ù×÷(°´×Ö½Ú´¦Àí,²»Ö§³Ö UTF-8 ÓïÒå)</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>util.str_contains(s, sub)</code></td><td>åŒ…å« <code>sub</code> è¿”å› 1,å¦åˆ™ 0ã€‚</td></tr>
-<tr><td><code>util.str_replace(s, old, new)</code></td><td>æ›¿æ¢æ‰€æœ‰å‡ºç°;<code>old</code> ä¸ºç©ºæ—¶åŸæ ·è¿”å› <code>s</code>ã€‚</td></tr>
-<tr><td><code>util.str_split(s, sep)</code></td><td>å­—ç¬¦ä¸²æ•°ç»„;åˆ†éš”ç¬¦ä¸ºç©ºæ—¶æŒ‰å•ä¸ªå­—ç¬¦æ‹†åˆ†ã€‚</td></tr>
-<tr><td><code>util.str_trim(s)</code></td><td>å»æ‰é¦–å°¾ç©ºæ ¼ã€åˆ¶è¡¨ç¬¦ã€CRã€LFã€‚</td></tr>
-<tr><td><code>util.str_lower(s)</code></td><td>è½¬å°å†™(ä»… ASCII)ã€‚</td></tr>
-<tr><td><code>util.str_upper(s)</code></td><td>è½¬å¤§å†™(ä»… ASCII)ã€‚</td></tr>
-<tr><td><code>util.str_substring(s, start, end)</code></td><td>æŒ‰å­—èŠ‚å–å­ä¸²,end ä¸åŒ…å«,ä¸‹æ ‡è‡ªåŠ¨å¤¹å–ã€‚</td></tr>
-<tr><td><code>util.str_length(s)</code></td><td>å­—èŠ‚æ•°ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>util.str_contains(s, sub)</code></td><td>°üº¬ <code>sub</code> ·µ»Ø 1,·ñÔò 0¡£</td></tr>
+<tr><td><code>util.str_replace(s, old, new)</code></td><td>Ìæ»»ËùÓĞ³öÏÖ;<code>old</code> Îª¿ÕÊ±Ô­Ñù·µ»Ø <code>s</code>¡£</td></tr>
+<tr><td><code>util.str_split(s, sep)</code></td><td>×Ö·û´®Êı×é;·Ö¸ô·ûÎª¿ÕÊ±°´µ¥¸ö×Ö·û²ğ·Ö¡£</td></tr>
+<tr><td><code>util.str_trim(s)</code></td><td>È¥µôÊ×Î²¿Õ¸ñ¡¢ÖÆ±í·û¡¢CR¡¢LF¡£</td></tr>
+<tr><td><code>util.str_lower(s)</code></td><td>×ªĞ¡Ğ´(½ö ASCII)¡£</td></tr>
+<tr><td><code>util.str_upper(s)</code></td><td>×ª´óĞ´(½ö ASCII)¡£</td></tr>
+<tr><td><code>util.str_substring(s, start, end)</code></td><td>°´×Ö½ÚÈ¡×Ó´®,end ²»°üº¬,ÏÂ±ê×Ô¶¯¼ĞÈ¡¡£</td></tr>
+<tr><td><code>util.str_length(s)</code></td><td>×Ö½ÚÊı¡£</td></tr>
 </table>
 
-<h3>ç¤ºä¾‹</h3>
+<h3>Ê¾Àı</h3>
 <pre><code>import fox.std.util -&gt; u
 arr = [3, 1, 2]
 arr = u.arr_sort(arr)                    # [1, 2, 3]
@@ -109,34 +109,34 @@ println(u.arr_length(arr))               # 3
 println(u.str_replace("a-b-c", "-", "+"))# a+b+c</code></pre>
 
 <h2>5. file &mdash; <code>import fox.sys.io.fs</code></h2>
-<p>æ–‡ä»¶å¥æŸ„æ˜¯ä¸é€æ˜çš„æ•´æ•°,ä» 1 å¼€å§‹ã€‚åŒä¸€æ–‡ä»¶ä¸èƒ½é‡å¤æ‰“å¼€ã€‚æ‰€æœ‰è®¿é—®å‡ä¸ºäºŒè¿›åˆ¶æ¨¡å¼ã€‚</p>
+<p>ÎÄ¼ş¾ä±úÊÇ²»Í¸Ã÷µÄÕûÊı,´Ó 1 ¿ªÊ¼¡£Í¬Ò»ÎÄ¼ş²»ÄÜÖØ¸´´ò¿ª¡£ËùÓĞ·ÃÎÊ¾ùÎª¶ş½øÖÆÄ£Ê½¡£</p>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>file.file_open(name, mode)</code></td><td>æ•´æ•°å¥æŸ„ã€‚æ¨¡å¼:<code>"read"</code>(è¯»)ã€<code>"write"</code>(å†™,æˆªæ–­)ã€<code>"append"</code>(è¿½åŠ )ã€‚</td></tr>
-<tr><td><code>file.file_read(handle)</code></td><td>æ•´ä¸ªæ–‡ä»¶çš„å­—ç¬¦ä¸²å†…å®¹(ä»…è¯»æ¨¡å¼)ã€‚</td></tr>
-<tr><td><code>file.file_write(handle, txt [, æ¢è¡Œ])</code></td><td>å†™å…¥æ–‡æœ¬;ç¬¬ä¸‰ä¸ªå‚æ•°ä¸º 1 æ—¶è¿½åŠ æ¢è¡Œã€‚</td></tr>
-<tr><td><code>file.file_close(handle)</code></td><td>å…³é—­æ–‡ä»¶ã€‚</td></tr>
-<tr><td><code>file.file_remove(name)</code></td><td>åˆ é™¤æ–‡ä»¶(å¿…é¡»å…ˆå…³é—­)ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>file.file_open(name, mode)</code></td><td>ÕûÊı¾ä±ú¡£Ä£Ê½:<code>"read"</code>(¶Á)¡¢<code>"write"</code>(Ğ´,½Ø¶Ï)¡¢<code>"append"</code>(×·¼Ó)¡£</td></tr>
+<tr><td><code>file.file_read(handle)</code></td><td>Õû¸öÎÄ¼şµÄ×Ö·û´®ÄÚÈİ(½ö¶ÁÄ£Ê½)¡£</td></tr>
+<tr><td><code>file.file_write(handle, txt [, »»ĞĞ])</code></td><td>Ğ´ÈëÎÄ±¾;µÚÈı¸ö²ÎÊıÎª 1 Ê±×·¼Ó»»ĞĞ¡£</td></tr>
+<tr><td><code>file.file_close(handle)</code></td><td>¹Ø±ÕÎÄ¼ş¡£</td></tr>
+<tr><td><code>file.file_remove(name)</code></td><td>É¾³ıÎÄ¼ş(±ØĞëÏÈ¹Ø±Õ)¡£</td></tr>
 </table>
 
-<h3>ç¤ºä¾‹</h3>
+<h3>Ê¾Àı</h3>
 <pre><code>import fox.sys.io.fs -&gt; file
 h = file.file_open("data.txt", "write")
 file.file_write(h, "hello", 1)
 file.file_close(h)</code></pre>
 
 <h2>6. socket &mdash; <code>import fox.std.socket</code></h2>
-<p>ä»… TCP å®¢æˆ·ç«¯ã€é˜»å¡å¼ã€IPv4ã€‚å¥æŸ„æ˜¯ä¸é€æ˜çš„æ•´æ•°,ä» 1 å¼€å§‹ã€‚</p>
+<p>½ö TCP ¿Í»§¶Ë¡¢×èÈûÊ½¡¢IPv4¡£¾ä±úÊÇ²»Í¸Ã÷µÄÕûÊı,´Ó 1 ¿ªÊ¼¡£</p>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>socket.socket_create()</code></td><td>æ•´æ•°å¥æŸ„ã€‚</td></tr>
-<tr><td><code>socket.socket_connect(h, ip, port)</code></td><td>æˆåŠŸè¿”å› 1;è¿æ¥å»ºç«‹å‰ä¼šé˜»å¡ã€‚</td></tr>
-<tr><td><code>socket.socket_send(h, data)</code></td><td>æ•´æ•°:å®é™…å‘é€çš„å­—èŠ‚æ•°ã€‚</td></tr>
-<tr><td><code>socket.socket_recv(h, size)</code></td><td>æ”¶åˆ°çš„å­—èŠ‚ä¸²(å¯èƒ½çŸ­äº <code>size</code>;å¯¹ç«¯å…³é—­æ—¶è¿”å›ç©ºä¸²)ã€‚æœ‰æ•°æ®å‰ä¼šé˜»å¡ã€‚</td></tr>
-<tr><td><code>socket.socket_close(h)</code></td><td>å…³é—­è¿æ¥ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>socket.socket_create()</code></td><td>ÕûÊı¾ä±ú¡£</td></tr>
+<tr><td><code>socket.socket_connect(h, ip, port)</code></td><td>³É¹¦·µ»Ø 1;Á¬½Ó½¨Á¢Ç°»á×èÈû¡£</td></tr>
+<tr><td><code>socket.socket_send(h, data)</code></td><td>ÕûÊı:Êµ¼Ê·¢ËÍµÄ×Ö½ÚÊı¡£</td></tr>
+<tr><td><code>socket.socket_recv(h, size)</code></td><td>ÊÕµ½µÄ×Ö½Ú´®(¿ÉÄÜ¶ÌÓÚ <code>size</code>;¶Ô¶Ë¹Ø±ÕÊ±·µ»Ø¿Õ´®)¡£ÓĞÊı¾İÇ°»á×èÈû¡£</td></tr>
+<tr><td><code>socket.socket_close(h)</code></td><td>¹Ø±ÕÁ¬½Ó¡£</td></tr>
 </table>
 
-<h3>ç¤ºä¾‹</h3>
+<h3>Ê¾Àı</h3>
 <pre><code>import fox.std.socket -&gt; s
 h = s.socket_create()
 s.socket_connect(h, "127.0.0.1", 8080)
@@ -145,83 +145,83 @@ reply = s.socket_recv(h, 4096)
 s.socket_close(h)</code></pre>
 
 <h2>7. time &mdash; <code>import fox.sys.time</code></h2>
-<p>å•ä½éƒ½æ˜¯æ•´ç§’(32 ä½æ•´æ•°,2038 å¹´å‰åæº¢å‡º)ã€‚ä½¿ç”¨æœ¬åœ°æ—¶é—´ã€‚</p>
+<p>µ¥Î»¶¼ÊÇÕûÃë(32 Î»ÕûÊı,2038 ÄêÇ°ºóÒç³ö)¡£Ê¹ÓÃ±¾µØÊ±¼ä¡£</p>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>time.now()</code></td><td>æ•´æ•°:è‡ª 1970-01-01 00:00 UTC èµ·çš„ç§’æ•°ã€‚</td></tr>
-<tr><td><code>time.format([æ ¼å¼])</code></td><td>strftime æ ¼å¼åŒ–çš„å½“å‰æœ¬åœ°æ—¶é—´,é»˜è®¤ <code>"%Y-%m-%d %H:%M:%S"</code>ã€‚</td></tr>
-<tr><td><code>time.field("åç§°")</code></td><td>æ•´æ•°åˆ†é‡:<code>year</code>(å¹´)ã€<code>month</code>(1&ndash;12)ã€<code>day</code>ã€<code>hour</code>ã€<code>minute</code>ã€<code>second</code>ã€<code>weekday</code>(0&ndash;6,å‘¨æ—¥ä¸º 0)ã€<code>dayofyear</code>/<code>yearday</code>(0&ndash;365)ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>time.now()</code></td><td>ÕûÊı:×Ô 1970-01-01 00:00 UTC ÆğµÄÃëÊı¡£</td></tr>
+<tr><td><code>time.format([¸ñÊ½])</code></td><td>strftime ¸ñÊ½»¯µÄµ±Ç°±¾µØÊ±¼ä,Ä¬ÈÏ <code>"%Y-%m-%d %H:%M:%S"</code>¡£</td></tr>
+<tr><td><code>time.field("Ãû³Æ")</code></td><td>ÕûÊı·ÖÁ¿:<code>year</code>(Äê)¡¢<code>month</code>(1&ndash;12)¡¢<code>day</code>¡¢<code>hour</code>¡¢<code>minute</code>¡¢<code>second</code>¡¢<code>weekday</code>(0&ndash;6,ÖÜÈÕÎª 0)¡¢<code>dayofyear</code>/<code>yearday</code>(0&ndash;365)¡£</td></tr>
 </table>
 
-<h3>ç¤ºä¾‹</h3>
+<h3>Ê¾Àı</h3>
 <pre><code>import fox.sys.time -&gt; t
 println(t.format())            # 2026-08-19 12:00:00
 println(t.field("year"))       # 2026</code></pre>
 
-<h2>8. gl_fg &mdash; <code>import fox.gl.fg</code>(OpenGL å›¾å½¢)</h2>
-<p>å•çª—å£ OpenGL 3.3 / GLFW æ¸²æŸ“åº“ã€‚åæ ‡ä»¥åƒç´ ä¸ºå•ä½,åŸç‚¹åœ¨<b>å·¦ä¸Šè§’</b>,y è½´å‘ä¸‹ã€‚é¢œè‰²ä¸º 0&ndash;1 çš„æµ®ç‚¹æ•°ã€‚</p>
+<h2>8. gl_fg &mdash; <code>import fox.gl.fg</code>(OpenGL Í¼ĞÎ)</h2>
+<p>µ¥´°¿Ú OpenGL 3.3 / GLFW äÖÈ¾¿â¡£×ø±êÒÔÏñËØÎªµ¥Î»,Ô­µãÔÚ<b>×óÉÏ½Ç</b>,y ÖáÏòÏÂ¡£ÑÕÉ«Îª 0&ndash;1 µÄ¸¡µãÊı¡£</p>
 
-<h3>çª—å£ç”Ÿå‘½å‘¨æœŸä¸è®¡æ—¶</h3>
+<h3>´°¿ÚÉúÃüÖÜÆÚÓë¼ÆÊ±</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>gl_fg.create_window(title, w, h)</code></td><td>çª—å£ç´¢å¼•(0)ã€‚åŒä¸€æ—¶é—´åªå…è®¸ä¸€ä¸ªçª—å£ã€‚</td></tr>
-<tr><td><code>gl_fg.close()</code></td><td>é‡Šæ”¾çª—å£ã€çº¹ç†å’Œ GLFWã€‚</td></tr>
-<tr><td><code>gl_fg.window_should_close(win)</code></td><td>çª—å£å…³é—­æ ‡å¿—ç½®ä½æ—¶è¿”å› 1ã€‚</td></tr>
-<tr><td><code>gl_fg.swap_buffers(win)</code></td><td>äº¤æ¢å‰åç¼“å†²ã€‚</td></tr>
-<tr><td><code>gl_fg.poll_events()</code></td><td>å¤„ç†çª—å£ä¸è¾“å…¥äº‹ä»¶ã€‚</td></tr>
-<tr><td><code>gl_fg.update(win)</code></td><td>swap_buffers + poll_events,å¹¶æ›´æ–° <code>frame_time</code>ã€‚</td></tr>
-<tr><td><code>gl_fg.time()</code></td><td>double:GLFW åˆå§‹åŒ–ä»¥æ¥çš„ç§’æ•°ã€‚</td></tr>
-<tr><td><code>gl_fg.frame_time(win)</code></td><td>double:ä¸Šä¸€å¸§è€—æ—¶(ç§’),ç”± <code>update</code> æ›´æ–°ã€‚</td></tr>
-<tr><td><code>gl_fg.window_size(win)</code></td><td>æ•°ç»„ <code>[w, h]</code>(åƒç´ ),éšçª—å£ç¼©æ”¾å®æ—¶å˜åŒ–ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>gl_fg.create_window(title, w, h)</code></td><td>´°¿ÚË÷Òı(0)¡£Í¬Ò»Ê±¼äÖ»ÔÊĞíÒ»¸ö´°¿Ú¡£</td></tr>
+<tr><td><code>gl_fg.close()</code></td><td>ÊÍ·Å´°¿Ú¡¢ÎÆÀíºÍ GLFW¡£</td></tr>
+<tr><td><code>gl_fg.window_should_close(win)</code></td><td>´°¿Ú¹Ø±Õ±êÖ¾ÖÃÎ»Ê±·µ»Ø 1¡£</td></tr>
+<tr><td><code>gl_fg.swap_buffers(win)</code></td><td>½»»»Ç°ºó»º³å¡£</td></tr>
+<tr><td><code>gl_fg.poll_events()</code></td><td>´¦Àí´°¿ÚÓëÊäÈëÊÂ¼ş¡£</td></tr>
+<tr><td><code>gl_fg.update(win)</code></td><td>swap_buffers + poll_events,²¢¸üĞÂ <code>frame_time</code>¡£</td></tr>
+<tr><td><code>gl_fg.time()</code></td><td>double:GLFW ³õÊ¼»¯ÒÔÀ´µÄÃëÊı¡£</td></tr>
+<tr><td><code>gl_fg.frame_time(win)</code></td><td>double:ÉÏÒ»Ö¡ºÄÊ±(Ãë),ÓÉ <code>update</code> ¸üĞÂ¡£</td></tr>
+<tr><td><code>gl_fg.window_size(win)</code></td><td>Êı×é <code>[w, h]</code>(ÏñËØ),Ëæ´°¿ÚËõ·ÅÊµÊ±±ä»¯¡£</td></tr>
 </table>
 
-<h3>ç»˜å›¾</h3>
+<h3>»æÍ¼</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>gl_fg.clear_color(r, g, b, a)</code></td><td>è®¾ç½®æ¸…å±é¢œè‰²(0&ndash;1 æµ®ç‚¹)ã€‚</td></tr>
-<tr><td><code>gl_fg.clear()</code></td><td>æ¸…ç©ºé¢œè‰²ç¼“å†²ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_triangle(x1,y1,r1,g1,b1, x2,y2,r2,g2,b2, x3,y3,r3,g3,b3)</code></td><td>å®å¿ƒä¸‰è§’å½¢;æ¯ä¸ªé¡¶ç‚¹å¯ä»¥æœ‰ä¸åŒçš„é¢œè‰²ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_rect([x,y,r,g,b], [..], [..], [..])</code></td><td>ç”± 4 ä¸ªäº”å…ƒç´ æ•°ç»„(å·¦ä¸Šã€å³ä¸Šã€å³ä¸‹ã€å·¦ä¸‹)ç»˜åˆ¶çš„å®å¿ƒå››è¾¹å½¢;æ¯é¡¶ç‚¹ç‹¬ç«‹é¢œè‰²ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_line(x1, y1, x2, y2, ç²—ç»†, r, g, b)</code></td><td>å•è‰²ç›´çº¿ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_circle(cx, cy, radius, r, g, b)</code></td><td>å®å¿ƒåœ†(64 æ®µæ‰‡é¢)ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_text(å­—ä½“æ–‡ä»¶, æ–‡æœ¬, x, y, å­—å·, r, g, b)</code></td><td>ç”¨ TTF å­—ä½“ç»˜åˆ¶æ–‡æœ¬;ä»… ASCII 32&ndash;127ã€‚å­—ä½“æŒ‰ç»™å®šè·¯å¾„ã€<code>$FGFONT_DIR</code>ã€exe æ—çš„ <code>fonts/</code>ã€å½“å‰ç›®å½•ä¾æ¬¡æŸ¥æ‰¾ã€‚</td></tr>
-<tr><td><code>gl_fg.load_texture(win, æ–‡ä»¶)</code></td><td>ç”± PNG/JPG/BMP/GIF åŠ è½½çº¹ç†,è¿”å›æ•´æ•° id;æŒ‰è·¯å¾„ç¼“å­˜(æœ€å¤š 256 ä¸ª)ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_image(win, tex, x, y, w, h)</code></td><td>ç»˜åˆ¶çº¹ç†,å·¦ä¸Šè§’åœ¨ (x, y)ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_image_rotated(win, tex, x, y, w, h, è§’åº¦)</code></td><td>ç»•ä¸­å¿ƒæ—‹è½¬ç»˜åˆ¶;è§’åº¦å•ä½åº¦,é¡ºæ—¶é’ˆ(y å‘ä¸‹åæ ‡ç³»)ã€‚</td></tr>
-<tr><td><code>gl_fg.draw_image_tinted(win, tex, x, y, w, h, r, g, b, a)</code></td><td>ç€è‰²ç»˜åˆ¶;(1,1,1,1) ä¸ºåŸæ ·,alpha å¯åšæ·¡å‡ºã€‚</td></tr>
-<tr><td><code>gl_fg.image_size(win, tex)</code></td><td>æ•°ç»„ <code>[w, h]</code>(åƒç´ )ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>gl_fg.clear_color(r, g, b, a)</code></td><td>ÉèÖÃÇåÆÁÑÕÉ«(0&ndash;1 ¸¡µã)¡£</td></tr>
+<tr><td><code>gl_fg.clear()</code></td><td>Çå¿ÕÑÕÉ«»º³å¡£</td></tr>
+<tr><td><code>gl_fg.draw_triangle(x1,y1,r1,g1,b1, x2,y2,r2,g2,b2, x3,y3,r3,g3,b3)</code></td><td>ÊµĞÄÈı½ÇĞÎ;Ã¿¸ö¶¥µã¿ÉÒÔÓĞ²»Í¬µÄÑÕÉ«¡£</td></tr>
+<tr><td><code>gl_fg.draw_rect([x,y,r,g,b], [..], [..], [..])</code></td><td>ÓÉ 4 ¸öÎåÔªËØÊı×é(×óÉÏ¡¢ÓÒÉÏ¡¢ÓÒÏÂ¡¢×óÏÂ)»æÖÆµÄÊµĞÄËÄ±ßĞÎ;Ã¿¶¥µã¶ÀÁ¢ÑÕÉ«¡£</td></tr>
+<tr><td><code>gl_fg.draw_line(x1, y1, x2, y2, ´ÖÏ¸, r, g, b)</code></td><td>µ¥É«Ö±Ïß¡£</td></tr>
+<tr><td><code>gl_fg.draw_circle(cx, cy, radius, r, g, b)</code></td><td>ÊµĞÄÔ²(64 ¶ÎÉÈÃæ)¡£</td></tr>
+<tr><td><code>gl_fg.draw_text(×ÖÌåÎÄ¼ş, ÎÄ±¾, x, y, ×ÖºÅ, r, g, b)</code></td><td>ÓÃ TTF ×ÖÌå»æÖÆÎÄ±¾;½ö ASCII 32&ndash;127¡£×ÖÌå°´¸ø¶¨Â·¾¶¡¢<code>$FGFONT_DIR</code>¡¢exe ÅÔµÄ <code>fonts/</code>¡¢µ±Ç°Ä¿Â¼ÒÀ´Î²éÕÒ¡£</td></tr>
+<tr><td><code>gl_fg.load_texture(win, ÎÄ¼ş)</code></td><td>ÓÉ PNG/JPG/BMP/GIF ¼ÓÔØÎÆÀí,·µ»ØÕûÊı id;°´Â·¾¶»º´æ(×î¶à 256 ¸ö)¡£</td></tr>
+<tr><td><code>gl_fg.draw_image(win, tex, x, y, w, h)</code></td><td>»æÖÆÎÆÀí,×óÉÏ½ÇÔÚ (x, y)¡£</td></tr>
+<tr><td><code>gl_fg.draw_image_rotated(win, tex, x, y, w, h, ½Ç¶È)</code></td><td>ÈÆÖĞĞÄĞı×ª»æÖÆ;½Ç¶Èµ¥Î»¶È,Ë³Ê±Õë(y ÏòÏÂ×ø±êÏµ)¡£</td></tr>
+<tr><td><code>gl_fg.draw_image_tinted(win, tex, x, y, w, h, r, g, b, a)</code></td><td>×ÅÉ«»æÖÆ;(1,1,1,1) ÎªÔ­Ñù,alpha ¿É×öµ­³ö¡£</td></tr>
+<tr><td><code>gl_fg.image_size(win, tex)</code></td><td>Êı×é <code>[w, h]</code>(ÏñËØ)¡£</td></tr>
 </table>
 
-<h3>é€»è¾‘åˆ†è¾¨ç‡ç¼©æ”¾(å¯é€‰)</h3>
+<h3>Âß¼­·Ö±æÂÊËõ·Å(¿ÉÑ¡)</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>gl_fg.set_scale(win, é€»è¾‘å®½, é€»è¾‘é«˜)</code></td><td>æŒ‰é€»è¾‘åˆ†è¾¨ç‡ç¼©æ”¾ç»˜åˆ¶,ä¿æŒå®½é«˜æ¯”å®Œæ•´é€‚é…,é”šç‚¹åœ¨å·¦ä¸Šã€‚<code>(0, 0)</code> å…³é—­ç¼©æ”¾ã€‚</td></tr>
-<tr><td><code>gl_fg.set_scale_anchor(win, é€»è¾‘å®½, é€»è¾‘é«˜, ax, ay)</code></td><td>åŒä¸Š,å¯è‡ªå®šä¹‰é”šç‚¹,å–å€¼ [0, 1]:0 = å·¦/ä¸Š,0.5 = å±…ä¸­,1 = å³/ä¸‹ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>gl_fg.set_scale(win, Âß¼­¿í, Âß¼­¸ß)</code></td><td>°´Âß¼­·Ö±æÂÊËõ·Å»æÖÆ,±£³Ö¿í¸ß±ÈÍêÕûÊÊÅä,ÃªµãÔÚ×óÉÏ¡£<code>(0, 0)</code> ¹Ø±ÕËõ·Å¡£</td></tr>
+<tr><td><code>gl_fg.set_scale_anchor(win, Âß¼­¿í, Âß¼­¸ß, ax, ay)</code></td><td>Í¬ÉÏ,¿É×Ô¶¨ÒåÃªµã,È¡Öµ [0, 1]:0 = ×ó/ÉÏ,0.5 = ¾ÓÖĞ,1 = ÓÒ/ÏÂ¡£</td></tr>
 </table>
-<p>å¼€å¯ç¼©æ”¾å,é¼ æ ‡åæ ‡ä¼šæ˜ å°„å›é€»è¾‘åæ ‡ã€‚å…³é—­ç¼©æ”¾æ—¶,ä¸€ä¸ªé€»è¾‘å•ä½ç­‰äºä¸€ä¸ªåƒç´ ã€‚</p>
+<p>¿ªÆôËõ·Åºó,Êó±ê×ø±ê»áÓ³Éä»ØÂß¼­×ø±ê¡£¹Ø±ÕËõ·ÅÊ±,Ò»¸öÂß¼­µ¥Î»µÈÓÚÒ»¸öÏñËØ¡£</p>
 
-<h3>è¾“å…¥</h3>
+<h3>ÊäÈë</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>gl_fg.mouse_down(win, æŒ‰é”®)</code></td><td>æŒ‰ä½æ—¶è¿”å› 1ã€‚æŒ‰é”®:0 = å·¦é”®,1 = å³é”®,2 = ä¸­é”®ã€‚</td></tr>
-<tr><td><code>gl_fg.mouse_pos(win)</code></td><td>æ•°ç»„ <code>[x, y]</code>;(0,0) åœ¨å·¦ä¸Šè§’ã€‚</td></tr>
-<tr><td><code>gl_fg.mouse_wheel(win)</code></td><td>double:è·ä¸Šæ¬¡æŸ¥è¯¢ç´¯è®¡çš„å‚ç›´æ»šè½®é‡;è¯»å–åæ¸…é›¶ã€‚</td></tr>
-<tr><td><code>gl_fg.key_down(win, é”®å)</code></td><td>æŒ‰ä½æœŸé—´è¿”å› 1ã€‚</td></tr>
-<tr><td><code>gl_fg.key_pressed(win, é”®å)</code></td><td>æ¯æ¬¡ç‰©ç†æŒ‰ä¸‹è§¦å‘ä¸€æ¬¡ 1;æŸ¥è¯¢åè¢«æ¶ˆè´¹ã€‚</td></tr>
-<tr><td><code>gl_fg.key_released(win, é”®å)</code></td><td>æ¯æ¬¡æ¾å¼€è§¦å‘ä¸€æ¬¡ 1;æŸ¥è¯¢åè¢«æ¶ˆè´¹ã€‚</td></tr>
-<tr><td><code>gl_fg.key_any_pressed(win)</code></td><td>è‡ªä¸Šæ¬¡æŸ¥è¯¢èµ·æœ‰ä»»æ„é”®æŒ‰ä¸‹è¿”å› 1,å¹¶æ¸…ç©ºæ‰€æœ‰å¾…å¤„ç†æŒ‰é”®ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>gl_fg.mouse_down(win, °´¼ü)</code></td><td>°´×¡Ê±·µ»Ø 1¡£°´¼ü:0 = ×ó¼ü,1 = ÓÒ¼ü,2 = ÖĞ¼ü¡£</td></tr>
+<tr><td><code>gl_fg.mouse_pos(win)</code></td><td>Êı×é <code>[x, y]</code>;(0,0) ÔÚ×óÉÏ½Ç¡£</td></tr>
+<tr><td><code>gl_fg.mouse_wheel(win)</code></td><td>double:¾àÉÏ´Î²éÑ¯ÀÛ¼ÆµÄ´¹Ö±¹öÂÖÁ¿;¶ÁÈ¡ºóÇåÁã¡£</td></tr>
+<tr><td><code>gl_fg.key_down(win, ¼üÃû)</code></td><td>°´×¡ÆÚ¼ä·µ»Ø 1¡£</td></tr>
+<tr><td><code>gl_fg.key_pressed(win, ¼üÃû)</code></td><td>Ã¿´ÎÎïÀí°´ÏÂ´¥·¢Ò»´Î 1;²éÑ¯ºó±»Ïû·Ñ¡£</td></tr>
+<tr><td><code>gl_fg.key_released(win, ¼üÃû)</code></td><td>Ã¿´ÎËÉ¿ª´¥·¢Ò»´Î 1;²éÑ¯ºó±»Ïû·Ñ¡£</td></tr>
+<tr><td><code>gl_fg.key_any_pressed(win)</code></td><td>×ÔÉÏ´Î²éÑ¯ÆğÓĞÈÎÒâ¼ü°´ÏÂ·µ»Ø 1,²¢Çå¿ÕËùÓĞ´ı´¦Àí°´¼ü¡£</td></tr>
 </table>
-<p>é”®å:å•ä¸ªå¯æ‰“å°å­—ç¬¦(<code>"p"</code>ã€<code>"="</code>ã€<code>"-"</code> ...)ã€æ•°å­—,æˆ– <code>space enter escape tab backspace up down left right home end pageup pagedown insert delete shift ctrl alt f1..f12</code>ã€‚</p>
+<p>¼üÃû:µ¥¸ö¿É´òÓ¡×Ö·û(<code>"p"</code>¡¢<code>"="</code>¡¢<code>"-"</code> ...)¡¢Êı×Ö,»ò <code>space enter escape tab backspace up down left right home end pageup pagedown insert delete shift ctrl alt f1..f12</code>¡£</p>
 
-<h3>UI æ§ä»¶</h3>
+<h3>UI ¿Ø¼ş</h3>
 <table>
-<tr><th>å‡½æ•°</th><th>ç»“æœ</th></tr>
-<tr><td><code>gl_fg.button(win, x, y, w, h, å­—ä½“, æ–‡æœ¬)</code></td><td>ç»˜åˆ¶ç°è‰²æŒ‰é’®(æ‚¬åœ/æŒ‰ä¸‹å˜æš—),æ–‡æœ¬ç™½è‰²å±…ä¸­;æ‚¬åœæ—¶æ¯æ¬¡ç‚¹å‡»è¿”å› 1ã€‚</td></tr>
-<tr><td><code>gl_fg.text_input(win, x, y, w, h, å­—ä½“, å­—å·)</code></td><td>ç»˜åˆ¶æ–‡æœ¬æ¡†å¹¶è¿”å›å…¶å†…å®¹ã€‚ç‚¹å‡»èšç„¦,è¾“å…¥ç¼–è¾‘,Backspace åˆ é™¤,Enter æäº¤æ•´è¡Œå¹¶æ¸…ç©ºã€‚</td></tr>
-<tr><td><code>gl_fg.simulate_click(win [, æ¬¡æ•°])</code></td><td>æ’é˜Ÿæ¨¡æ‹Ÿå·¦é”®ç‚¹å‡»(é»˜è®¤ 1 æ¬¡),ç”±ä¸‹ä¸€æ¬¡ <code>mouse_down(win, 0)</code> æˆ–æ‚¬åœçš„æŒ‰é’®æ¶ˆè´¹ã€‚</td></tr>
+<tr><th>º¯Êı</th><th>½á¹û</th></tr>
+<tr><td><code>gl_fg.button(win, x, y, w, h, ×ÖÌå, ÎÄ±¾)</code></td><td>»æÖÆ»ÒÉ«°´Å¥(ĞüÍ£/°´ÏÂ±ä°µ),ÎÄ±¾°×É«¾ÓÖĞ;ĞüÍ£Ê±Ã¿´Îµã»÷·µ»Ø 1¡£</td></tr>
+<tr><td><code>gl_fg.text_input(win, x, y, w, h, ×ÖÌå, ×ÖºÅ)</code></td><td>»æÖÆÎÄ±¾¿ò²¢·µ»ØÆäÄÚÈİ¡£µã»÷¾Û½¹,ÊäÈë±à¼­,Backspace É¾³ı,Enter Ìá½»ÕûĞĞ²¢Çå¿Õ¡£</td></tr>
+<tr><td><code>gl_fg.simulate_click(win [, ´ÎÊı])</code></td><td>ÅÅ¶ÓÄ£Äâ×ó¼üµã»÷(Ä¬ÈÏ 1 ´Î),ÓÉÏÂÒ»´Î <code>mouse_down(win, 0)</code> »òĞüÍ£µÄ°´Å¥Ïû·Ñ¡£</td></tr>
 </table>
 
-<h3>ç¤ºä¾‹ &mdash; æœ€å°æ¸¸æˆå¾ªç¯</h3>
+<h3>Ê¾Àı &mdash; ×îĞ¡ÓÎÏ·Ñ­»·</h3>
 <pre><code>import fox.gl.fg -&gt; fg
 
 fg.create_window("Demo", 800, 600)
@@ -237,15 +237,15 @@ while (fg.window_should_close(0) == 0) {
 }
 fg.close()</code></pre>
 
-<h2>9. åç¨‹(è™šæ‹Ÿæœºå†…ç½®)</h2>
-<p><code>co.*</code> ä¸éœ€è¦ import,ç›´æ¥ç”±å­—èŠ‚ç è™šæ‹Ÿæœºæä¾›ã€‚å‚è§<a href="index.html#coroutines">è¯­è¨€å‚è€ƒçš„åç¨‹ä¸€èŠ‚</a>ã€‚</p>
+<h2>9. Ğ­³Ì(ĞéÄâ»úÄÚÖÃ)</h2>
+<p><code>co.*</code> ²»ĞèÒª import,Ö±½ÓÓÉ×Ö½ÚÂëĞéÄâ»úÌá¹©¡£²Î¼û<a href="index.html#coroutines">ÓïÑÔ²Î¿¼µÄĞ­³ÌÒ»½Ú</a>¡£</p>
 
-<h2>10. æ’ä»¶</h2>
-<p>å¤–éƒ¨ <code>.fox</code>/<code>.foxlib</code> è„šæœ¬å¯ç”¨ <code>!import åç§°</code> å¼•å…¥(ä¾æ¬¡åœ¨è„šæœ¬ç›®å½•ã€<code>C:\FoxLibs</code>ã€å½“å‰ç›®å½•æŸ¥æ‰¾)ã€‚ç³»ç»Ÿåº“ä¹Ÿä¼šä» <code>C:\FoxLibs</code>ã€<code>C:\Program Files\FoxVast\Libs</code>ã€<code>./libs</code> å’Œå½“å‰ç›®å½•è§£æã€‚</p>
+<h2>10. ²å¼ş</h2>
+<p>Íâ²¿ <code>.fox</code>/<code>.foxlib</code> ½Å±¾¿ÉÓÃ <code>!import Ãû³Æ</code> ÒıÈë(ÒÀ´ÎÔÚ½Å±¾Ä¿Â¼¡¢<code>C:\FoxLibs</code>¡¢µ±Ç°Ä¿Â¼²éÕÒ)¡£ÏµÍ³¿âÒ²»á´Ó <code>C:\FoxLibs</code>¡¢<code>C:\Program Files\FoxVast\Libs</code>¡¢<code>./libs</code> ºÍµ±Ç°Ä¿Â¼½âÎö¡£</p>
 
 </main>
 
-<footer>FoxLang æ–‡æ¡£ &middot; ä½œè€…:Lemon_Chicken</footer>
+<footer>FoxLang ÎÄµµ &middot; ×÷Õß:Lemon_Chicken</footer>
 
 </body>
 </html>

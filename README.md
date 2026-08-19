@@ -1,30 +1,30 @@
 # FoxVast
 
-> **FoxVast** æ˜¯ä¸€æ¬¾ç”± Lemon_Chicken å€¾åŠ›æ‰“é€ çš„ç°ä»£åŒ–ã€å¼ºç±»å‹å‘½ä»¤å¼è„šæœ¬ç¼–ç¨‹è¯­è¨€ã€‚å®ƒæŠ›å¼ƒäº†ä¼ ç»Ÿè¯­è¨€è‡ƒè‚¿çš„å˜é‡å£°æ˜ä¸å¤æ‚çš„æ•™æ¡ï¼Œå¼•å…¥äº†ç‹¬åˆ›çš„ç®¡é“å¼è¾“å…¥æµä¸æŒ‡ä»¤çº§ç»ˆç«¯æ§åˆ¶ï¼Œæ—¨åœ¨ä¸ºæå®¢ä»¬æä¾›æœ€çº¯ç²¹ã€æœ€ç›´è§‚çš„å¼€å‘ä½“éªŒã€‚
+> **FoxVast** ÊÇÒ»¿îÓÉ Lemon_Chicken ÇãÁ¦´òÔìµÄÏÖ´ú»¯¡¢Ç¿ÀàĞÍÃüÁîÊ½½Å±¾±à³ÌÓïÑÔ¡£ËüÅ×ÆúÁË´«Í³ÓïÑÔÓ·Ö×µÄ±äÁ¿ÉùÃ÷Óë¸´ÔÓµÄ½ÌÌõ£¬ÒıÈëÁË¶À´´µÄ¹ÜµÀÊ½ÊäÈëÁ÷ÓëÖ¸Áî¼¶ÖÕ¶Ë¿ØÖÆ£¬Ö¼ÔÚÎª¼«¿ÍÃÇÌá¹©×î´¿´â¡¢×îÖ±¹ÛµÄ¿ª·¢ÌåÑé¡£
 
-> çŠ¶æ€:æ´»è·ƒå¼€å‘ä¸­ã€‚æœ¬ README ä¸ä»£ç ç°çŠ¶åŒæ­¥;å·²å®ç°è€Œæœªæ–‡æ¡£åŒ–çš„è®¾è®¡å–èˆè§ [docs/ROADMAP.md](docs/ROADMAP.md)ã€‚
-
----
-
-## è¯­è¨€æ ¸å¿ƒç‰¹æ€§
-
-* **è‡ªç”±çš„è¿è¡Œæ—¶èµ‹å€¼**:å–æ¶ˆäº† `var`ã€`let`ã€`const` ç­‰ä¼ ç»Ÿå…³é”®å­—çš„æŸç¼š,å˜é‡ç›´æ¥èµ‹å€¼å³å¯ä½¿ç”¨,ç±»å‹ç”±è¿è¡Œæ—¶åŠ¨æ€å†³å®šã€‚
-* **ä¸¥è°¨çš„å‡½æ•°å¼ºç±»å‹**:å‡½æ•°è¾¹ç•Œå¤„å‚æ•°å¼ºåˆ¶é€šè¿‡ `<-` ç¬¦å·æ˜¾å¼ç±»å‹ç»‘å®š,è¿”å›å€¼å¼ºæ ¡éªŒ(è¿”å›ç±»å‹ä¸ç¬¦ç›´æ¥æŠ¥é”™)ã€‚
-* **æŒ‡ä»¤çº§ç»ˆç«¯äº¤äº’**:`input() <- variable` ç®¡é“å¼è¾“å…¥æµ,é…åˆä¸“é—¨ç”¨äºè¾“å‡ºæ¢è¡Œçš„ `end` æŒ‡ä»¤ã€‚
-* **å®Œæ•´çš„æµç¨‹æ§åˆ¶**:`if / else`ã€`while / for`ã€`break / continue`,é€»è¾‘å…³é”®å­— `and / or / not`ã€‚
-* **å¤åˆè¿ç®—**:`+ - * / %` ä¸å…¨éƒ¨å…³ç³»æ¯”è¾ƒ(`== != > < >= <=`)é½å¤‡ã€‚
-* **ä¸°å¯Œçš„å®¹å™¨**:æ•°ç»„ã€dict(å­—å…¸)ã€bytes,æ”¯æŒä¸‹æ ‡è¯»å†™ã€æ•°ç»„æ‹¼æ¥/æ’åºç­‰åŸç”Ÿåº“èƒ½åŠ›ã€‚
-* **class / struct**:å­—æ®µã€æ–¹æ³•(éšå¼ `this`)ã€æ„é€  `init`ã€`new ClassName(...)` å®ä¾‹åŒ–ã€‚
-* **å¼‚å¸¸å¤„ç†**:`try { } catch (e) { }` + `error("msg")` æŠ›å‡º,VM ä¸è§£é‡Šå™¨åŒè·¯æ”¯æŒã€‚
-* **æ¨¡å—ä¸æ’ä»¶**:`import "file.fox"` æ–‡ä»¶åˆå¹¶ã€`import fox.std.util -> alias` åº“åˆ«åã€`!import fjson` ç­‰æ’ä»¶å¯¼å…¥(æŸ¥æ‰¾é¡ºåº:è„šæœ¬ç›®å½• â†’ `C:\FoxLibs` â†’ å·¥ä½œç›®å½•)ã€‚
-* **å­—èŠ‚ç å·¥å…·é“¾**:`.fox` â†’ `.fc`(varint å‹ç¼©ã€å¸¸é‡å»é‡ã€XOR æ··æ·†),æ”¯æŒå¤šæ¨¡å—åˆå¹¶ `-fc`ã€åæ±‡ç¼– `-d`ã€`.far`(ZIP)æ‰“åŒ…åˆ†å‘ã€‚
+> ×´Ì¬:»îÔ¾¿ª·¢ÖĞ¡£±¾ README Óë´úÂëÏÖ×´Í¬²½;ÒÑÊµÏÖ¶øÎ´ÎÄµµ»¯µÄÉè¼ÆÈ¡Éá¼û [docs/ROADMAP.md](docs/ROADMAP.md)¡£
 
 ---
 
-## è¯­æ³•é€Ÿè§ˆ (Syntax Overview)
+## ÓïÑÔºËĞÄÌØĞÔ
+
+* **×ÔÓÉµÄÔËĞĞÊ±¸³Öµ**:È¡ÏûÁË `var`¡¢`let`¡¢`const` µÈ´«Í³¹Ø¼ü×ÖµÄÊø¸¿,±äÁ¿Ö±½Ó¸³Öµ¼´¿ÉÊ¹ÓÃ,ÀàĞÍÓÉÔËĞĞÊ±¶¯Ì¬¾ö¶¨¡£
+* **ÑÏ½÷µÄº¯ÊıÇ¿ÀàĞÍ**:º¯Êı±ß½ç´¦²ÎÊıÇ¿ÖÆÍ¨¹ı `<-` ·ûºÅÏÔÊ½ÀàĞÍ°ó¶¨,·µ»ØÖµÇ¿Ğ£Ñé(·µ»ØÀàĞÍ²»·ûÖ±½Ó±¨´í)¡£
+* **Ö¸Áî¼¶ÖÕ¶Ë½»»¥**:`input() <- variable` ¹ÜµÀÊ½ÊäÈëÁ÷,ÅäºÏ×¨ÃÅÓÃÓÚÊä³ö»»ĞĞµÄ `end` Ö¸Áî¡£
+* **ÍêÕûµÄÁ÷³Ì¿ØÖÆ**:`if / else`¡¢`while / for`¡¢`break / continue`,Âß¼­¹Ø¼ü×Ö `and / or / not`¡£
+* **¸´ºÏÔËËã**:`+ - * / %` ÓëÈ«²¿¹ØÏµ±È½Ï(`== != > < >= <=`)Æë±¸¡£
+* **·á¸»µÄÈİÆ÷**:Êı×é¡¢dict(×Öµä)¡¢bytes,Ö§³ÖÏÂ±ê¶ÁĞ´¡¢Êı×éÆ´½Ó/ÅÅĞòµÈÔ­Éú¿âÄÜÁ¦¡£
+* **class / struct**:×Ö¶Î¡¢·½·¨(ÒşÊ½ `this`)¡¢¹¹Ôì `init`¡¢`new ClassName(...)` ÊµÀı»¯¡£
+* **Òì³£´¦Àí**:`try { } catch (e) { }` + `error("msg")` Å×³ö,VM Óë½âÊÍÆ÷Ë«Â·Ö§³Ö¡£
+* **Ä£¿éÓë²å¼ş**:`import "file.fox"` ÎÄ¼şºÏ²¢¡¢`import fox.std.util -> alias` ¿â±ğÃû¡¢`!import fjson` µÈ²å¼şµ¼Èë(²éÕÒË³Ğò:½Å±¾Ä¿Â¼ ¡ú `C:\FoxLibs` ¡ú ¹¤×÷Ä¿Â¼)¡£
+* **×Ö½ÚÂë¹¤¾ßÁ´**:`.fox` ¡ú `.fc`(varint Ñ¹Ëõ¡¢³£Á¿È¥ÖØ¡¢XOR »ìÏı),Ö§³Ö¶àÄ£¿éºÏ²¢ `-fc`¡¢·´»ã±à `-d`¡¢`.far`(ZIP)´ò°ü·Ö·¢¡£
+
+---
+
+## Óï·¨ËÙÀÀ (Syntax Overview)
 
 ```fox
-// å®šä¹‰ä¸€ä¸ªå¸¦æœ‰æ˜¾å¼ç±»å‹ç»‘å®šçš„å‡½æ•°
+// ¶¨ÒåÒ»¸ö´øÓĞÏÔÊ½ÀàĞÍ°ó¶¨µÄº¯Êı
 func calculate(val <- int, base <- double) -> double {
     if (val > 0) {
         ret double(val) + base
@@ -32,56 +32,56 @@ func calculate(val <- int, base <- double) -> double {
     ret base
 }
 
-// dict ä¸æ•°ç»„
+// dict ÓëÊı×é
 func describe(p <- dict) -> void {
     println("name: " + p["name"])
     println("tags: " + util.IntChangeString(util.arr_length(p["tags"])) + " items")
 }
 
-// ä¸»ç¨‹åºå…¥å£
+// Ö÷³ÌĞòÈë¿Ú
 func main() -> void {
-    print("æ¬¢è¿ä½¿ç”¨ Lemon Studio FoxVast!")
-    end // ç²¾å‡†æ§åˆ¶è¾“å‡ºæ¢è¡Œ
+    print("»¶Ó­Ê¹ÓÃ Lemon Studio FoxVast!")
+    end // ¾«×¼¿ØÖÆÊä³ö»»ĞĞ
 
-    print("è¯·è¾“å…¥æ‚¨çš„éªŒè¯åŸºæ•°: ")
-    input() <- userNum // ç®¡é“å¼æ¥æ”¶ç»ˆç«¯æµæ•°æ®
+    print("ÇëÊäÈëÄúµÄÑéÖ¤»ùÊı: ")
+    input() <- userNum // ¹ÜµÀÊ½½ÓÊÕÖÕ¶ËÁ÷Êı¾İ
 
     res = calculate(int(userNum), 3.14)
-    println("è®¡ç®—ç»“æœ: ")
+    println("¼ÆËã½á¹û: ")
 
-    // å¼‚å¸¸
+    // Òì³£
     try {
         error("boom")
     } catch (e) {
         println("caught: " + e)
     }
 
-    exit(0) // è¿›ç¨‹å®‰å…¨é€€å‡º
+    exit(0) // ½ø³Ì°²È«ÍË³ö
 }
 ```
 
-> æ³¨:å­—ç¬¦ä¸²æ‹¼æ¥ `+` åªè¿æ¥å­—ç¬¦ä¸²,ä¸è‡ªåŠ¨åš int â†’ string,éœ€è¦æ—¶ç”¨ `util.IntChangeString(...)`ã€‚
+> ×¢:×Ö·û´®Æ´½Ó `+` Ö»Á¬½Ó×Ö·û´®,²»×Ô¶¯×ö int ¡ú string,ĞèÒªÊ±ÓÃ `util.IntChangeString(...)`¡£
 
 ---
 
-## å¿«é€Ÿå…¥é—¨ (Quick Start)
+## ¿ìËÙÈëÃÅ (Quick Start)
 
-### 1. æ„å»ºç¼–è¯‘å™¨
+### 1. ¹¹½¨±àÒëÆ÷
 
-FoxVast çš„è§£é‡Šå™¨ä¸å­—èŠ‚ç ç¼–è¯‘å™¨åŸºäº C++ å®ç°,éœ€è¦æ”¯æŒ `C++17` çš„ç¼–è¯‘å™¨(å¦‚ MinGW-w64 GCC 9+)ä¸ `CMake`ã€‚
+FoxVast µÄ½âÊÍÆ÷Óë×Ö½ÚÂë±àÒëÆ÷»ùÓÚ C++ ÊµÏÖ,ĞèÒªÖ§³Ö `C++17` µÄ±àÒëÆ÷(Èç MinGW-w64 GCC 9+)Óë `CMake`¡£
 
 ```bash
 git clone https://github.com/zzxlemon/FoxVast.git
 cd FoxVast
 
-# é…ç½®å¹¶ç¼–è¯‘(MinGW ç¯å¢ƒ)
+# ÅäÖÃ²¢±àÒë(MinGW »·¾³)
 cmake -S FoxCore -B cmake-build -G "MinGW Makefiles" -DCMAKE_BUILD_TYPE=Release
 cmake --build cmake-build
 ```
 
-æ„å»ºäº§ç‰©ä¸º `cmake-build/core/fox.exe` ä¸ `cmake-build/core/fox.*.dll`(è¿è¡Œæ—¶åº“;åº“ç¼ºå¤±æ—¶å¯¹åº” `fox.<lib>` å‘½åç©ºé—´ä¸å¯ç”¨)ã€‚
+¹¹½¨²úÎïÎª `cmake-build/core/fox.exe` Óë `cmake-build/core/fox.*.dll`(ÔËĞĞÊ±¿â;¿âÈ±Ê§Ê±¶ÔÓ¦ `fox.<lib>` ÃüÃû¿Õ¼ä²»¿ÉÓÃ)¡£
 
-### 2. è¿è¡Œæ‚¨çš„ç¬¬ä¸€ä¸ª FoxVast è„šæœ¬
+### 2. ÔËĞĞÄúµÄµÚÒ»¸ö FoxVast ½Å±¾
 
 `hello.fox`:
 
@@ -93,103 +93,103 @@ func main() -> void {
 ```
 
 ```bash
-./fox.exe -f hello.fox   # è§£é‡Šè¿è¡Œ(æ—§è·¯å¾„,ä¸»è¦ä¸ºäº†è°ƒè¯•)
-./fox.exe -c hello.fox   # ç¼–è¯‘ä¸º hello.fc
-./fox.exe -fc hello.fox  # ç¼–è¯‘ + è¿è¡Œ(å·²å­˜åœ¨ .fc åˆ™ç›´æ¥è¿è¡Œ;æ”¹è¿‡æºç é¡»é‡æ–° -c)
+./fox.exe -f hello.fox   # ½âÊÍÔËĞĞ(¾ÉÂ·¾¶,Ö÷ÒªÎªÁËµ÷ÊÔ)
+./fox.exe -c hello.fox   # ±àÒëÎª hello.fc
+./fox.exe -fc hello.fox  # ±àÒë + ÔËĞĞ(ÒÑ´æÔÚ .fc ÔòÖ±½ÓÔËĞĞ;¸Ä¹ıÔ´ÂëĞëÖØĞÂ -c)
 ```
 
-### 3. æ’ä»¶ä¸æ ‡å‡†åº“
+### 3. ²å¼şÓë±ê×¼¿â
 
-å®˜æ–¹æ’ä»¶ `fjson`(JSON è§£æ/ç”Ÿæˆ)ä¸ `flog`(æ—¥å¿—,æ”¯æŒçº§åˆ«è¿‡æ»¤ã€æ¨¡æ¿ã€æ–‡ä»¶è¾“å‡ºã€ANSI é¢œè‰²ä¸åŒºé—´é«˜äº®)ä½äº `package_plugin/`ã€‚æ”¾å…¥ `C:\FoxLibs\` åå³å¯ `!import fjson` / `!import flog` ä½¿ç”¨,è¯¦è§å„æ’ä»¶ç›®å½•çš„ READMEã€‚
+¹Ù·½²å¼ş `fjson`(JSON ½âÎö/Éú³É)Óë `flog`(ÈÕÖ¾,Ö§³Ö¼¶±ğ¹ıÂË¡¢Ä£°å¡¢ÎÄ¼şÊä³ö¡¢ANSI ÑÕÉ«ÓëÇø¼ä¸ßÁÁ)Î»ÓÚ `package_plugin/`¡£·ÅÈë `C:\FoxLibs\` ºó¼´¿É `!import fjson` / `!import flog` Ê¹ÓÃ,Ïê¼û¸÷²å¼şÄ¿Â¼µÄ README¡£
 
 ---
 
-## è¯­æ³•è§„åˆ™ç®€è¡¨
+## Óï·¨¹æÔò¼ò±í
 
-| è¯­æ³•è¦ç´  | è¡¨è¾¾å¼/å…³é”®å­—ç¤ºä¾‹ | è¯´æ˜ |
+| Óï·¨ÒªËØ | ±í´ïÊ½/¹Ø¼ü×ÖÊ¾Àı | ËµÃ÷ |
 | :--- | :--- | :--- |
-| **åŸç”Ÿç±»å‹** | `int`, `double`, `string`, `void` | å¦æœ‰ `array`ã€`dict`ã€`bytes`ã€`object`(class å®ä¾‹) |
-| **åŸºç¡€èµ‹å€¼** | `x = 10`, `name = "fox"` | æ— éœ€æ˜¾å¼å£°æ˜,ç›´æ¥èµ‹å€¼ä½¿ç”¨;`c <- dict` æ˜¯å‡½æ•°å‚æ•°çš„å¼ºç±»å‹ç»‘å®š |
-| **ç±»å‹è½¬æ¢** | `int(expr)`, `double(expr)` | å†…ç½®è½¬æ¢å‡½æ•°,å¦æœ‰ util åº“ 6 ä¸ªè½¬æ¢å‡½æ•° |
-| **ç®—æœ¯ä¸é€»è¾‘** | `+ - * / %`, `and`, `or`, `not` | ä¹˜ã€é™¤ã€å–æ¨¡å·²å®ç°;å­—ç¬¦ä¸²ä¸æ”¯æŒæ¡ä»¶æ±‚å€¼ |
-| **å…³ç³»æ¯”è¾ƒ** | `==`, `!=`, `>`, `<`, `>=`, `<=` | æ”¯æŒå¤åˆå¸ƒå°”è¡¨è¾¾å¼æ±‚å€¼ |
-| **æ§åˆ¶æµ** | `if (cond) { ... } else { ... }` | `else` å·²å®ç° |
-| **å¾ªç¯æµ** | `while (cond) { ... }`, `for (;;) { ... }` | `break` / `continue` å·²å®ç° |
-| **å‡½æ•°** | `func f(p <- int) -> int { ret p }` | å‚æ•°æ˜¾å¼ç±»å‹ç»‘å®š,è¿”å›ç±»å‹å¼ºæ ¡éªŒ,void å‡½æ•°ä¸å¯è¿”å›å€¼ |
-| **ç±»ä¸ç»“æ„** | `class Point { x <- int; init(...) {...} }` | å­—æ®µç±»å‹é™ `int/double/string/dict/bytes`;æ–¹æ³•é¦–å‚ä¸ºéšå¼ `this` |
-| **å¼‚å¸¸** | `try { } catch (e) { }`, `error("msg")` | `error()` æŠ› LangError,ç”±æœ€è¿‘çš„ catch æ•è· |
-| **å†…å­˜ç®¡ç†** | `free name`, `free_all` | æ¸…é™¤å…¨å±€å˜é‡(æ—  GC;è¯¦è§ ROADMAP) |
-| **å¯¼å…¥** | `import "file.fox"`, `import fox.std.util -> alias`, `!import fjson` | æ–‡ä»¶åˆå¹¶(å¸¦ç¯æ£€æµ‹)/ åº“åˆ«å / æ’ä»¶ |
-| **è¿”å›ä¸é€€å‡º** | `ret expr`, `exit(code)` | `ret` å‡½æ•°è¿”å›;`exit` ç»ˆæ­¢ç¨‹åº,é 0 ä¸ºé”™è¯¯ç  |
+| **Ô­ÉúÀàĞÍ** | `int`, `double`, `string`, `void` | ÁíÓĞ `array`¡¢`dict`¡¢`bytes`¡¢`object`(class ÊµÀı) |
+| **»ù´¡¸³Öµ** | `x = 10`, `name = "fox"` | ÎŞĞèÏÔÊ½ÉùÃ÷,Ö±½Ó¸³ÖµÊ¹ÓÃ;`c <- dict` ÊÇº¯Êı²ÎÊıµÄÇ¿ÀàĞÍ°ó¶¨ |
+| **ÀàĞÍ×ª»»** | `int(expr)`, `double(expr)` | ÄÚÖÃ×ª»»º¯Êı,ÁíÓĞ util ¿â 6 ¸ö×ª»»º¯Êı |
+| **ËãÊõÓëÂß¼­** | `+ - * / %`, `and`, `or`, `not` | ³Ë¡¢³ı¡¢È¡Ä£ÒÑÊµÏÖ;×Ö·û´®²»Ö§³ÖÌõ¼şÇóÖµ |
+| **¹ØÏµ±È½Ï** | `==`, `!=`, `>`, `<`, `>=`, `<=` | Ö§³Ö¸´ºÏ²¼¶û±í´ïÊ½ÇóÖµ |
+| **¿ØÖÆÁ÷** | `if (cond) { ... } else { ... }` | `else` ÒÑÊµÏÖ |
+| **Ñ­»·Á÷** | `while (cond) { ... }`, `for (;;) { ... }` | `break` / `continue` ÒÑÊµÏÖ |
+| **º¯Êı** | `func f(p <- int) -> int { ret p }` | ²ÎÊıÏÔÊ½ÀàĞÍ°ó¶¨,·µ»ØÀàĞÍÇ¿Ğ£Ñé,void º¯Êı²»¿É·µ»ØÖµ |
+| **ÀàÓë½á¹¹** | `class Point { x <- int; init(...) {...} }` | ×Ö¶ÎÀàĞÍÏŞ `int/double/string/dict/bytes`;·½·¨Ê×²ÎÎªÒşÊ½ `this` |
+| **Òì³£** | `try { } catch (e) { }`, `error("msg")` | `error()` Å× LangError,ÓÉ×î½üµÄ catch ²¶»ñ |
+| **ÄÚ´æ¹ÜÀí** | `free name`, `free_all` | Çå³ıÈ«¾Ö±äÁ¿(ÎŞ GC;Ïê¼û ROADMAP) |
+| **µ¼Èë** | `import "file.fox"`, `import fox.std.util -> alias`, `!import fjson` | ÎÄ¼şºÏ²¢(´ø»·¼ì²â)/ ¿â±ğÃû / ²å¼ş |
+| **·µ»ØÓëÍË³ö** | `ret expr`, `exit(code)` | `ret` º¯Êı·µ»Ø;`exit` ÖÕÖ¹³ÌĞò,·Ç 0 Îª´íÎóÂë |
 
 ---
 
-## å‘½ä»¤è¡Œå·¥å…·
+## ÃüÁîĞĞ¹¤¾ß
 
-| å‚æ•° | ä½œç”¨ |
+| ²ÎÊı | ×÷ÓÃ |
 |---|---|
-| `-f <file.fox>` | è§£é‡Šè¿è¡Œ(æ—§è·¯å¾„)ã€‚å®˜æ–¹æ¨èç¼–è¯‘è¿è¡Œ |
-| `-c <file.fox>` | ç¼–è¯‘ä¸º `.fc`;å¯¹å…¥å£æ–‡ä»¶ä¼šå†…è”å±•å¼€ `!import`/`import`,ç”Ÿæˆè‡ªåŒ…å«å­—èŠ‚ç  |
-| `-fc <file.fox>` | ç¼–è¯‘ + è¿è¡Œ;è‹¥åŒç›®å½• `.fc` å·²å­˜åœ¨ç›´æ¥åŠ è½½è¿è¡Œ(æ”¹è¿‡æºç é¡»é‡æ–° `-c`) |
-| `-d <file.fc>` | åæ±‡ç¼–å­—èŠ‚ç  |
-| `-p` / `-u` / `-far` | `.far` æ‰“åŒ… / è§£åŒ… / è¿è¡Œ(ZIP æ ¼å¼å•æ–‡ä»¶åˆ†å‘) |
-| `pack=true` / `pack=false` | `.fx`/`.fz` æ··æ·†æ‰“åŒ…å¼€å…³(XOR æ··æ·†,éåŠ å¯†,è§ ROADMAP) |
-| `-s utf-8 / gbk` | åˆ‡æ¢æ§åˆ¶å°ä»£ç é¡µ |
-| `-version` | ç‰ˆæœ¬ä¿¡æ¯ |
+| `-f <file.fox>` | ½âÊÍÔËĞĞ(¾ÉÂ·¾¶)¡£¹Ù·½ÍÆ¼ö±àÒëÔËĞĞ |
+| `-c <file.fox>` | ±àÒëÎª `.fc`;¶ÔÈë¿ÚÎÄ¼ş»áÄÚÁªÕ¹¿ª `!import`/`import`,Éú³É×Ô°üº¬×Ö½ÚÂë |
+| `-fc <file.fox>` | ±àÒë + ÔËĞĞ;ÈôÍ¬Ä¿Â¼ `.fc` ÒÑ´æÔÚÖ±½Ó¼ÓÔØÔËĞĞ(¸Ä¹ıÔ´ÂëĞëÖØĞÂ `-c`) |
+| `-d <file.fc>` | ·´»ã±à×Ö½ÚÂë |
+| `-p` / `-u` / `-far` | `.far` ´ò°ü / ½â°ü / ÔËĞĞ(ZIP ¸ñÊ½µ¥ÎÄ¼ş·Ö·¢) |
+| `pack=true` / `pack=false` | `.fx`/`.fz` »ìÏı´ò°ü¿ª¹Ø(XOR »ìÏı,·Ç¼ÓÃÜ,¼û ROADMAP) |
+| `-s utf-8 / gbk` | ÇĞ»»¿ØÖÆÌ¨´úÂëÒ³ |
+| `-version` | °æ±¾ĞÅÏ¢ |
 
 ---
 
-## æ ‡å‡†åº“ä¸æ’ä»¶
+## ±ê×¼¿âÓë²å¼ş
 
-| åº“ | å‘½åç©ºé—´ | ç”¨é€” |
+| ¿â | ÃüÃû¿Õ¼ä | ÓÃÍ¾ |
 |---|---|---|
-| `fox.std.util` | `util.` | æ•°ç»„(length/append/pop/contains/slice/sort)ã€å­—ç¬¦ä¸²(contains/replace/split/trim/lower/upper/substring/length/æ‹¼æ¥è½¬æ¢) |
+| `fox.std.util` | `util.` | Êı×é(length/append/pop/contains/slice/sort)¡¢×Ö·û´®(contains/replace/split/trim/lower/upper/substring/length/Æ´½Ó×ª»») |
 | `fox.sys.io.fs` | `file.` | `file_open/read/write/close/remove` |
-| `fox.sys.time` | `time.` | `now` / `format`(strftime)/ `field`(ç§’çº§) |
+| `fox.sys.time` | `time.` | `now` / `format`(strftime)/ `field`(Ãë¼¶) |
 | `fox.std.math` | `math.` | `sin / cos / tan` |
 | `fox.std.random` | `random.` | `random("int", min, max)` |
 | `fox.std.socket` | `socket.` | TCP socket:create/connect/send/recv/close |
-| `fox.gl.fg` | `fg.` | GLFW çª—å£ä¸ 2D ç»˜åˆ¶:window/clear/draw_triangle/draw_rect/draw_text/draw_line/draw_circle/mouse |
-| `package_plugin/fjson` | `fjson` | JSON è§£æ/ç”Ÿæˆ(çº¯ Fox æ’ä»¶,è§å…¶ README) |
-| `package_plugin/flog` | `flog` | æ—¥å¿—(çº¯ Fox æ’ä»¶,è§å…¶ README / colors.md) |
+| `fox.gl.fg` | `fg.` | GLFW ´°¿ÚÓë 2D »æÖÆ:window/clear/draw_triangle/draw_rect/draw_text/draw_line/draw_circle/mouse |
+| `package_plugin/fjson` | `fjson` | JSON ½âÎö/Éú³É(´¿ Fox ²å¼ş,¼ûÆä README) |
+| `package_plugin/flog` | `flog` | ÈÕÖ¾(´¿ Fox ²å¼ş,¼ûÆä README / colors.md) |
 
-è¿è¡Œæ—¶åº“æŒ‰éœ€åŠ¨æ€åŠ è½½:`fox.exe` æ—æœ‰ `fox.<name>.dll` å³æ³¨å†Œå¯¹åº”å‘½åç©ºé—´;åº“ç¼ºå¤±ä¸å½±å“å…¶ä»–åŠŸèƒ½ã€‚
+ÔËĞĞÊ±¿â°´Ğè¶¯Ì¬¼ÓÔØ:`fox.exe` ÅÔÓĞ `fox.<name>.dll` ¼´×¢²á¶ÔÓ¦ÃüÃû¿Õ¼ä;¿âÈ±Ê§²»Ó°ÏìÆäËû¹¦ÄÜ¡£
 
 ---
 
-## ä»“åº“ç›®å½•ç»“æ„
+## ²Ö¿âÄ¿Â¼½á¹¹
 
 ```text
 FoxVast/
-â”œâ”€â”€ FoxCore/                # è¯­è¨€å®ç°æœ¬ä½“
-â”‚   â”œâ”€â”€ src/                # frontend(lexer/parser/ast) / interpreter / vm / util
-â”‚   â”œâ”€â”€ libs/               # åŸç”Ÿåº“(system: io/fs/time/math/random/socket + graphics)
-â”‚   â”œâ”€â”€ native/             # ç¬¬ä¸‰æ–¹ä¾èµ–(glfw / glad / stb_truetype / å­—ä½“)
-â”‚   â””â”€â”€ CMakeLists.txt      # CMake æ„å»ºé…ç½®
-â”œâ”€â”€ dlls/                   # è¿è¡Œæ—¶åº“ DLL è–„å£³å…¥å£(fox.<name>.dll)
-â”œâ”€â”€ Package/                # åŒ…ç®¡ç†å™¨ foxpkg(install/uninstall;update/list/from å¾…å®ç°)
-â”œâ”€â”€ package_plugin/         # çº¯ Fox æ’ä»¶:fjsonã€flog
-â”œâ”€â”€ test/                   # ç¤ºä¾‹ä¸å›å½’(main / smoke / features / snake / hangman)
-â”œâ”€â”€ docs/                   # è®¾è®¡å†³ç­–ä¸è·¯çº¿å›¾
-â””â”€â”€ README.md
+©À©¤©¤ FoxCore/                # ÓïÑÔÊµÏÖ±¾Ìå
+©¦   ©À©¤©¤ src/                # frontend(lexer/parser/ast) / interpreter / vm / util
+©¦   ©À©¤©¤ libs/               # Ô­Éú¿â(system: io/fs/time/math/random/socket + graphics)
+©¦   ©À©¤©¤ native/             # µÚÈı·½ÒÀÀµ(glfw / glad / stb_truetype / ×ÖÌå)
+©¦   ©¸©¤©¤ CMakeLists.txt      # CMake ¹¹½¨ÅäÖÃ
+©À©¤©¤ dlls/                   # ÔËĞĞÊ±¿â DLL ±¡¿ÇÈë¿Ú(fox.<name>.dll)
+©À©¤©¤ Package/                # °ü¹ÜÀíÆ÷ foxpkg(install/uninstall;update/list/from ´ıÊµÏÖ)
+©À©¤©¤ package_plugin/         # ´¿ Fox ²å¼ş:fjson¡¢flog
+©À©¤©¤ test/                   # Ê¾ÀıÓë»Ø¹é(main / smoke / features / snake / hangman)
+©À©¤©¤ docs/                   # Éè¼Æ¾ö²ßÓëÂ·ÏßÍ¼
+©¸©¤©¤ README.md
 ```
 
 ---
 
-## å‚ä¸è´¡çŒ® (Contributing)
+## ²ÎÓë¹±Ï× (Contributing)
 
-1. Fork æœ¬ä»“åº“
-2. åˆ›å»ºæ‚¨çš„ç‰¹æ€§åˆ†æ”¯ (`git checkout -b feature/AmazingFeature`)
-3. æäº¤æ‚¨çš„ä¿®æ”¹ (`git commit -m 'Add some AmazingFeature'`)
-4. æ¨é€åˆ°åˆ†æ”¯ (`git push origin feature/AmazingFeature`)
-5. åœ¨æœ¬ä»“åº“æäº¤ä¸€ä¸ª **Pull Request**
+1. Fork ±¾²Ö¿â
+2. ´´½¨ÄúµÄÌØĞÔ·ÖÖ§ (`git checkout -b feature/AmazingFeature`)
+3. Ìá½»ÄúµÄĞŞ¸Ä (`git commit -m 'Add some AmazingFeature'`)
+4. ÍÆËÍµ½·ÖÖ§ (`git push origin feature/AmazingFeature`)
+5. ÔÚ±¾²Ö¿âÌá½»Ò»¸ö **Pull Request**
 
-è®¡åˆ’ä¸­çš„å·¥ä½œ(CI è½åœ°ã€foxpkg è¡¥å…¨ã€bool/int64ã€UTF-8 ç­‰)è§ [docs/ROADMAP.md](docs/ROADMAP.md),æ¬¢è¿è®¤é¢†ã€‚
+¼Æ»®ÖĞµÄ¹¤×÷(CI ÂäµØ¡¢foxpkg ²¹È«¡¢bool/int64¡¢UTF-8 µÈ)¼û [docs/ROADMAP.md](docs/ROADMAP.md),»¶Ó­ÈÏÁì¡£
 
 ---
 
-## å¼€æºè®¸å¯è¯
+## ¿ªÔ´Ğí¿ÉÖ¤
 
-æœ¬é¡¹ç›®åŸºäº **MIT** è®¸å¯è¯å¼€æº - è¯¦æƒ…è¯·å‚é˜… [LICENSE](LICENSE) æ–‡ä»¶ã€‚
+±¾ÏîÄ¿»ùÓÚ **MIT** Ğí¿ÉÖ¤¿ªÔ´ - ÏêÇéÇë²ÎÔÄ [LICENSE](LICENSE) ÎÄ¼ş¡£
 
-**(æ­¤ä¿¡æ¯åœ¨æœªæ¥çš„ç‰ˆæœ¬å˜æ›´å¯èƒ½ä¼šæœ‰æ‰€å˜åŒ–)**
+**(´ËĞÅÏ¢ÔÚÎ´À´µÄ°æ±¾±ä¸ü¿ÉÄÜ»áÓĞËù±ä»¯)**

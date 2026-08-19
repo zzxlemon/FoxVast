@@ -1,128 +1,128 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
+<meta charset="GBK">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FoxLang è¯­è¨€å‚è€ƒ</title>
+<title>FoxLang ÓïÑÔ²Î¿¼</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header>
     <div class="inner">
-        <h1>FoxLang è¯­è¨€å‚è€ƒ</h1>
-        <div class="ver">FoxVast VM 1.3.210+b1 &middot; 64 ä½å­—èŠ‚ç è™šæ‹Ÿæœº</div>
+        <h1>FoxLang ÓïÑÔ²Î¿¼</h1>
+        <div class="ver">FoxVast VM 1.3.210+b1 &middot; 64 Î»×Ö½ÚÂëÐéÄâ»ú</div>
     </div>
 </header>
 
 <nav class="links">
-    <a href="index.html">è¯­è¨€å‚è€ƒ</a>
-    <a href="libraries.html">å‡½æ•°åº“å‚è€ƒ</a>
+    <a href="index.html">ÓïÑÔ²Î¿¼</a>
+    <a href="libraries.html">º¯Êý¿â²Î¿¼</a>
 </nav>
 
 <main>
 
-<h2>1. è¿è¡Œç¨‹åº</h2>
-<p>FoxLang å…ˆæŠŠ <code>.fox</code> æºä»£ç ç¼–è¯‘ä¸º <code>.fc</code> å­—èŠ‚ç ,å†æ‰§è¡Œå­—èŠ‚ç ã€‚æ¯ä¸ªç¨‹åºå¿…é¡»å®šä¹‰é¡¶å±‚å‡½æ•° <code>main</code>,å®ƒæ˜¯ç¨‹åºå…¥å£ã€‚</p>
+<h2>1. ÔËÐÐ³ÌÐò</h2>
+<p>FoxLang ÏÈ°Ñ <code>.fox</code> Ô´´úÂë±àÒëÎª <code>.fc</code> ×Ö½ÚÂë,ÔÙÖ´ÐÐ×Ö½ÚÂë¡£Ã¿¸ö³ÌÐò±ØÐë¶¨Òå¶¥²ãº¯Êý <code>main</code>,ËüÊÇ³ÌÐòÈë¿Ú¡£</p>
 
 <table>
-<tr><th>å‘½ä»¤</th><th>è¯´æ˜Ž</th></tr>
-<tr><td><code>fox -c prog.fox</code></td><td>ç¼–è¯‘ä¸º <code>prog.fc</code>(ç”Ÿæˆåœ¨æºç æ—è¾¹)ã€‚</td></tr>
-<tr><td><code>fox -fc prog.fc</code></td><td>è¿è¡Œå­—èŠ‚ç (ç¬¬ä¸€ä¸ªæ–‡ä»¶æ˜¯å…¥å£,å…¶ä½™æ–‡ä»¶ä½œä¸ºæ¨¡å—åŠ è½½)ã€‚</td></tr>
-<tr><td><code>fox -d prog.fc</code></td><td>åæ±‡ç¼–å­—èŠ‚ç ã€‚</td></tr>
-<tr><td><code>fox -p out.far a.fox b.fox</code></td><td>æ‰“åŒ…ç¨‹åºä¸º <code>.far</code> å½’æ¡£(ç¬¬ä¸€ä¸ªæ–‡ä»¶æ˜¯å…¥å£)ã€‚</td></tr>
-<tr><td><code>fox -u arch.far [ç›®å½•]</code></td><td>è§£åŒ… <code>.far</code> å½’æ¡£(é»˜è®¤è¾“å‡ºåˆ° <code>output/</code>)ã€‚</td></tr>
-<tr><td><code>fox -far arch.far</code></td><td>è¿è¡Œå½’æ¡£ä¸­çš„å…¥å£ç¨‹åºã€‚</td></tr>
-<tr><td><code>fox -s utf-8|gbk</code></td><td>è®¾ç½®æŽ§åˆ¶å°ç¼–ç ã€‚</td></tr>
-<tr><td><code>fox -version</code></td><td>æ˜¾ç¤ºç‰ˆæœ¬ä¿¡æ¯ã€‚</td></tr>
+<tr><th>ÃüÁî</th><th>ËµÃ÷</th></tr>
+<tr><td><code>fox -c prog.fox</code></td><td>±àÒëÎª <code>prog.fc</code>(Éú³ÉÔÚÔ´ÂëÅÔ±ß)¡£</td></tr>
+<tr><td><code>fox -fc prog.fc</code></td><td>ÔËÐÐ×Ö½ÚÂë(µÚÒ»¸öÎÄ¼þÊÇÈë¿Ú,ÆäÓàÎÄ¼þ×÷ÎªÄ£¿é¼ÓÔØ)¡£</td></tr>
+<tr><td><code>fox -d prog.fc</code></td><td>·´»ã±à×Ö½ÚÂë¡£</td></tr>
+<tr><td><code>fox -p out.far a.fox b.fox</code></td><td>´ò°ü³ÌÐòÎª <code>.far</code> ¹éµµ(µÚÒ»¸öÎÄ¼þÊÇÈë¿Ú)¡£</td></tr>
+<tr><td><code>fox -u arch.far [Ä¿Â¼]</code></td><td>½â°ü <code>.far</code> ¹éµµ(Ä¬ÈÏÊä³öµ½ <code>output/</code>)¡£</td></tr>
+<tr><td><code>fox -far arch.far</code></td><td>ÔËÐÐ¹éµµÖÐµÄÈë¿Ú³ÌÐò¡£</td></tr>
+<tr><td><code>fox -s utf-8|gbk</code></td><td>ÉèÖÃ¿ØÖÆÌ¨±àÂë¡£</td></tr>
+<tr><td><code>fox -version</code></td><td>ÏÔÊ¾°æ±¾ÐÅÏ¢¡£</td></tr>
 </table>
 
-<p class="note"><code>.far</code> æ˜¯æ™®é€š ZIP(ä»…å­˜å‚¨ã€ä¸åŽ‹ç¼©),å…¶ä¸­åŒ…å«ç¼–è¯‘å¥½çš„ <code>.fc</code> æ–‡ä»¶(ä½äºŽ <code>src/</code> ä¸‹)ã€‚</p>
+<p class="note"><code>.far</code> ÊÇÆÕÍ¨ ZIP(½ö´æ´¢¡¢²»Ñ¹Ëõ),ÆäÖÐ°üº¬±àÒëºÃµÄ <code>.fc</code> ÎÄ¼þ(Î»ÓÚ <code>src/</code> ÏÂ)¡£</p>
 
 <pre><code>func main() -&gt; void {
     println("Hello, FoxLang")
     exit(0)
 }</code></pre>
 
-<h2>2. è¯æ³•ç»“æž„</h2>
+<h2>2. ´Ê·¨½á¹¹</h2>
 
-<h3>æ³¨é‡Š</h3>
+<h3>×¢ÊÍ</h3>
 <ul>
-<li><code>#</code> â€” è¡Œæ³¨é‡Š,åˆ°è¡Œå°¾ç»“æŸã€‚</li>
-<li><code>#* ... *#</code> â€” å—æ³¨é‡Š(ä¸å¯åµŒå¥—)ã€‚</li>
+<li><code>#</code> ¡ª ÐÐ×¢ÊÍ,µ½ÐÐÎ²½áÊø¡£</li>
+<li><code>#* ... *#</code> ¡ª ¿é×¢ÊÍ(²»¿ÉÇ¶Ì×)¡£</li>
 </ul>
 
-<h3>å­—é¢é‡</h3>
+<h3>×ÖÃæÁ¿</h3>
 <table>
-<tr><th>å­—é¢é‡</th><th>ç¤ºä¾‹</th><th>è¯´æ˜Ž</th></tr>
-<tr><td>æ•´æ•° int</td><td><code>42</code></td><td>ä»…åè¿›åˆ¶æ•°å­—;32 ä½èŒƒå›´ã€‚ä¸æ”¯æŒåå…­è¿›åˆ¶/ä¸‹åˆ’çº¿/æŒ‡æ•°ã€‚è´Ÿæ•°ç”¨ <code>-</code>ã€‚</td></tr>
-<tr><td>æµ®ç‚¹ double</td><td><code>3.14</code></td><td>æ•°å­—æœ€å¤šå¸¦ä¸€ä¸ª <code>.</code>ã€‚</td></tr>
-<tr><td>å­—ç¬¦ä¸²</td><td><code>"hi"</code></td><td>åªèƒ½ç”¨åŒå¼•å·(ä¸èƒ½ç”¨å•å¼•å·)ã€‚å…è®¸è·¨å¤šè¡Œã€‚</td></tr>
-<tr><td>æ•°ç»„</td><td><code>[1, 2, 3]</code></td><td>å…è®¸æœ«å°¾é€—å·ã€‚</td></tr>
-<tr><td>å­—å…¸</td><td><code>{"k": 1, "n": 2}</code></td><td>é”®å¿…é¡»æ˜¯å­—ç¬¦ä¸²å­—é¢é‡æˆ–è£¸æ ‡è¯†ç¬¦ã€‚å…è®¸æœ«å°¾é€—å·ã€‚</td></tr>
-<tr><td>å­—èŠ‚ä¸² bytes</td><td><code>new(1024)</code></td><td>é›¶å¡«å……çš„å­—èŠ‚ç¼“å†²åŒº;æ²¡æœ‰å­—èŠ‚ä¸²å­—é¢é‡ã€‚</td></tr>
+<tr><th>×ÖÃæÁ¿</th><th>Ê¾Àý</th><th>ËµÃ÷</th></tr>
+<tr><td>ÕûÊý int</td><td><code>42</code></td><td>½öÊ®½øÖÆÊý×Ö;32 Î»·¶Î§¡£²»Ö§³ÖÊ®Áù½øÖÆ/ÏÂ»®Ïß/Ö¸Êý¡£¸ºÊýÓÃ <code>-</code>¡£</td></tr>
+<tr><td>¸¡µã double</td><td><code>3.14</code></td><td>Êý×Ö×î¶à´øÒ»¸ö <code>.</code>¡£</td></tr>
+<tr><td>×Ö·û´®</td><td><code>"hi"</code></td><td>Ö»ÄÜÓÃË«ÒýºÅ(²»ÄÜÓÃµ¥ÒýºÅ)¡£ÔÊÐí¿ç¶àÐÐ¡£</td></tr>
+<tr><td>Êý×é</td><td><code>[1, 2, 3]</code></td><td>ÔÊÐíÄ©Î²¶ººÅ¡£</td></tr>
+<tr><td>×Öµä</td><td><code>{"k": 1, "n": 2}</code></td><td>¼ü±ØÐëÊÇ×Ö·û´®×ÖÃæÁ¿»òÂã±êÊ¶·û¡£ÔÊÐíÄ©Î²¶ººÅ¡£</td></tr>
+<tr><td>×Ö½Ú´® bytes</td><td><code>new(1024)</code></td><td>ÁãÌî³äµÄ×Ö½Ú»º³åÇø;Ã»ÓÐ×Ö½Ú´®×ÖÃæÁ¿¡£</td></tr>
 </table>
 
-<h3>å­—ç¬¦ä¸²è½¬ä¹‰</h3>
-<p><code>\"</code> <code>\\</code> <code>\/</code> <code>\b</code> <code>\f</code> <code>\n</code> <code>\r</code> <code>\t</code> <code>\e</code>(ESC,å¯ç”¨äºŽ ANSI é¢œè‰²),<code>\uXXXX</code>(Unicode ç ç‚¹,ç¼–ç ä¸º UTF-8)ã€‚æœªçŸ¥è½¬ä¹‰åŽŸæ ·ä¿ç•™ã€‚</p>
+<h3>×Ö·û´®×ªÒå</h3>
+<p><code>\"</code> <code>\\</code> <code>\/</code> <code>\b</code> <code>\f</code> <code>\n</code> <code>\r</code> <code>\t</code> <code>\e</code>(ESC,¿ÉÓÃÓÚ ANSI ÑÕÉ«),<code>\uXXXX</code>(Unicode Âëµã,±àÂëÎª UTF-8)¡£Î´Öª×ªÒåÔ­Ñù±£Áô¡£</p>
 
-<h3>å…³é”®å­—</h3>
-<p><code>func</code> <code>void</code> <code>int</code> <code>double</code> <code>string</code> <code>print</code> <code>println</code> <code>ret</code> <code>if</code> <code>else</code> <code>while</code> <code>for</code> <code>break</code> <code>continue</code> <code>and</code> <code>or</code> <code>!</code>(é€»è¾‘éž) <code>new</code> <code>class</code> <code>struct</code> <code>dict</code> <code>try</code> <code>catch</code> <code>error</code> <code>exit</code> <code>import</code> <code>!import</code> <code>yield</code> <code>input</code> <code>goto</code> <code>free</code> <code>free_all</code> <code>endl</code></p>
+<h3>¹Ø¼ü×Ö</h3>
+<p><code>func</code> <code>void</code> <code>int</code> <code>double</code> <code>string</code> <code>print</code> <code>println</code> <code>ret</code> <code>if</code> <code>else</code> <code>while</code> <code>for</code> <code>break</code> <code>continue</code> <code>and</code> <code>or</code> <code>!</code>(Âß¼­·Ç) <code>new</code> <code>class</code> <code>struct</code> <code>dict</code> <code>try</code> <code>catch</code> <code>error</code> <code>exit</code> <code>import</code> <code>!import</code> <code>yield</code> <code>input</code> <code>goto</code> <code>free</code> <code>free_all</code> <code>endl</code></p>
 
-<p class="warn">ä»¥ <code>;</code> ç»“å°¾çš„è¯­å¥æ˜¯é”™è¯¯:FoxLang ç”¨æ¢è¡Œä½œä¸ºè¯­å¥ç»“æŸç¬¦ã€‚<code>;</code> åªå‡ºçŽ°åœ¨ <code>for</code> å¤´éƒ¨ã€‚</p>
+<p class="warn">ÒÔ <code>;</code> ½áÎ²µÄÓï¾äÊÇ´íÎó:FoxLang ÓÃ»»ÐÐ×÷ÎªÓï¾ä½áÊø·û¡£<code>;</code> Ö»³öÏÖÔÚ <code>for</code> Í·²¿¡£</p>
 
-<h3>ç­¾åç±»åž‹ vs è¿è¡Œæ—¶ç±»åž‹</h3>
+<h3>Ç©ÃûÀàÐÍ vs ÔËÐÐÊ±ÀàÐÍ</h3>
 <table>
-<tr><th>ç­¾åä¸­å¯å£°æ˜Žçš„ç±»åž‹</th><th>è¿è¡Œæ—¶å€¼ç±»åž‹</th></tr>
-<tr><td><code>int</code>ã€<code>double</code>ã€<code>string</code>ã€<code>dict</code>ã€<code>void</code>;å­—æ®µè¿˜å¯ç”¨ <code>new</code>(å³ bytes)</td><td>Intã€Doubleã€Stringã€Voidã€Arrayã€Bytesã€Dictã€Objectã€Coroutine</td></tr>
+<tr><th>Ç©ÃûÖÐ¿ÉÉùÃ÷µÄÀàÐÍ</th><th>ÔËÐÐÊ±ÖµÀàÐÍ</th></tr>
+<tr><td><code>int</code>¡¢<code>double</code>¡¢<code>string</code>¡¢<code>dict</code>¡¢<code>void</code>;×Ö¶Î»¹¿ÉÓÃ <code>new</code>(¼´ bytes)</td><td>Int¡¢Double¡¢String¡¢Void¡¢Array¡¢Bytes¡¢Dict¡¢Object¡¢Coroutine</td></tr>
 </table>
-<p>å˜é‡æœ¬èº«æ˜¯åŠ¨æ€ç±»åž‹çš„:è¿è¡Œæ—¶åœ¨ <code>ret</code> å¤„æ£€æŸ¥å£°æ˜Žçš„è¿”å›žç±»åž‹,è¿ç®—æŒ‰å®žé™…å€¼ç±»åž‹åœ¨ç¼–è¯‘æœŸ/è¿è¡ŒæœŸæ£€æŸ¥ã€‚</p>
+<p>±äÁ¿±¾ÉíÊÇ¶¯Ì¬ÀàÐÍµÄ:ÔËÐÐÊ±ÔÚ <code>ret</code> ´¦¼ì²éÉùÃ÷µÄ·µ»ØÀàÐÍ,ÔËËã°´Êµ¼ÊÖµÀàÐÍÔÚ±àÒëÆÚ/ÔËÐÐÆÚ¼ì²é¡£</p>
 
-<h2>3. å˜é‡ä¸Žèµ‹å€¼</h2>
-<p>è¯­è¨€æ²¡æœ‰å˜é‡å£°æ˜Žã€‚<code>name = expr</code> ä¼šåˆ›å»ºæˆ–è¦†ç›–ä¸€ä¸ªå˜é‡ã€‚æ‰€æœ‰å˜é‡ä½äºŽåŒä¸€ä¸ªæ‰å¹³å‘½åç©ºé—´ä¸­,æ•´ä¸ªç¨‹åºå…±äº«(å‡½æ•°ä½“ä¸å¼•å…¥ä½œç”¨åŸŸ),å› æ­¤å‚æ•°åä¸Žé¡¶å±‚åå­—ä¸èƒ½å†²çªã€‚</p>
+<h2>3. ±äÁ¿Óë¸³Öµ</h2>
+<p>ÓïÑÔÃ»ÓÐ±äÁ¿ÉùÃ÷¡£<code>name = expr</code> »á´´½¨»ò¸²¸ÇÒ»¸ö±äÁ¿¡£ËùÓÐ±äÁ¿Î»ÓÚÍ¬Ò»¸ö±âÆ½ÃüÃû¿Õ¼äÖÐ,Õû¸ö³ÌÐò¹²Ïí(º¯ÊýÌå²»ÒýÈë×÷ÓÃÓò),Òò´Ë²ÎÊýÃûÓë¶¥²ãÃû×Ö²»ÄÜ³åÍ»¡£</p>
 
 <table>
-<tr><th>å½¢å¼</th><th>å«ä¹‰</th></tr>
-<tr><td><code>a = expr</code></td><td>åˆ›å»ºæˆ–è¦†ç›–å˜é‡ <code>a</code>ã€‚èµ‹å€¼æ˜¯è¯­å¥,ä¸æ˜¯è¡¨è¾¾å¼ã€‚</td></tr>
-<tr><td><code>a[i] = expr</code></td><td>å¯¹æ•°ç»„/å­—å…¸/å­—èŠ‚ä¸²å€¼æŒ‰ä¸‹æ ‡å†™å…¥ã€‚</td></tr>
-<tr><td><code>obj.field = expr</code></td><td>å¯¹è±¡å­—æ®µå†™å…¥ã€‚</td></tr>
-<tr><td><code>obj.field[i] = expr</code></td><td>å¯¹è±¡å­—æ®µæŒ‰ä¸‹æ ‡å†™å…¥ã€‚</td></tr>
-<tr><td><code>int x = 5</code></td><td>å¸¦ç±»åž‹å£°æ˜Ž(int/double/string/dict),åˆ›å»ºä¸€ä¸ªå…¨å±€å˜é‡,ä»…å­—èŠ‚ç æ¨¡å¼æ”¯æŒã€‚<code>int x</code> å•ç‹¬å†™æ˜¯æ— æ“ä½œã€‚</td></tr>
-<tr><td><code>free(name)</code></td><td>åˆ é™¤ä¸€ä¸ªå˜é‡ã€‚</td></tr>
-<tr><td><code>free_all()</code></td><td>åˆ é™¤æ‰€æœ‰å˜é‡ã€‚</td></tr>
+<tr><th>ÐÎÊ½</th><th>º¬Òå</th></tr>
+<tr><td><code>a = expr</code></td><td>´´½¨»ò¸²¸Ç±äÁ¿ <code>a</code>¡£¸³ÖµÊÇÓï¾ä,²»ÊÇ±í´ïÊ½¡£</td></tr>
+<tr><td><code>a[i] = expr</code></td><td>¶ÔÊý×é/×Öµä/×Ö½Ú´®Öµ°´ÏÂ±êÐ´Èë¡£</td></tr>
+<tr><td><code>obj.field = expr</code></td><td>¶ÔÏó×Ö¶ÎÐ´Èë¡£</td></tr>
+<tr><td><code>obj.field[i] = expr</code></td><td>¶ÔÏó×Ö¶Î°´ÏÂ±êÐ´Èë¡£</td></tr>
+<tr><td><code>int x = 5</code></td><td>´øÀàÐÍÉùÃ÷(int/double/string/dict),´´½¨Ò»¸öÈ«¾Ö±äÁ¿,½ö×Ö½ÚÂëÄ£Ê½Ö§³Ö¡£<code>int x</code> µ¥¶ÀÐ´ÊÇÎÞ²Ù×÷¡£</td></tr>
+<tr><td><code>free(name)</code></td><td>É¾³ýÒ»¸ö±äÁ¿¡£</td></tr>
+<tr><td><code>free_all()</code></td><td>É¾³ýËùÓÐ±äÁ¿¡£</td></tr>
 </table>
 
-<h2>4. è¿ç®—ç¬¦ä¸Žä¼˜å…ˆçº§</h2>
+<h2>4. ÔËËã·ûÓëÓÅÏÈ¼¶</h2>
 <table>
-<tr><th>ä¼˜å…ˆçº§</th><th>è¿ç®—ç¬¦</th><th>ç»“åˆæ€§</th></tr>
-<tr><td>æœ€é«˜</td><td><code>-x</code> å–è´Ÿã€<code>!x</code> é€»è¾‘éž(ç»“æžœä¸º int 1/0)</td><td>â€”</td></tr>
-<tr><td></td><td><code>*</code> <code>/</code> <code>%</code></td><td>å·¦</td></tr>
-<tr><td></td><td><code>+</code> <code>-</code></td><td>å·¦</td></tr>
-<tr><td></td><td><code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code></td><td>å·¦</td></tr>
-<tr><td>æœ€ä½Ž</td><td><code>and</code>ã€<code>or</code>(çŸ­è·¯æ±‚å€¼)</td><td>å·¦</td></tr>
+<tr><th>ÓÅÏÈ¼¶</th><th>ÔËËã·û</th><th>½áºÏÐÔ</th></tr>
+<tr><td>×î¸ß</td><td><code>-x</code> È¡¸º¡¢<code>!x</code> Âß¼­·Ç(½á¹ûÎª int 1/0)</td><td>¡ª</td></tr>
+<tr><td></td><td><code>*</code> <code>/</code> <code>%</code></td><td>×ó</td></tr>
+<tr><td></td><td><code>+</code> <code>-</code></td><td>×ó</td></tr>
+<tr><td></td><td><code>==</code> <code>!=</code> <code>&gt;</code> <code>&lt;</code> <code>&gt;=</code> <code>&lt;=</code></td><td>×ó</td></tr>
+<tr><td>×îµÍ</td><td><code>and</code>¡¢<code>or</code>(¶ÌÂ·ÇóÖµ)</td><td>×ó</td></tr>
 </table>
 
 <ul>
-<li>æ²¡æœ‰ <code>+=</code>/<code>++</code>/å¤åˆèµ‹å€¼,æ²¡æœ‰ä¸‰å…ƒè¿ç®—ç¬¦ã€‚</li>
-<li><code>int</code> ä¸Ž <code>double</code> æ··ç”¨åšç®—æœ¯æˆ–æ¯”è¾ƒæ˜¯ç¼–è¯‘é”™è¯¯,éœ€ç”¨ <code>double(x)</code>/<code>int(x)</code> æ˜¾å¼è½¬æ¢ã€‚</li>
-<li><code>string + string</code> æ‹¼æŽ¥;<code>string + int</code> æ˜¯ç¼–è¯‘é”™è¯¯,æ•°å­—ç”¨ <code>util.IntChangeString</code> æˆ– <code>util.DoubleChangeString</code> è½¬æ¢ã€‚</li>
-<li>æ¯”è¾ƒäº§ç”Ÿ int 1/0ã€‚å­—ç¬¦ä¸²åªæ”¯æŒ <code>==</code>/<code>!=</code>,ç”¨ <code>&lt;</code>/<code>&gt;</code> ç­‰ä¼šæ¯”è¾ƒä¼šæŠ¥é”™ã€‚</li>
-<li><code>==</code>/<code>!=</code> å¯¹æ•°ç»„ã€å­—å…¸ã€å­—èŠ‚ä¸²ã€å¯¹è±¡åšæ·±æ¯”è¾ƒã€‚</li>
+<li>Ã»ÓÐ <code>+=</code>/<code>++</code>/¸´ºÏ¸³Öµ,Ã»ÓÐÈýÔªÔËËã·û¡£</li>
+<li><code>int</code> Óë <code>double</code> »ìÓÃ×öËãÊõ»ò±È½ÏÊÇ±àÒë´íÎó,ÐèÓÃ <code>double(x)</code>/<code>int(x)</code> ÏÔÊ½×ª»»¡£</li>
+<li><code>string + string</code> Æ´½Ó;<code>string + int</code> ÊÇ±àÒë´íÎó,Êý×ÖÓÃ <code>util.IntChangeString</code> »ò <code>util.DoubleChangeString</code> ×ª»»¡£</li>
+<li>±È½Ï²úÉú int 1/0¡£×Ö·û´®Ö»Ö§³Ö <code>==</code>/<code>!=</code>,ÓÃ <code>&lt;</code>/<code>&gt;</code> µÈ»á±È½Ï»á±¨´í¡£</li>
+<li><code>==</code>/<code>!=</code> ¶ÔÊý×é¡¢×Öµä¡¢×Ö½Ú´®¡¢¶ÔÏó×öÉî±È½Ï¡£</li>
 </ul>
 
-<p>ä¸‹æ ‡ <code>arr[i]</code>(æ•°ç»„ã€å­—å…¸ã€å­—èŠ‚ä¸²)ä¸Žæˆå‘˜è®¿é—® <code>obj.field</code> çš„ç»‘å®šæ¯”ç®—æœ¯è¿ç®—ç¬¦æ›´ç´§ã€‚</p>
+<p>ÏÂ±ê <code>arr[i]</code>(Êý×é¡¢×Öµä¡¢×Ö½Ú´®)Óë³ÉÔ±·ÃÎÊ <code>obj.field</code> µÄ°ó¶¨±ÈËãÊõÔËËã·û¸ü½ô¡£</p>
 
-<h2>5. è¯­å¥</h2>
+<h2>5. Óï¾ä</h2>
 
-<h3>æ¡ä»¶åˆ¤æ–­</h3>
+<h3>Ìõ¼þÅÐ¶Ï</h3>
 <pre><code>if (score &gt; 100) {
     println("high")
 } else {
     println("low")
 }</code></pre>
-<p>å•ä¸ªè¯­å¥å¯ä»¥çœç•¥èŠ±æ‹¬å·ã€‚<code>else if</code> é€šè¿‡åµŒå¥—å®žçŽ°ã€‚æ¡ä»¶æŽ¥å— int(0 ä¸ºå‡)ã€double,ä»¥åŠéžç©ºæ•°ç»„/å­—å…¸/å­—èŠ‚ä¸²;å­—ç¬¦ä¸²ä¸èƒ½ä½œä¸ºæ¡ä»¶ã€‚</p>
+<p>µ¥¸öÓï¾ä¿ÉÒÔÊ¡ÂÔ»¨À¨ºÅ¡£<code>else if</code> Í¨¹ýÇ¶Ì×ÊµÏÖ¡£Ìõ¼þ½ÓÊÜ int(0 Îª¼Ù)¡¢double,ÒÔ¼°·Ç¿ÕÊý×é/×Öµä/×Ö½Ú´®;×Ö·û´®²»ÄÜ×÷ÎªÌõ¼þ¡£</p>
 
-<h3>å¾ªçŽ¯</h3>
+<h3>Ñ­»·</h3>
 <pre><code>while (i &lt; 10) {
     i = i + 1
 }
@@ -131,9 +131,9 @@ for (k = 0; k &lt; 5; k = k + 1) {
     if (k == 2) continue
     println(k)
 }</code></pre>
-<p>æ”¯æŒ <code>break</code> å’Œ <code>continue</code>;for æ¡ä»¶ç•™ç©ºè¡¨ç¤ºæ— é™å¾ªçŽ¯ã€‚</p>
+<p>Ö§³Ö <code>break</code> ºÍ <code>continue</code>;for Ìõ¼þÁô¿Õ±íÊ¾ÎÞÏÞÑ­»·¡£</p>
 
-<h3>å‡½æ•°</h3>
+<h3>º¯Êý</h3>
 <pre><code>func add(a &lt;- int, b &lt;- int) -&gt; int {
     ret a + b
 }
@@ -142,36 +142,36 @@ func log(msg &lt;- string) -&gt; void {
     println(msg)
 }</code></pre>
 <ul>
-<li>å‚æ•°ç±»åž‹: <code>int</code>ã€<code>double</code>ã€<code>string</code>ã€<code>dict</code>ã€‚</li>
-<li>è¿”å›žç±»åž‹å†™åœ¨ <code>-&gt;</code> åŽ;å…è®¸ <code>void</code>ã€<code>int</code>ã€<code>double</code>ã€<code>string</code>ã€<code>dict</code>ã€‚çœç•¥ <code>-&gt; ç±»åž‹</code> å³ <code>void</code>ã€‚ç±»åž‹åŽå¯åŠ å†’å·:<code>func f() -&gt; int : { ... }</code>ã€‚</li>
-<li><code>ret expr</code> è¿”å›žå€¼;è£¸ <code>ret</code> åªåœ¨ void å‡½æ•°ä¸­åˆæ³•ã€‚éž void å‡½æ•°çš„æ¯æ¡è·¯å¾„éƒ½å¿…é¡»äº§ç”Ÿè¿”å›žç±»åž‹çš„å€¼ã€‚</li>
-<li>è°ƒç”¨æœŸé—´å‚æ•°ä¼šä½œä¸ºå…¨å±€å˜é‡ç»‘å®š,è¿”å›žåŽè‡ªåŠ¨æ¢å¤ã€‚</li>
+<li>²ÎÊýÀàÐÍ: <code>int</code>¡¢<code>double</code>¡¢<code>string</code>¡¢<code>dict</code>¡£</li>
+<li>·µ»ØÀàÐÍÐ´ÔÚ <code>-&gt;</code> ºó;ÔÊÐí <code>void</code>¡¢<code>int</code>¡¢<code>double</code>¡¢<code>string</code>¡¢<code>dict</code>¡£Ê¡ÂÔ <code>-&gt; ÀàÐÍ</code> ¼´ <code>void</code>¡£ÀàÐÍºó¿É¼ÓÃ°ºÅ:<code>func f() -&gt; int : { ... }</code>¡£</li>
+<li><code>ret expr</code> ·µ»ØÖµ;Âã <code>ret</code> Ö»ÔÚ void º¯ÊýÖÐºÏ·¨¡£·Ç void º¯ÊýµÄÃ¿ÌõÂ·¾¶¶¼±ØÐë²úÉú·µ»ØÀàÐÍµÄÖµ¡£</li>
+<li>µ÷ÓÃÆÚ¼ä²ÎÊý»á×÷ÎªÈ«¾Ö±äÁ¿°ó¶¨,·µ»Øºó×Ô¶¯»Ö¸´¡£</li>
 </ul>
 
-<h3>è¾“å…¥è¾“å‡º</h3>
+<h3>ÊäÈëÊä³ö</h3>
 <table>
-<tr><th>è¯­å¥</th><th>å«ä¹‰</th></tr>
-<tr><td><code>print(x)</code></td><td>è¾“å‡º,ä¸æ¢è¡Œã€‚</td></tr>
-<tr><td><code>println(x)</code></td><td>è¾“å‡ºå¹¶æ¢è¡Œã€‚</td></tr>
-<tr><td><code>endl</code></td><td>åªè¾“å‡ºä¸€ä¸ªæ¢è¡Œã€‚</td></tr>
-<tr><td><code>input() -&gt; var</code></td><td>ä»Žæ ‡å‡†è¾“å…¥è¯»å–ä¸€è¡Œ(å­—ç¬¦ä¸²)å­˜å…¥ <code>var</code>ã€‚</td></tr>
-<tr><td><code>exit(code)</code></td><td>ä»¥æ•´æ•°é€€å‡ºç ç»“æŸè¿›ç¨‹ã€‚</td></tr>
+<tr><th>Óï¾ä</th><th>º¬Òå</th></tr>
+<tr><td><code>print(x)</code></td><td>Êä³ö,²»»»ÐÐ¡£</td></tr>
+<tr><td><code>println(x)</code></td><td>Êä³ö²¢»»ÐÐ¡£</td></tr>
+<tr><td><code>endl</code></td><td>Ö»Êä³öÒ»¸ö»»ÐÐ¡£</td></tr>
+<tr><td><code>input() -&gt; var</code></td><td>´Ó±ê×¼ÊäÈë¶ÁÈ¡Ò»ÐÐ(×Ö·û´®)´æÈë <code>var</code>¡£</td></tr>
+<tr><td><code>exit(code)</code></td><td>ÒÔÕûÊýÍË³öÂë½áÊø½ø³Ì¡£</td></tr>
 </table>
 
-<h3>é”™è¯¯ä¸Žå¼‚å¸¸</h3>
+<h3>´íÎóÓëÒì³£</h3>
 <pre><code>try {
     error("something went wrong")
 } catch (e) {
-    println(e)    # è¾“å‡º something went wrong
+    println(e)    # Êä³ö something went wrong
 }</code></pre>
-<p><code>error(msg)</code> è¦æ±‚å­—ç¬¦ä¸²å‚æ•°,æŠ›å‡ºå¯æ•èŽ·çš„é”™è¯¯ã€‚å‡½æ•°åº“åœ¨å‚æ•°éžæ³•æ—¶ä¹Ÿä¼šæŠ›é”™,åŒæ ·å¯ä»¥æ•èŽ·ã€‚æ²¡æœ‰ <code>finally</code>ã€‚æœªè¢« try/catch æ•èŽ·çš„è¿è¡Œæ—¶é”™è¯¯ä¼šç»ˆæ­¢ç¨‹åº,å¹¶æ‰“å°å¸¦æºç è¡Œå·çš„è°ƒç”¨æ ˆã€‚</p>
+<p><code>error(msg)</code> ÒªÇó×Ö·û´®²ÎÊý,Å×³ö¿É²¶»ñµÄ´íÎó¡£º¯Êý¿âÔÚ²ÎÊý·Ç·¨Ê±Ò²»áÅ×´í,Í¬Ñù¿ÉÒÔ²¶»ñ¡£Ã»ÓÐ <code>finally</code>¡£Î´±» try/catch ²¶»ñµÄÔËÐÐÊ±´íÎó»áÖÕÖ¹³ÌÐò,²¢´òÓ¡´øÔ´ÂëÐÐºÅµÄµ÷ÓÃÕ»¡£</p>
 
-<h3>è·³è½¬</h3>
+<h3>Ìø×ª</h3>
 <pre><code>fn skip:
 goto skip</code></pre>
-<p><code>goto label</code> åœ¨å½“å‰å‡½æ•°å†…è·³è½¬;æ ‡ç­¾(<code>fn name:</code>)æŒ‰å‡½æ•°ä½œç”¨åŸŸã€‚</p>
+<p><code>goto label</code> ÔÚµ±Ç°º¯ÊýÄÚÌø×ª;±êÇ©(<code>fn name:</code>)°´º¯Êý×÷ÓÃÓò¡£</p>
 
-<h2>6. ç±»ä¸Žå¯¹è±¡</h2>
+<h2>6. ÀàÓë¶ÔÏó</h2>
 <pre><code>class Point {
     x &lt;- int
     y &lt;- int
@@ -189,27 +189,27 @@ goto skip</code></pre>
 }
 
 p = new Point(3, 4, "origin")
-println(p.x)          # 3,å­—æ®µè¯»å–
-p.tag = "moved"       # å­—æ®µå†™å…¥
-println(p.describe()) # æ–¹æ³•è°ƒç”¨</code></pre>
+println(p.x)          # 3,×Ö¶Î¶ÁÈ¡
+p.tag = "moved"       # ×Ö¶ÎÐ´Èë
+println(p.describe()) # ·½·¨µ÷ÓÃ</code></pre>
 <ul>
-<li>å­—æ®µç±»åž‹: <code>int</code>ã€<code>double</code>ã€<code>string</code>ã€<code>dict</code>,ä»¥åŠ <code>new</code>(å³ bytes ç¼“å†²åŒº)ã€‚</li>
-<li><code>init</code> æ˜¯æž„é€ å‡½æ•°ã€‚<code>new ClassName(args)</code> æŠŠå‚æ•°æ˜ å°„åˆ° <code>init</code> çš„å‚æ•°(ä¸å«éšå¼ <code>this</code>);æ²¡æœ‰ <code>init</code> æ—¶,å‚æ•°æŒ‰å£°æ˜Žé¡ºåºæ˜ å°„åˆ°å­—æ®µã€‚</li>
-<li>æ–¹æ³•å¸¦éšå¼ <code>this</code>;è°ƒç”¨å½¢å¼ä¸º <code>obj.method()</code>ã€‚</li>
-<li><code>struct</code> ä¸Ž <code>class</code> ç­‰ä»·ã€‚</li>
-<li>æˆå‘˜è®¿é—®ä½¿ç”¨ç‚¹åˆ†æ ‡è¯†ç¬¦(<code>obj.field</code>ã€<code>obj.method(...)</code>),æŒ‰æœ€åŽä¸€ä¸ªç‚¹è§£æžã€‚</li>
+<li>×Ö¶ÎÀàÐÍ: <code>int</code>¡¢<code>double</code>¡¢<code>string</code>¡¢<code>dict</code>,ÒÔ¼° <code>new</code>(¼´ bytes »º³åÇø)¡£</li>
+<li><code>init</code> ÊÇ¹¹Ôìº¯Êý¡£<code>new ClassName(args)</code> °Ñ²ÎÊýÓ³Éäµ½ <code>init</code> µÄ²ÎÊý(²»º¬ÒþÊ½ <code>this</code>);Ã»ÓÐ <code>init</code> Ê±,²ÎÊý°´ÉùÃ÷Ë³ÐòÓ³Éäµ½×Ö¶Î¡£</li>
+<li>·½·¨´øÒþÊ½ <code>this</code>;µ÷ÓÃÐÎÊ½Îª <code>obj.method()</code>¡£</li>
+<li><code>struct</code> Óë <code>class</code> µÈ¼Û¡£</li>
+<li>³ÉÔ±·ÃÎÊÊ¹ÓÃµã·Ö±êÊ¶·û(<code>obj.field</code>¡¢<code>obj.method(...)</code>),°´×îºóÒ»¸öµã½âÎö¡£</li>
 </ul>
 
-<h2>7. ç±»åž‹è½¬æ¢</h2>
+<h2>7. ÀàÐÍ×ª»»</h2>
 <table>
-<tr><th>è½¬æ¢</th><th>ç»“æžœ</th></tr>
-<tr><td><code>int(x)</code></td><td>ç”± int/double(æˆªæ–­)æˆ– string å¾—åˆ° intã€‚</td></tr>
-<tr><td><code>double(x)</code></td><td>ç”± int/double æˆ– string å¾—åˆ° doubleã€‚</td></tr>
+<tr><th>×ª»»</th><th>½á¹û</th></tr>
+<tr><td><code>int(x)</code></td><td>ÓÉ int/double(½Ø¶Ï)»ò string µÃµ½ int¡£</td></tr>
+<tr><td><code>double(x)</code></td><td>ÓÉ int/double »ò string µÃµ½ double¡£</td></tr>
 </table>
-<p>ä¹Ÿå¯ç”¨å‡½æ•°åº“:<code>util.IntChangeString</code>ã€<code>util.StringChangeInt</code>ã€<code>util.StringChangeDouble</code>ã€<code>util.DoubleChangeString</code>ã€<code>util.DoubleChangeInt</code>ã€<code>util.IntChangeDouble</code>ã€‚int ä¸Ž double ä¹‹é—´æ²¡æœ‰è‡ªåŠ¨è½¬æ¢ã€‚</p>
+<p>Ò²¿ÉÓÃº¯Êý¿â:<code>util.IntChangeString</code>¡¢<code>util.StringChangeInt</code>¡¢<code>util.StringChangeDouble</code>¡¢<code>util.DoubleChangeString</code>¡¢<code>util.DoubleChangeInt</code>¡¢<code>util.IntChangeDouble</code>¡£int Óë double Ö®¼äÃ»ÓÐ×Ô¶¯×ª»»¡£</p>
 
-<h2 id="coroutines">8. åç¨‹</h2>
-<p>åç¨‹æ˜¯å­—èŠ‚ç è™šæ‹Ÿæœºçš„ç‰¹æ€§;<code>yield</code> åœ¨æ—§è§£é‡Šå™¨ä¸­ä¸æ”¯æŒã€‚åç¨‹ä¸Žè°ƒç”¨æ–¹å…±äº«å…¨å±€å˜é‡(å‚æ•°å…¨å±€é‡æŒ‰æ¯æ¬¡ resume æ®µç»‘å®š)ã€‚</p>
+<h2 id="coroutines">8. Ð­³Ì</h2>
+<p>Ð­³ÌÊÇ×Ö½ÚÂëÐéÄâ»úµÄÌØÐÔ;<code>yield</code> ÔÚ¾É½âÊÍÆ÷ÖÐ²»Ö§³Ö¡£Ð­³ÌÓëµ÷ÓÃ·½¹²ÏíÈ«¾Ö±äÁ¿(²ÎÊýÈ«¾ÖÁ¿°´Ã¿´Î resume ¶Î°ó¶¨)¡£</p>
 
 <pre><code>func task(id &lt;- int) -&gt; void {
     n = 0
@@ -220,46 +220,46 @@ println(p.describe()) # æ–¹æ³•è°ƒç”¨</code></pre>
 }
 
 func main() -&gt; void {
-    c = co.create("task", 1)      # åç¨‹å¥æŸ„
-    v = co.resume(c)              # è¿è¡Œåˆ°ç¬¬ä¸€æ¬¡ yield;v = 100
+    c = co.create("task", 1)      # Ð­³Ì¾ä±ú
+    v = co.resume(c)              # ÔËÐÐµ½µÚÒ»´Î yield;v = 100
     v = co.resume(c)              # v = 101
     if (co.status(c) != "suspended") { ... }
-    # å‡½æ•°æ‰§è¡Œå®ŒåŽ:
+    # º¯ÊýÖ´ÐÐÍêºó:
     if (co.status(c) != "dead") { ... }
-    println(co.result(c))         # æœ€ç»ˆè¿”å›žå€¼
+    println(co.result(c))         # ×îÖÕ·µ»ØÖµ
     exit(0)
 }</code></pre>
 
 <table>
-<tr><th>å‡½æ•°</th><th>è¯´æ˜Ž</th></tr>
-<tr><td><code>co.create("fn", å‚æ•°...)</code></td><td>ç”±å‡½æ•°åˆ›å»ºåç¨‹;<code>å‚æ•°</code>ç»‘å®šåˆ°å®ƒçš„å½¢å‚ã€‚</td></tr>
-<tr><td><code>co.resume(coro [, å€¼])</code></td><td>è¿è¡Œåˆ°ä¸‹ä¸€ä¸ª <code>yield</code>;è¿”å›ž yield äº§ç”Ÿçš„å€¼,å‡½æ•°ç»“æŸæ—¶è¿”å›žæœ€ç»ˆè¿”å›žå€¼ã€‚<code>å€¼</code> ä¼šæˆä¸º yield è¡¨è¾¾å¼çš„ç»“æžœã€‚</td></tr>
-<tr><td><code>co.status(coro)</code></td><td><code>"suspended"</code>(æŒ‚èµ·)ã€<code>"running"</code>(è¿è¡Œä¸­)æˆ– <code>"dead"</code>(å·²ç»“æŸ)ã€‚</td></tr>
-<tr><td><code>co.result(coro)</code></td><td>å·²ç»“æŸåç¨‹çš„æœ€ç»ˆè¿”å›žå€¼ã€‚</td></tr>
-<tr><td><code>yield(expr)</code> / <code>yield</code></td><td>æŒ‚èµ·å½“å‰åç¨‹ã€‚åœ¨åç¨‹ä¹‹å¤–æˆ– <code>co.resume</code> å†…éƒ¨è°ƒç”¨å‡ä¸ºéžæ³•ã€‚</td></tr>
+<tr><th>º¯Êý</th><th>ËµÃ÷</th></tr>
+<tr><td><code>co.create("fn", ²ÎÊý...)</code></td><td>ÓÉº¯Êý´´½¨Ð­³Ì;<code>²ÎÊý</code>°ó¶¨µ½ËüµÄÐÎ²Î¡£</td></tr>
+<tr><td><code>co.resume(coro [, Öµ])</code></td><td>ÔËÐÐµ½ÏÂÒ»¸ö <code>yield</code>;·µ»Ø yield ²úÉúµÄÖµ,º¯Êý½áÊøÊ±·µ»Ø×îÖÕ·µ»ØÖµ¡£<code>Öµ</code> »á³ÉÎª yield ±í´ïÊ½µÄ½á¹û¡£</td></tr>
+<tr><td><code>co.status(coro)</code></td><td><code>"suspended"</code>(¹ÒÆð)¡¢<code>"running"</code>(ÔËÐÐÖÐ)»ò <code>"dead"</code>(ÒÑ½áÊø)¡£</td></tr>
+<tr><td><code>co.result(coro)</code></td><td>ÒÑ½áÊøÐ­³ÌµÄ×îÖÕ·µ»ØÖµ¡£</td></tr>
+<tr><td><code>yield(expr)</code> / <code>yield</code></td><td>¹ÒÆðµ±Ç°Ð­³Ì¡£ÔÚÐ­³ÌÖ®Íâ»ò <code>co.resume</code> ÄÚ²¿µ÷ÓÃ¾ùÎª·Ç·¨¡£</td></tr>
 </table>
 
-<h2>9. å¯¼å…¥</h2>
-<pre><code>import fox.std.util -&gt; u        # ç³»ç»Ÿåº“,å¸¦åˆ«å
-import fox.gl.fg                # ç³»ç»Ÿåº“,ä»¥ gl_fg.func(...) è°ƒç”¨
-import "other.fox"              # è·¨æ–‡ä»¶æºç å¯¼å…¥(ç›¸å¯¹å½“å‰æ–‡ä»¶)
-!import myplugin                # æ’ä»¶(è„šæœ¬ç›®å½•,ç„¶åŽ C:\FoxLibs,å†å½“å‰ç›®å½•)
+<h2>9. µ¼Èë</h2>
+<pre><code>import fox.std.util -&gt; u        # ÏµÍ³¿â,´ø±ðÃû
+import fox.gl.fg                # ÏµÍ³¿â,ÒÔ gl_fg.func(...) µ÷ÓÃ
+import "other.fox"              # ¿çÎÄ¼þÔ´Âëµ¼Èë(Ïà¶Ôµ±Ç°ÎÄ¼þ)
+!import myplugin                # ²å¼þ(½Å±¾Ä¿Â¼,È»ºó C:\FoxLibs,ÔÙµ±Ç°Ä¿Â¼)
 !import "plugin.fox"</code></pre>
-<p>ç³»ç»Ÿåº“ä»¥ DLL å½¢å¼æä¾›(<code>fox.&lt;lib&gt;.dll</code>,ä½äºŽå¯æ‰§è¡Œæ–‡ä»¶æ—æˆ– <code>dlls/</code>),ä½¿ç”¨å‰å¿…é¡»å…ˆ importã€‚å®Œæ•´æ¸…å•è§<a href="libraries.html">å‡½æ•°åº“å‚è€ƒ</a>ã€‚</p>
+<p>ÏµÍ³¿âÒÔ DLL ÐÎÊ½Ìá¹©(<code>fox.&lt;lib&gt;.dll</code>,Î»ÓÚ¿ÉÖ´ÐÐÎÄ¼þÅÔ»ò <code>dlls/</code>),Ê¹ÓÃÇ°±ØÐëÏÈ import¡£ÍêÕûÇåµ¥¼û<a href="libraries.html">º¯Êý¿â²Î¿¼</a>¡£</p>
 
-<h2>10. é™åˆ¶ä¸Žæ³¨æ„äº‹é¡¹</h2>
+<h2>10. ÏÞÖÆÓë×¢ÒâÊÂÏî</h2>
 <ul>
-<li>æ•´æ•°ä¸º 32 ä½(ç§’çº§æ—¶é—´æˆ³åœ¨ 2038 å¹´å‰åŽä¼šæº¢å‡º)ã€‚</li>
-<li>å­—ç¬¦ä¸²æ˜¯å­—èŠ‚åºåˆ—:<code>str_length</code>/ä¸‹æ ‡æŒ‰å­—èŠ‚è®¡ç®—;å¤§å°å†™è½¬æ¢ä»…æ”¯æŒ ASCII;æ ¸å¿ƒä¸è§£æžå­—ç¬¦ä¸²ä¸­çš„ UTF-8ã€‚</li>
-<li>æ¯æ¬¡å‡½æ•°è°ƒç”¨é€šè¿‡ <code>new()</code> æœ€å¤šåˆ†é… 512 å­—èŠ‚(è¿è¡Œæ—¶ä¸Šé™)ã€‚</li>
-<li>æ²¡æœ‰å¸ƒå°”ã€nullã€switch ç»“æž„;å‡å€¼åŒ…æ‹¬ 0ã€ç©ºé›†åˆã€ç©ºå­—èŠ‚ä¸²ã€‚</li>
-<li>æ²¡æœ‰è¿ç®—ç¬¦é‡è½½;æ‰€æœ‰è¿ç®—æŒ‰å†…ç½®å€¼ç±»åž‹åˆ†æ´¾ã€‚</li>
-<li>åžƒåœ¾å›žæ”¶åœ¨æŒ‡ä»¤/è¯­å¥å®‰å…¨ç‚¹æ‰§è¡Œ;åç¨‹ã€å¯¹è±¡ã€å­—å…¸éƒ½å— GC ç®¡ç†ã€‚</li>
+<li>ÕûÊýÎª 32 Î»(Ãë¼¶Ê±¼ä´ÁÔÚ 2038 ÄêÇ°ºó»áÒç³ö)¡£</li>
+<li>×Ö·û´®ÊÇ×Ö½ÚÐòÁÐ:<code>str_length</code>/ÏÂ±ê°´×Ö½Ú¼ÆËã;´óÐ¡Ð´×ª»»½öÖ§³Ö ASCII;ºËÐÄ²»½âÎö×Ö·û´®ÖÐµÄ UTF-8¡£</li>
+<li>Ã¿´Îº¯Êýµ÷ÓÃÍ¨¹ý <code>new()</code> ×î¶à·ÖÅä 512 ×Ö½Ú(ÔËÐÐÊ±ÉÏÏÞ)¡£</li>
+<li>Ã»ÓÐ²¼¶û¡¢null¡¢switch ½á¹¹;¼ÙÖµ°üÀ¨ 0¡¢¿Õ¼¯ºÏ¡¢¿Õ×Ö½Ú´®¡£</li>
+<li>Ã»ÓÐÔËËã·ûÖØÔØ;ËùÓÐÔËËã°´ÄÚÖÃÖµÀàÐÍ·ÖÅÉ¡£</li>
+<li>À¬»ø»ØÊÕÔÚÖ¸Áî/Óï¾ä°²È«µãÖ´ÐÐ;Ð­³Ì¡¢¶ÔÏó¡¢×Öµä¶¼ÊÜ GC ¹ÜÀí¡£</li>
 </ul>
 
 </main>
 
-<footer>FoxLang æ–‡æ¡£ &middot; ä½œè€…:Lemon_Chicken</footer>
+<footer>FoxLang ÎÄµµ &middot; ×÷Õß:Lemon_Chicken</footer>
 
 </body>
 </html>

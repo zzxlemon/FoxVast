@@ -32,7 +32,7 @@ set(FOX_VM_VERSION "${FOX_VM_VERSION_DEFAULT}" CACHE STRING "FoxVast VM version"
 
 configure_file(src/util/version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/version.hpp @ONLY)
 
-# ---- Shared runtime (value + common) â€” linked by fox.exe and every DLL ----
+# ---- Shared runtime (value + common) ¡ª linked by fox.exe and every DLL ----
 add_library(fox_rt STATIC
     src/frontend/value.cpp
     src/util/common.cpp

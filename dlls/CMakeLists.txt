@@ -1,4 +1,4 @@
-# FoxVast runtime library DLLs â€” one DLL per library
+# FoxVast runtime library DLLs ¡ª one DLL per library
 # Each DLL exports register_fox_library(LibraryManager*).
 
 set(FOX_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../FoxCore)
