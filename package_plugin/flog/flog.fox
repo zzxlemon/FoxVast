@@ -1,0 +1,13 @@
+# flog - flexible logging library for FoxVast.
+#
+# Usage: place this folder's files next to your script (or in C:\FoxLibs),
+# then:
+#   !import flog
+#
+# The library is purely functional: configuration is a dict that you pass
+# around. All set_* helpers return a new config dict.
+
+import "flog_cfg.fox"
+import "flog_render.fox"
+import "flog_output.fox"
+import "flog_api.fox"

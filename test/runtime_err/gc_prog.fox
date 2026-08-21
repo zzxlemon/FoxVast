@@ -1,0 +1,13 @@
+func main() -> void {
+    i = 0
+    while (i < 200000) {
+        t = {"v": i, "n": {"k": i * 2}}
+        x = t["v"] + t["n"]["k"]
+        i = i + 1
+        if (i % 50000 == 0) {
+            println(i)
+        }
+    }
+    println("done")
+    exit(0)
+}

@@ -1,0 +1,41 @@
+import fox.std.util
+func node_type(nd_t <- dict) -> string {
+    ret nd_t["t"]
+}
+func obj_has(nd_h <- dict, ky_h <- string) -> int {
+    vh = nd_h["v"]
+    kh = vh["keys"]
+    ih = 0
+    lh = util.arr_length(kh)
+    while (ih < lh) {
+        if (kh[ih] == ky_h) { ret 1 }
+        ih = ih + 1
+    }
+    ret 0
+}
+func get(nd_g <- dict, ky_g <- string) -> dict {
+    vg = nd_g["v"]
+    ret vg["vals"][ky_g]
+}
+func arr_len(nd_l <- dict) -> int {
+    ret util.arr_length(nd_l["v"])
+}
+func arr_get(nd_a <- dict, i_a2 <- int) -> dict {
+    ret nd_a["v"][i_a2]
+}
+func str_val(nd_s <- dict) -> string {
+    ret nd_s["v"]
+}
+func int_val(nd_i <- dict) -> int {
+    ret nd_i["v"]
+}
+func dbl_val(nd_d <- dict) -> double {
+    ret nd_d["v"]
+}
+func bool_val(nd_b <- dict) -> int {
+    ret nd_b["v"]
+}
+func is_null(nd_n <- dict) -> int {
+    if (nd_n["t"] == "null") { ret 1 }
+    ret 0
+}

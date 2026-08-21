@@ -1,0 +1,27 @@
+import fox.gl.fg -> fg
+import fox.std.util -> util
+
+func main() -> void {
+    font = "NotoSansSC-VariableFont_wght.ttf"
+    win = fg.create_window("chatbox test", 500, 320)
+    fg.set_scale(win, 500, 320)
+    msg = ""
+    last = ""
+    while (1) {
+        if (fg.window_should_close(win) == 1) { break }
+        if (fg.key_down(win, "q") == 1) { break }
+        msg = fg.text_input(win, 30, 200, 440, 42, font, 24)
+        if (fg.button(win, 30, 260, 120, 40, font, "Send") == 1) {
+            last = msg
+            msg = ""
+        }
+        fg.clear_color(0.05, 0.07, 0.11, 1.0)
+        fg.clear()
+        fg.draw_text(font, "CHAT INPUT TEST (type, Enter sends, Q quit)", 30, 40, 22, 1.0, 1.0, 1.0)
+        fg.draw_text(font, "typed: " + msg, 30, 90, 22, 0.6, 1.0, 0.6)
+        fg.draw_text(font, "sent:  " + last, 30, 130, 22, 0.5, 0.8, 1.0)
+        fg.update(win)
+    }
+    fg.close()
+    println("chat test done")
+}

@@ -1,0 +1,115 @@
+# flog_cfg.fox - flog configuration and level helpers.
+#
+# flog has no global state (FoxVast is purely functional): every configuration
+# is a dict that flows through function parameters and return values. All
+# "set_*" helpers return a NEW dict; pass the result to the next call.
+#
+# Config keys:
+#   level      int 0..4   minimum level that is emitted (0=debug .. 4=fatal)
+#   format     string     output template (see flog_render.fox for placeholders)
+#   time_fmt   string     strftime template used for {time}
+#   name       string     module/tag printed for {name}, may be ""
+#   output     string     "console" | "file" | "both"
+#   file_path  string     log file path (used when output is file/both)
+#   append     int        1 = append to file, 0 = overwrite
+#   color      int        1 = ANSI colors on the console ({color}/{reset}),
+#                         0 = plain (default). Files are always plain.
+#   color_map  dict       per-level ANSI SGR code, keys "0".."4":
+#                         {"0": 90, "1": 32, "2": 33, "3": 31, "4": 35}
+#                         (grey/green/yellow/red/magenta). Change codes with
+#                         flog_set_color_code.
+#
+# NOTE: single-line dict literals only; multi-line dicts are not supported by
+# the language parser (statement collection stops at newline).
+
+func flog_level_num(l <- string) -> int {
+    if (l == "debug") { ret 0 }
+    if (l == "info") { ret 1 }
+    if (l == "warn") { ret 2 }
+    if (l == "error") { ret 3 }
+    if (l == "fatal") { ret 4 }
+    ret 1
+}
+
+func flog_level_name(l <- int) -> string {
+    if (l == 0) { ret "DEBUG" }
+    if (l == 1) { ret "INFO" }
+    if (l == 2) { ret "WARN" }
+    if (l == 3) { ret "ERROR" }
+    if (l == 4) { ret "FATAL" }
+    ret "INFO"
+}
+
+# Default configuration: debug level, console output, standard template.
+# The {color}/{reset} tokens are stripped (become empty) when color=0, so the
+# default output is byte-identical to the plain template until colors are on.
+func flog_default_config() -> dict {
+    ret {"level": 0, "format": "{color}{time} [{level}] {msg}{reset}", "time_fmt": "%Y-%m-%d %H:%M:%S", "name": "", "output": "console", "file_path": "log.txt", "append": 1, "color": 0, "color_map": {"0": 90, "1": 32, "2": 33, "3": 31, "4": 35}}
+}
+
+# Build a complete config from a dict that already carries values for ALL
+# nine keys (the setters pass the full set).
+func flog_apply(c <- dict, overrides <- dict) -> dict {
+    ret {"level": overrides["level"], "format": overrides["format"], "time_fmt": overrides["time_fmt"], "name": overrides["name"], "output": overrides["output"], "file_path": overrides["file_path"], "append": overrides["append"], "color": overrides["color"], "color_map": overrides["color_map"]}
+}
+
+# ---- Individual setters (all return a new config dict) ----
+
+func flog_set_level(c <- dict, l <- int) -> dict {
+    if (l < 0) { l = 0 }
+    if (l > 4) { l = 4 }
+    ret {"level": l, "format": c["format"], "time_fmt": c["time_fmt"], "name": c["name"], "output": c["output"], "file_path": c["file_path"], "append": c["append"], "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_level_name(c <- dict, l <- string) -> dict {
+    ret flog.flog_set_level(c, flog.flog_level_num(l))
+}
+
+func flog_set_format(c <- dict, fmt <- string) -> dict {
+    ret {"level": c["level"], "format": fmt, "time_fmt": c["time_fmt"], "name": c["name"], "output": c["output"], "file_path": c["file_path"], "append": c["append"], "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_time_fmt(c <- dict, fmt <- string) -> dict {
+    ret {"level": c["level"], "format": c["format"], "time_fmt": fmt, "name": c["name"], "output": c["output"], "file_path": c["file_path"], "append": c["append"], "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_name(c <- dict, n <- string) -> dict {
+    ret {"level": c["level"], "format": c["format"], "time_fmt": c["time_fmt"], "name": n, "output": c["output"], "file_path": c["file_path"], "append": c["append"], "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_output(c <- dict, o <- string) -> dict {
+    if ((o != "console") and (o != "file") and (o != "both")) { o = "console" }
+    ret {"level": c["level"], "format": c["format"], "time_fmt": c["time_fmt"], "name": c["name"], "output": o, "file_path": c["file_path"], "append": c["append"], "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_path(c <- dict, p <- string) -> dict {
+    ret {"level": c["level"], "format": c["format"], "time_fmt": c["time_fmt"], "name": c["name"], "output": c["output"], "file_path": p, "append": c["append"], "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_append(c <- dict, a <- int) -> dict {
+    if (a != 0) { a = 1 }
+    ret {"level": c["level"], "format": c["format"], "time_fmt": c["time_fmt"], "name": c["name"], "output": c["output"], "file_path": c["file_path"], "append": a, "color": c["color"], "color_map": c["color_map"]}
+}
+
+func flog_set_color(c <- dict, v <- int) -> dict {
+    if (v != 0) { v = 1 }
+    ret {"level": c["level"], "format": c["format"], "time_fmt": c["time_fmt"], "name": c["name"], "output": c["output"], "file_path": c["file_path"], "append": c["append"], "color": v, "color_map": c["color_map"]}
+}
+
+# Pick a custom ANSI SGR code for one level (0..4), e.g. flog_set_color_code(c, 3, 91)
+# makes error bright red. Common codes: 30-37 basic, 90-97 bright, 0 reset.
+func flog_set_color_code(c <- dict, l <- int, code <- int) -> dict {
+    if (l < 0) { l = 0 }
+    if (l > 4) { l = 4 }
+    fc_cm0 = c["color_map"]["0"]
+    fc_cm1 = c["color_map"]["1"]
+    fc_cm2 = c["color_map"]["2"]
+    fc_cm3 = c["color_map"]["3"]
+    fc_cm4 = c["color_map"]["4"]
+    if (l == 0) { fc_cm0 = code }
+    if (l == 1) { fc_cm1 = code }
+    if (l == 2) { fc_cm2 = code }
+    if (l == 3) { fc_cm3 = code }
+    if (l == 4) { fc_cm4 = code }
+    ret {"level": c["level"], "format": c["format"], "time_fmt": c["time_fmt"], "name": c["name"], "output": c["output"], "file_path": c["file_path"], "append": c["append"], "color": c["color"], "color_map": {"0": fc_cm0, "1": fc_cm1, "2": fc_cm2, "3": fc_cm3, "4": fc_cm4}}
+}

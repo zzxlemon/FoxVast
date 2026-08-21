@@ -1,0 +1,174 @@
+import fox.std.util -> u
+import fox.std.random -> r
+
+func main() -> void{
+    W = 10
+    H = 10
+    MAX = 30  # cap snake length so the fixed-size arrays never overflow
+
+    # Two parallel arrays track each body segment's coordinates.
+    # snakeX[0],snakeY[0] = head; rest = tail.  Unused tail slots stay 0.
+    snakeX = [5, 4, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    snakeY = [5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    snakeLen = 3
+    dir = 3  # 0=up, 1=down, 2=left, 3=right
+
+    # Keep rolling random food positions until one lands on empty space
+    gotFood = 0
+    while (gotFood == 0){
+        foodX = r.random("int", 0, 9)
+        foodY = r.random("int", 0, 9)
+        gotFood = 1
+        i = 0
+        while (i < snakeLen){
+            if (foodX == snakeX[i] and foodY == snakeY[i]){
+                gotFood = 0
+            }
+            i = i + 1
+        }
+    }
+
+    gameOver = 0
+    while (gameOver == 0){
+        println("")
+        k = 0
+        topBorder = "#"
+        while (k < W){
+            topBorder = topBorder + "#"
+            k = k + 1
+        }
+        topBorder = topBorder + "#"
+        println(topBorder)
+
+        # Scan every (x,y) cell: match against snake and food to pick the character
+        y = 0
+        while (y < H){
+            row = "#"
+            x = 0
+            while (x < W){
+                ch = "."
+                i = 0
+                while (i < snakeLen){
+                    if (x == snakeX[i] and y == snakeY[i]){
+                        if (i == 0){
+                            ch = "H"
+                        }
+                        if (i > 0){
+                            ch = "S"
+                        }
+                    }
+                    i = i + 1
+                }
+                if (x == foodX and y == foodY){
+                    ch = "F"
+                }
+                row = row + ch
+                x = x + 1
+            }
+            row = row + "#"
+            println(row)
+            y = y + 1
+        }
+
+        bottomBorder = "#"
+        k = 0
+        while (k < W){
+            bottomBorder = bottomBorder + "#"
+            k = k + 1
+        }
+        bottomBorder = bottomBorder + "#"
+        println(bottomBorder)
+        # Bytecode VM doesn't auto-coerce int to string in concatenation
+        println("Score: " + u.IntChangeString(snakeLen - 3))
+
+        print("Dir(w/a/s/d/q): ")
+        input() -> inStr
+
+        if (inStr == "q"){
+            gameOver = 1
+        }
+
+        newDir = -1
+        if (inStr == "w"){ newDir = 0 }
+        if (inStr == "s"){ newDir = 1 }
+        if (inStr == "a"){ newDir = 2 }
+        if (inStr == "d"){ newDir = 3 }
+
+        # Block 180-degree reversal so the snake can't instantly self-intersect
+        if (newDir >= 0){
+            if (dir == 0 and newDir == 1){ newDir = dir }
+            if (dir == 1 and newDir == 0){ newDir = dir }
+            if (dir == 2 and newDir == 3){ newDir = dir }
+            if (dir == 3 and newDir == 2){ newDir = dir }
+            dir = newDir
+        }
+
+        dx = 0
+        dy = 0
+        if (dir == 0){ dy = -1 }
+        if (dir == 1){ dy = 1 }
+        if (dir == 2){ dx = -1 }
+        if (dir == 3){ dx = 1 }
+
+        newX = snakeX[0] + dx
+        newY = snakeY[0] + dy
+
+        # Wall collision kills the snake
+        if (newX < 0){ gameOver = 1 }
+        if (newX >= W){ gameOver = 1 }
+        if (newY < 0){ gameOver = 1 }
+        if (newY >= H){ gameOver = 1 }
+
+        if (gameOver == 0){
+            eatFood = 0
+            if (newX == foodX and newY == foodY){
+                eatFood = 1
+                snakeLen = snakeLen + 1
+                if (snakeLen > MAX){
+                    snakeLen = MAX
+                }
+            }
+
+            # Shift every body segment forward by one, then place the head
+            i = snakeLen - 1
+            while (i > 0){
+                snakeX[i] = snakeX[i - 1]
+                snakeY[i] = snakeY[i - 1]
+                i = i - 1
+            }
+            snakeX[0] = newX
+            snakeY[0] = newY
+
+            # Check self-collision AFTER the move so the vacated tail
+            # cell doesn't trigger a false positive
+            if (eatFood == 0){
+                i = 1
+                while (i < snakeLen){
+                    if (newX == snakeX[i] and newY == snakeY[i]){
+                        gameOver = 1
+                    }
+                    i = i + 1
+                }
+            }
+
+            if (eatFood == 1){
+                gotFood = 0
+                while (gotFood == 0){
+                    foodX = r.random("int", 0, 9)
+                    foodY = r.random("int", 0, 9)
+                    gotFood = 1
+                    i = 0
+                    while (i < snakeLen){
+                        if (foodX == snakeX[i] and foodY == snakeY[i]){
+                            gotFood = 0
+                        }
+                        i = i + 1
+                    }
+                }
+            }
+        }
+    }
+
+    println("Game Over! Score: " + u.IntChangeString(snakeLen - 3))
+    exit(0)
+}

@@ -1,0 +1,60 @@
+# flog_output.fox - write a rendered line to the configured destinations.
+import fox.sys.io.fs
+#
+# File logging opens the file per line (open -> write -> close): FoxVast has
+# no global state, so no handle is kept between calls. This is reliable (no
+# leaked handles) and cheap enough for typical log volumes.
+
+# Write one line to the log file configured in c. append=1 appends (default),
+# append=0 overwrites the file with this line.
+func _flog_file_write(c <- dict, line <- string) -> void {
+    mode = "append"
+    if (c["append"] == 0) { mode = "write" }
+    h = file.file_open(c["file_path"], mode)
+    file.file_write(h, line, 1)
+    file.file_close(h)
+}
+
+# Append a plain text line to an arbitrary file (utility, no config needed).
+func flog_append_file(path <- string, line <- string) -> void {
+    h = file.file_open(path, "append")
+    file.file_write(h, line, 1)
+    file.file_close(h)
+}
+
+# Overwrite a file with one line (utility; useful for stamp files).
+func flog_write_file(path <- string, line <- string) -> void {
+    h = file.file_open(path, "write")
+    file.file_write(h, line, 1)
+    file.file_close(h)
+}
+
+# Delete the configured log file (called manually; an open-handle error is
+# raised if the file is still in use, which cannot happen here).
+func flog_clear_file(c <- dict) -> void {
+    file.file_remove(c["file_path"])
+}
+
+# Core: honor the level filter, render, and dispatch to console/file/both.
+# The console gets the colored line when enabled; files always get the plain
+# rendering so log files never contain ANSI escapes.
+func _flog_emit(c <- dict, l <- int, msg <- string) -> void {
+    if (l < c["level"]) { ret }
+    line = flog.flog_render(c, l, msg)
+    if (c["output"] == "console" or c["output"] == "both") {
+        println(line)
+    }
+    if (c["output"] == "file" or c["output"] == "both") {
+        flog._flog_file_write(c, flog.flog_render_plain(c, l, msg))
+    }
+}
+
+# Same as _flog_emit but writes the rendered line to a specific file, leaving
+# the config untouched (handy for audit trails / per-module files).
+func _flog_emit_to(c <- dict, l <- int, msg <- string, path <- string) -> void {
+    if (l < c["level"]) { ret }
+    line = flog.flog_render_plain(c, l, msg)
+    h = file.file_open(path, "append")
+    file.file_write(h, line, 1)
+    file.file_close(h)
+}

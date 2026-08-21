@@ -8,7 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# ---- Shared runtime (value + common) �� linked by fox.exe and every DLL ----
+# ---- Shared runtime (value + common)linked by fox.exe and every DLL ----
 add_library(fox_rt STATIC
     src/frontend/value.cpp
     src/util/common.cpp

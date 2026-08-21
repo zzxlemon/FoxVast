@@ -1,0 +1,173 @@
+import fox.std.util -> u
+import fox.std.random -> r
+
+func main() -> void {
+    w0 = ["p","y","t","h","o","n"]
+    L0 = 6
+    w1 = ["h","a","n","g","m","a","n"]
+    L1 = 7
+    w2 = ["j","i","g","s","a","w"]
+    L2 = 6
+    w3 = ["p","u","z","z","l","e"]
+    L3 = 6
+    w4 = ["g","a","l","a","x","y"]
+    L4 = 6
+    w5 = ["k","n","i","g","h","t"]
+    L5 = 6
+    w6 = ["o","x","y","g","e","n"]
+    L6 = 6
+    w7 = ["f","r","o","z","e","n"]
+    L7 = 6
+    w8 = ["j","u","n","g","l","e"]
+    L8 = 6
+    w9 = ["c","a","n","y","o","n"]
+    L9 = 6
+
+    playAgain = 1
+    while (playAgain == 1) {
+        idx = r.random("int", 0, 9)
+        if (idx == 0) { wordLen = L0 }
+        if (idx == 1) { wordLen = L1 }
+        if (idx == 2) { wordLen = L2 }
+        if (idx == 3) { wordLen = L3 }
+        if (idx == 4) { wordLen = L4 }
+        if (idx == 5) { wordLen = L5 }
+        if (idx == 6) { wordLen = L6 }
+        if (idx == 7) { wordLen = L7 }
+        if (idx == 8) { wordLen = L8 }
+        if (idx == 9) { wordLen = L9 }
+
+        guessed = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        wrongLetters = ""
+        wrongCount = 0
+        maxWrong = 26
+        won = 0
+
+        while (won == 0 and wrongCount < maxWrong) {
+            println("")
+            print("  ")
+            i = 0
+            while (i < wordLen) {
+                if (idx == 0) { ch = w0[i] }
+                if (idx == 1) { ch = w1[i] }
+                if (idx == 2) { ch = w2[i] }
+                if (idx == 3) { ch = w3[i] }
+                if (idx == 4) { ch = w4[i] }
+                if (idx == 5) { ch = w5[i] }
+                if (idx == 6) { ch = w6[i] }
+                if (idx == 7) { ch = w7[i] }
+                if (idx == 8) { ch = w8[i] }
+                if (idx == 9) { ch = w9[i] }
+                if (guessed[i] == 1) {
+                    print(ch)
+                }
+                if (guessed[i] == 0) {
+                    print("_")
+                }
+                print(" ")
+                i = i + 1
+            }
+            println("")
+
+            if (wrongCount > 0) {
+                print("  Wrong: ")
+                print(wrongLetters)
+                print(" (")
+                print(u.IntChangeString(wrongCount))
+                println("/" + u.IntChangeString(maxWrong) + ")")
+            }
+
+            print("  Guess: ")
+            input() -> guess
+
+            found = 0
+            j = 0
+            while (j < wordLen) {
+                if (idx == 0) { ch = w0[j] }
+                if (idx == 1) { ch = w1[j] }
+                if (idx == 2) { ch = w2[j] }
+                if (idx == 3) { ch = w3[j] }
+                if (idx == 4) { ch = w4[j] }
+                if (idx == 5) { ch = w5[j] }
+                if (idx == 6) { ch = w6[j] }
+                if (idx == 7) { ch = w7[j] }
+                if (idx == 8) { ch = w8[j] }
+                if (idx == 9) { ch = w9[j] }
+                if (guess == ch and guessed[j] == 0) {
+                    guessed[j] = 1
+                    found = 1
+                }
+                j = j + 1
+            }
+
+            if (found == 0) {
+                wrongCount = wrongCount + 1
+                if (wrongLetters == "") {
+                    wrongLetters = guess
+                }
+                if (wrongLetters != "" and wrongLetters != guess) {
+                    wrongLetters = wrongLetters + " " + guess
+                }
+            }
+
+            allGuessed = 1
+            k = 0
+            while (k < wordLen) {
+                if (guessed[k] == 0) {
+                    allGuessed = 0
+                }
+                k = k + 1
+            }
+            if (allGuessed == 1) {
+                won = 1
+            }
+        }
+
+        println("")
+        println("  +-----+")
+        println("  |     |")
+        if (wrongCount >= 1) { println("  O     |") }
+        if (wrongCount < 1) { println("        |") }
+        if (wrongCount == 2) { println("  |     |") }
+        if (wrongCount == 3) { println(" /|     |") }
+        if (wrongCount >= 4) { println(" /|\\    |") }
+        if (wrongCount >= 1 and wrongCount <= 3) { println("        |") }
+        if (wrongCount == 5) { println(" /      |") }
+        if (wrongCount >= 6) { println(" / \\    |") }
+        if (wrongCount <= 4) { println("        |") }
+        println("  =======")
+
+        result = ""
+        i = 0
+        while (i < wordLen) {
+            if (idx == 0) { ch = w0[i] }
+            if (idx == 1) { ch = w1[i] }
+            if (idx == 2) { ch = w2[i] }
+            if (idx == 3) { ch = w3[i] }
+            if (idx == 4) { ch = w4[i] }
+            if (idx == 5) { ch = w5[i] }
+            if (idx == 6) { ch = w6[i] }
+            if (idx == 7) { ch = w7[i] }
+            if (idx == 8) { ch = w8[i] }
+            if (idx == 9) { ch = w9[i] }
+            result = result + ch
+            i = i + 1
+        }
+
+        if (won == 1) {
+            println("  You saved the hangman! Word: " + result)
+        }
+        if (won == 0) {
+            println("  Hangman died! Word was: " + result)
+        }
+
+        print("  Play again? (y/n): ")
+        input() -> again
+        if (again == "y" or again == "Y") {
+            playAgain = 1
+        }
+        if (again != "y" and again != "Y") {
+            playAgain = 0
+        }
+    }
+}
