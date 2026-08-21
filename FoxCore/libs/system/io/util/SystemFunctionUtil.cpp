@@ -264,3 +264,21 @@ Value Util::IntChangeDouble(const std::vector<Value>& args) {
 
     return Value(static_cast<double>(a.asInt()));
 }
+
+Value Util::TypeOf(const std::vector<Value>& args) {
+    if (args.size() != 1) {
+        throw std::runtime_error("typeof() requires one argument");
+    }
+    const char* name = "unknown";
+    switch (args[0].getType()) {
+    case Value::Type::Int: name = "int"; break;
+    case Value::Type::Double: name = "double"; break;
+    case Value::Type::String: name = "string"; break;
+    case Value::Type::Array: name = "array"; break;
+    case Value::Type::Dict: name = "dict"; break;
+    case Value::Type::Object: name = "object"; break;
+    case Value::Type::Bytes: name = "bytes"; break;
+    default: break;
+    }
+    return Value(std::string(name));
+}

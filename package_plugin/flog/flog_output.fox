@@ -40,12 +40,12 @@ func flog_clear_file(c <- dict) -> void {
 # rendering so log files never contain ANSI escapes.
 func _flog_emit(c <- dict, l <- int, msg <- string) -> void {
     if (l < c["level"]) { ret }
-    line = flog_render(c, l, msg)
+    line = flog.flog_render(c, l, msg)
     if (c["output"] == "console" or c["output"] == "both") {
         println(line)
     }
     if (c["output"] == "file" or c["output"] == "both") {
-        _flog_file_write(c, flog_render_plain(c, l, msg))
+        flog._flog_file_write(c, flog.flog_render_plain(c, l, msg))
     }
 }
 
@@ -53,7 +53,7 @@ func _flog_emit(c <- dict, l <- int, msg <- string) -> void {
 # the config untouched (handy for audit trails / per-module files).
 func _flog_emit_to(c <- dict, l <- int, msg <- string, path <- string) -> void {
     if (l < c["level"]) { ret }
-    line = flog_render_plain(c, l, msg)
+    line = flog.flog_render_plain(c, l, msg)
     h = file.file_open(path, "append")
     file.file_write(h, line, 1)
     file.file_close(h)

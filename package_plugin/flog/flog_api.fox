@@ -2,30 +2,30 @@
 
 # Log a message at an explicit numeric level (0=debug .. 4=fatal).
 func flog_log(c <- dict, l <- int, msg <- string) -> void {
-    _flog_emit(c, l, msg)
+    flog._flog_emit(c, l, msg)
 }
 
 # Render a line without writing it anywhere; useful for custom outputs.
 func flog_render_line(c <- dict, l <- int, msg <- string) -> string {
-    ret flog_render(c, l, msg)
+    ret flog.flog_render(c, l, msg)
 }
 
 # Same as flog_log but writes to a specific file instead of the configured
 # destination (config is not modified).
 func flog_log_to(c <- dict, l <- int, msg <- string, path <- string) -> void {
-    _flog_emit_to(c, l, msg, path)
+    flog._flog_emit_to(c, l, msg, path)
 }
 
 # Convenience level helpers.
-func flog_debug(c <- dict, msg <- string) -> void { _flog_emit(c, 0, msg) }
-func flog_info(c <- dict, msg <- string) -> void { _flog_emit(c, 1, msg) }
-func flog_warn(c <- dict, msg <- string) -> void { _flog_emit(c, 2, msg) }
-func flog_error(c <- dict, msg <- string) -> void { _flog_emit(c, 3, msg) }
-func flog_fatal(c <- dict, msg <- string) -> void { _flog_emit(c, 4, msg) }
+func flog_debug(c <- dict, msg <- string) -> void { flog._flog_emit(c, 0, msg) }
+func flog_info(c <- dict, msg <- string) -> void { flog._flog_emit(c, 1, msg) }
+func flog_warn(c <- dict, msg <- string) -> void { flog._flog_emit(c, 2, msg) }
+func flog_error(c <- dict, msg <- string) -> void { flog._flog_emit(c, 3, msg) }
+func flog_fatal(c <- dict, msg <- string) -> void { flog._flog_emit(c, 4, msg) }
 
 # Convenience level helpers writing to a specific file.
-func flog_debug_to(c <- dict, msg <- string, path <- string) -> void { _flog_emit_to(c, 0, msg, path) }
-func flog_info_to(c <- dict, msg <- string, path <- string) -> void { _flog_emit_to(c, 1, msg, path) }
-func flog_warn_to(c <- dict, msg <- string, path <- string) -> void { _flog_emit_to(c, 2, msg, path) }
-func flog_error_to(c <- dict, msg <- string, path <- string) -> void { _flog_emit_to(c, 3, msg, path) }
-func flog_fatal_to(c <- dict, msg <- string, path <- string) -> void { _flog_emit_to(c, 4, msg, path) }
+func flog_debug_to(c <- dict, msg <- string, path <- string) -> void { flog._flog_emit_to(c, 0, msg, path) }
+func flog_info_to(c <- dict, msg <- string, path <- string) -> void { flog._flog_emit_to(c, 1, msg, path) }
+func flog_warn_to(c <- dict, msg <- string, path <- string) -> void { flog._flog_emit_to(c, 2, msg, path) }
+func flog_error_to(c <- dict, msg <- string, path <- string) -> void { flog._flog_emit_to(c, 3, msg, path) }
+func flog_fatal_to(c <- dict, msg <- string, path <- string) -> void { flog._flog_emit_to(c, 4, msg, path) }

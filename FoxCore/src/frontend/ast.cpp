@@ -522,7 +522,10 @@ Value::Type CallExpr::compileBytecode(CompiledFunction& cf,
         // name is compiled as an object method call on 'prefix'.
         auto& libMgr = LibraryManager::getInstance();
         std::string resolvedLib = libMgr.resolveAlias(prefix);
+        bool isNamespacedScriptFn = BytecodeCompiler::s_userFuncNames.find(funcName)
+            != BytecodeCompiler::s_userFuncNames.end();
         if (prefix != "co" &&
+            !isNamespacedScriptFn &&
             !(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
             int objIdx = cf.addConstantStringDedup(prefix);
             cf.chunk.writeOp(OpCode::OP_GET_GLOBAL);
@@ -550,8 +553,12 @@ Value::Type CallExpr::compileBytecode(CompiledFunction& cf,
 
 Value::Type BinaryExpr::compileBytecode(CompiledFunction& cf,
     std::unordered_map<std::string, Value::Type>& varTypes) const {
+    // Super-instruction folding: a small int literal on the RHS is embedded
+    // in the opcode (OP_ADD_IMM etc.), skipping the OP_CONSTANT round-trip.
+    const NumberExpr* immRhs = dynamic_cast<const NumberExpr*>(this->right.get());
+    bool canFold = immRhs != nullptr && immRhs->value >= -128 && immRhs->value <= 127;
     Value::Type leftType = this->left->compileBytecode(cf, varTypes);
-    Value::Type rightType = this->right->compileBytecode(cf, varTypes);
+    Value::Type rightType = canFold ? Value::Type::Int : this->right->compileBytecode(cf, varTypes);
     if (leftType != Value::Type::Unknown && rightType != Value::Type::Unknown &&
         leftType != Value::Type::Void && rightType != Value::Type::Void) {
         if ((leftType == Value::Type::Double && rightType == Value::Type::Int) ||
@@ -574,6 +581,20 @@ Value::Type BinaryExpr::compileBytecode(CompiledFunction& cf,
         if (leftType != Value::Type::String && rightType == Value::Type::String) {
             throw std::runtime_error("TypeError: Cannot add non-string and string");
         }
+    }
+    if (canFold) {
+        OpCode immOp;
+        switch (op) {
+        case TOKEN_PLUS: immOp = OpCode::OP_ADD_IMM; break;
+        case TOKEN_MINUS: immOp = OpCode::OP_SUB_IMM; break;
+        case TOKEN_MUL: immOp = OpCode::OP_MUL_IMM; break;
+        case TOKEN_DIV: immOp = OpCode::OP_DIV_IMM; break;
+        case TOKEN_MOD: immOp = OpCode::OP_MOD_IMM; break;
+        default: throw std::runtime_error("BytecodeCompiler: unsupported binary operator");
+        }
+        cf.chunk.writeOp(immOp);
+        cf.chunk.writeByte(static_cast<uint8_t>(immRhs->value));
+        return (leftType == Value::Type::Int) ? Value::Type::Int : Value::Type::Unknown;
     }
     OpCode opcode;
     switch (op) {
@@ -642,14 +663,33 @@ Value::Type CastExpr::compileBytecode(CompiledFunction& cf,
 
 Value::Type CompareExpr::compileBytecode(CompiledFunction& cf,
     std::unordered_map<std::string, Value::Type>& varTypes) const {
+    // Super-instruction folding for comparisons against small int literals
+    // (OP_LT_IMM etc.), skipping the OP_CONSTANT round-trip.
+    const NumberExpr* immRhs = dynamic_cast<const NumberExpr*>(this->right.get());
+    bool canFold = immRhs != nullptr && immRhs->value >= -128 && immRhs->value <= 127;
     Value::Type leftType = left->compileBytecode(cf, varTypes);
-    Value::Type rightType = right->compileBytecode(cf, varTypes);
+    Value::Type rightType = canFold ? Value::Type::Int : right->compileBytecode(cf, varTypes);
     if (leftType != Value::Type::Unknown && rightType != Value::Type::Unknown &&
         leftType != Value::Type::Void && rightType != Value::Type::Void) {
         if ((leftType == Value::Type::Double && rightType == Value::Type::Int) ||
             (leftType == Value::Type::Int && rightType == Value::Type::Double)) {
             throw std::runtime_error("TypeError: Cannot compare int and double without explicit cast");
         }
+    }
+    if (canFold) {
+        OpCode immOp;
+        switch (op) {
+        case CompareType::EQ: immOp = OpCode::OP_EQ_IMM; break;
+        case CompareType::NE: immOp = OpCode::OP_NE_IMM; break;
+        case CompareType::GT: immOp = OpCode::OP_GT_IMM; break;
+        case CompareType::LT: immOp = OpCode::OP_LT_IMM; break;
+        case CompareType::GE: immOp = OpCode::OP_GE_IMM; break;
+        case CompareType::LE: immOp = OpCode::OP_LE_IMM; break;
+        default: throw std::runtime_error("BytecodeCompiler: unsupported comparison operator");
+        }
+        cf.chunk.writeOp(immOp);
+        cf.chunk.writeByte(static_cast<uint8_t>(immRhs->value));
+        return Value::Type::Int;
     }
     OpCode opcode;
     switch (op) {

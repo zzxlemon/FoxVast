@@ -15,7 +15,7 @@ func mk_num(x_mn <- double) -> dict {
         ret {"t": "num", "v": xm, "s": util.IntChangeString(xm)}
     }
     sm = util.DoubleChangeString(x_mn)
-    sm = _trim_zero(sm)
+    sm = fjson._trim_zero(sm)
     ret {"t": "num", "v": x_mn, "s": sm}
 }
 func mk_obj() -> dict {
@@ -29,7 +29,7 @@ func obj_set(nd_set <- dict, ky_set <- string, vl_set <- dict) -> dict {
     kbs = vob["keys"]
     vbs = vob["vals"]
     nkob = kbs
-    hob = obj_has(nd_set, ky_set)
+    hob = fjson.obj_has(nd_set, ky_set)
     if (hob == 0) { nkob = util.arr_append(nkob, ky_set) }
     nvob = {}
     iob = 0

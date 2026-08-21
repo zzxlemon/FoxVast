@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 
-// Token ����ö��
 enum TokenT {
     TOKEN_IDENTIFIER,    
     TOKEN_NUMBER,         
@@ -68,7 +67,12 @@ enum TokenT {
     TOKEN_ERROR,
     TOKEN_CLASS,
     TOKEN_STRUCT,
-    TOKEN_YIELD
+    TOKEN_YIELD,
+    TOKEN_PLUS_EQ,   // +=
+    TOKEN_MINUS_EQ,  // -=
+    TOKEN_MUL_EQ,    // *=
+    TOKEN_DIV_EQ,    // /=
+    TOKEN_MOD_EQ     // %=
 };
 
 struct Token {

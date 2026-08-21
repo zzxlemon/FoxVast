@@ -8,31 +8,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# ---- Version (single source of truth, overridable with -DFOX_VERSION=...) ----
-set(FOX_VERSION_DEFAULT "1.4.2")
-set(FOX_VM_VERSION_DEFAULT "1.3.210+b1")
-
-execute_process(
-    COMMAND git describe --tags --abbrev=0 --match "FoxVast-v*"
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    OUTPUT_VARIABLE FOX_GIT_TAG
-    OUTPUT_STRIP_TRAILING_WHITESPACE
-    ERROR_QUIET
-)
-set(FOX_VERSION_AUTO "${FOX_VERSION_DEFAULT}")
-if(FOX_GIT_TAG)
-    string(REGEX REPLACE "^FoxVast-v" "" FOX_VERSION_AUTO "${FOX_GIT_TAG}")
-endif()
-
-if(NOT DEFINED FOX_VERSION OR FOX_VERSION STREQUAL "${FOX_VERSION_DEFAULT}")
-    set(FOX_VERSION "${FOX_VERSION_AUTO}")
-endif()
-set(FOX_VERSION "${FOX_VERSION}" CACHE STRING "FoxVast release version" FORCE)
-set(FOX_VM_VERSION "${FOX_VM_VERSION_DEFAULT}" CACHE STRING "FoxVast VM version")
-
-configure_file(src/util/version.hpp.in ${CMAKE_CURRENT_BINARY_DIR}/generated/version.hpp @ONLY)
-
-# ---- Shared runtime (value + common) ¡ª linked by fox.exe and every DLL ----
+# ---- Shared runtime (value + common) ï¿½ï¿½ linked by fox.exe and every DLL ----
 add_library(fox_rt STATIC
     src/frontend/value.cpp
     src/util/common.cpp
@@ -43,7 +19,6 @@ target_include_directories(fox_rt PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter
     ${CMAKE_CURRENT_SOURCE_DIR}/src/util
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vm
-    ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 set_target_properties(fox_rt PROPERTIES POSITION_INDEPENDENT_CODE ON)
 

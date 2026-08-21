@@ -62,7 +62,7 @@ func flog_set_level(c <- dict, l <- int) -> dict {
 }
 
 func flog_set_level_name(c <- dict, l <- string) -> dict {
-    ret flog_set_level(c, flog_level_num(l))
+    ret flog.flog_set_level(c, flog.flog_level_num(l))
 }
 
 func flog_set_format(c <- dict, fmt <- string) -> dict {

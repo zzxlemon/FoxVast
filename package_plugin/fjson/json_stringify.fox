@@ -34,38 +34,38 @@ func _s_num(nd_m <- dict) -> string {
 }
 func _s_obj(nd_o <- dict) -> string {
     vo = nd_o["v"]
-    ret _s_obj_loop(vo["keys"], vo["vals"], 0, "{")
+    ret fjson._s_obj_loop(vo["keys"], vo["vals"], 0, "{")
 }
 func _s_obj_loop(ks_l <- dict, vl_l <- dict, i_l <- int, ot_l <- string) -> string {
     lso = util.arr_length(ks_l)
     if (i_l >= lso) { ret ot_l + "}" }
     kko = ks_l[i_l]
     if (i_l > 0) {
-        ret _s_obj_loop(ks_l, vl_l, i_l + 1, ot_l + "," + "\"" + _s_str(kko) + "\":" + stringify(vl_l[kko]))
+        ret fjson._s_obj_loop(ks_l, vl_l, i_l + 1, ot_l + "," + "\"" + fjson._s_str(kko) + "\":" + fjson.stringify(vl_l[kko]))
     }
-    ret _s_obj_loop(ks_l, vl_l, i_l + 1, ot_l + "\"" + _s_str(kko) + "\":" + stringify(vl_l[kko]))
+    ret fjson._s_obj_loop(ks_l, vl_l, i_l + 1, ot_l + "\"" + fjson._s_str(kko) + "\":" + fjson.stringify(vl_l[kko]))
 }
 func _s_arr(nd_r <- dict) -> string {
-    ret _s_arr_loop(nd_r["v"], 0, "[")
+    ret fjson._s_arr_loop(nd_r["v"], 0, "[")
 }
 func _s_arr_loop(v_r <- dict, i_r <- int, ot_r <- string) -> string {
     lsa = util.arr_length(v_r)
     if (i_r >= lsa) { ret ot_r + "]" }
     vva = v_r[i_r]
     if (i_r > 0) {
-        ret _s_arr_loop(v_r, i_r + 1, ot_r + "," + stringify(vva))
+        ret fjson._s_arr_loop(v_r, i_r + 1, ot_r + "," + fjson.stringify(vva))
     }
-    ret _s_arr_loop(v_r, i_r + 1, ot_r + stringify(vva))
+    ret fjson._s_arr_loop(v_r, i_r + 1, ot_r + fjson.stringify(vva))
 }
 func stringify(nd_sf <- dict) -> string {
     ts = nd_sf["t"]
-    if (ts == "obj") { ret _s_obj(nd_sf) }
-    if (ts == "arr") { ret _s_arr(nd_sf) }
+    if (ts == "obj") { ret fjson._s_obj(nd_sf) }
+    if (ts == "arr") { ret fjson._s_arr(nd_sf) }
     if (ts == "str") {
-        svs = {"r": _s_str(nd_sf["v"])}["r"]
+        svs = {"r": fjson._s_str(nd_sf["v"])}["r"]
         ret "\"" + svs + "\""
     }
-    if (ts == "num") { ret _s_num(nd_sf) }
+    if (ts == "num") { ret fjson._s_num(nd_sf) }
     if (ts == "bool") {
         if (nd_sf["v"] == 1) { ret "true" }
         ret "false"

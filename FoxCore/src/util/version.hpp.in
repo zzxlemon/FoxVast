@@ -1,4 +1,0 @@
-#pragma once
-
-#define FOX_VERSION "@FOX_VERSION@"
-#define FOX_VM_VERSION "@FOX_VM_VERSION@"

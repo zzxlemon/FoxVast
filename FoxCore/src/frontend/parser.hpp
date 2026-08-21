@@ -33,9 +33,16 @@ struct LangErrorException : std::exception {
 // Cross-file import support: 'import "file.fox"' statements are recorded here
 // (resolved to full paths) while parsing; the interpreter/compiler then merge
 // the functions of every imported file. import_base_file is the file currently
-// being parsed, used to resolve relative import paths.
-extern std::vector<std::string> imported_source_files;
+// being parsed, used to resolve relative import paths. Each entry carries the
+// namespace prefix (empty for the main file) and an optional alias; functions
+// of imported files are registered as "namespace.name" plus, when an alias is
+// given, an extra copy as "alias.name". import_prefix is the prefix of the
+// file being parsed, inherited by nested "import" statements inside a plugin;
+// import_alias likewise carries the plugin's alias into its nested imports.
+extern std::vector<std::tuple<std::string, std::string, std::string>> imported_source_files;
 extern std::string import_base_file;
+extern std::string import_prefix;
+extern std::string import_alias;
 
 struct ClassField {
     std::string name;

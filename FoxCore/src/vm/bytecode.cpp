@@ -500,9 +500,11 @@ void BytecodeCompiler::skipWhitespace(Lexer& lexer, Token& token) {
 }
 
 bool BytecodeCompiler::s_expandImports = true;
+std::unordered_set<std::string> BytecodeCompiler::s_userFuncNames;
 
 CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::string& filename) {
     program = CompiledProgram();
+    s_userFuncNames.clear();
     g_classRegistry.clear(); // fresh class/struct definitions per program
 
     // Initialize system libraries before parsing (needed for import resolution)
@@ -513,11 +515,41 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
     std::unordered_map<std::string, Function> parsedFunctions;
     std::unordered_map<std::string, std::string> funcOrigins; // func name -> source file
 
-    auto parseInto = [&](const std::string& src, const std::string& label) {
+    auto parseInto = [&](const std::string& src, const std::string& label,
+        const std::string& ns, const std::string& alias) {
         std::unordered_map<std::string, Value> fileVars;
         std::unordered_map<std::string, Function> fileFuncs;
         Parser parser(src, fileVars, fileFuncs);
+        import_prefix = ns;
+        import_alias = alias;
         parser.parseAllFunctions();
+        import_prefix.clear();
+        import_alias.clear();
+        // Namespace the functions of imported files: "namespace.name".
+        // They can only be called with the prefix (libname.func(...)),
+        // mirroring the system-library call convention. An optional alias
+        // registers a second copy under "alias.name".
+        if (!ns.empty()) {
+            std::unordered_map<std::string, Function> renamed;
+            for (auto& [funcName, func] : fileFuncs) {
+                func.name = ns + "." + funcName;
+                renamed[ns + "." + funcName] = std::move(func);
+            }
+            fileFuncs = std::move(renamed);
+    if (!alias.empty() && alias != ns) {
+        std::unordered_map<std::string, Function> aliases;
+        for (const auto& [funcName, func] : fileFuncs) {
+            if (funcName.size() > ns.size()
+                && funcName.compare(0, ns.size() + 1, ns + ".") == 0) {
+                std::string bare = funcName.substr(ns.size() + 1);
+                Function copy = func;
+                copy.name = alias + "." + bare;
+                aliases[alias + "." + bare] = std::move(copy);
+            }
+        }
+        fileFuncs.insert(aliases.begin(), aliases.end());
+    }
+        }
         for (const auto& [funcName, func] : fileFuncs) {
             auto it = parsedFunctions.find(funcName);
             if (it != parsedFunctions.end()) {
@@ -534,21 +566,23 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
     // cycles and duplicate processing.
     imported_source_files.clear();
     import_base_file = filename;
-    parseInto(source, filename.empty() ? "<main>" : filename);
+    parseInto(source, filename.empty() ? "<main>" : filename, "", "");
 
     if (s_expandImports) {
     std::unordered_set<std::string> visited;
     for (size_t idx = 0; idx < imported_source_files.size(); idx++) {
         // Copy: parsing appends to imported_source_files (nested imports),
         // which may reallocate the vector.
-        std::string path = imported_source_files[idx];
+        std::string path = std::get<0>(imported_source_files[idx]);
+        std::string ns = std::get<1>(imported_source_files[idx]);
+        std::string alias = std::get<2>(imported_source_files[idx]);
         if (!visited.insert(path).second) continue;
         std::string src = read_file(path);
         if (src.empty()) {
             throw std::runtime_error("Cannot read imported file: " + path);
         }
         import_base_file = path;
-        parseInto(src, path);
+        parseInto(src, path, ns, alias);
     }
     }
     import_base_file.clear();
@@ -564,7 +598,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
 
     // Collect user-defined function names for call validation
     for (const auto& [funcName, func] : parsedFunctions) {
-        userFuncNames.insert(funcName);
+        s_userFuncNames.insert(funcName);
     }
 
     // Compile each function
@@ -586,7 +620,7 @@ CompiledProgram BytecodeCompiler::compile(const std::string& source, const std::
         // Ensure every function ends with a return instruction.
         // NOTE: cannot use code.back() here: the operand byte of a 0-arg OP_CALL
         // is 0x00, which collides with the OP_RETURN opcode (P0-2). Appending
-        // unconditionally is safe �� an already-emitted OP_RETURN pops the frame,
+        // unconditionally is safe ?? an already-emitted OP_RETURN pops the frame,
         // so a trailing extra OP_RETURN is dead code.
         cf.chunk.writeOp(OpCode::OP_RETURN);
 
@@ -713,7 +747,10 @@ void BytecodeCompiler::compileFunctionBody(CompiledFunction& cf, const std::vect
                 std::string prefix = name.substr(0, dot);
                 auto& libMgr = LibraryManager::getInstance();
                 std::string resolvedLib = libMgr.resolveAlias(prefix);
+                bool isNsScript = BytecodeCompiler::s_userFuncNames.find(name)
+                    != BytecodeCompiler::s_userFuncNames.end();
                 if (prefix != "co" &&
+                    !isNsScript &&
                     !(libMgr.hasLibrary(resolvedLib) && libMgr.isImported(resolvedLib))) {
                     // Object method call statement: obj.method(args)
                     int objIdx = cf.addConstantStringDedup(prefix);
@@ -1097,7 +1134,7 @@ bool BytecodeCompiler::validateCall(const std::string& name) {
         return true;
     }
 
-    if (userFuncNames.find(name) != userFuncNames.end()) {
+    if (s_userFuncNames.find(name) != s_userFuncNames.end()) {
         return true;
     }
 
@@ -1171,9 +1208,13 @@ void VM::traceGC(Gc& gc) {
     for (const auto& v : stack) v.traceGC();
     for (const auto& [name, v] : globals) v.traceGC();
     for (const auto& v : globalVector_) v.traceGC();
-    for (const auto& frame : frames) {
+for (const auto& frame : frames) {
         for (const auto& v : frame.locals) v.traceGC();
         for (const auto& [name, v] : frame.savedGlobals) v.traceGC();
+        for (size_t i = 0; i < frame.paramSaveCount && i < 4; i++) {
+            frame.paramSavesSmall[i].traceGC();
+        }
+        for (const auto& v : frame.paramSavesBig) v.traceGC();
         frame.ctorResult.traceGC();
     }
     for (const auto& c : program.functions) {
@@ -1205,11 +1246,62 @@ void VM::loadProgram(const CompiledProgram& prog) {
     globalNames_.clear();
     globalSlots_.clear();
     globalConstCache_.clear();
+    paramSlots_.clear();
     stack.clear();
     frames.clear();
     tryHandlers.clear();
     coroutines_.clear();
     runtimeError = false;
+}
+
+// ---- parameter binding helpers ------------------------------------------
+// Parameters are globals by language design. Binding writes the argument
+// into the parameter's global slot; the previous slot value is saved in the
+// frame so it can be restored on return (recursion-safe). The name-keyed
+// `globals` map is NOT touched on the hot path; flushGlobals() syncs the
+// vector into it at library call boundaries.
+void VM::bindParams(CallFrame& frame, const CompiledFunction& func,
+                    const std::vector<Value>& args) {
+    size_t n = func.parameters.size();
+    auto& slots = paramSlots_[&func];
+    if (slots.empty()) {
+        slots.reserve(n);
+        for (const auto& p : func.parameters) {
+            slots.push_back(getOrCreateSlot(p.name));
+        }
+    }
+    frame.paramSlotsPtr = &slots;
+    frame.paramSaveCount = n;
+    if (n <= 4) {
+        for (size_t i = 0; i < n; i++) {
+            frame.paramSavesSmall[i] = globalVector_[slots[i]];
+            globalVector_[slots[i]] = args[i];
+        }
+    } else {
+        frame.paramSavesBig.resize(n);
+        for (size_t i = 0; i < n; i++) {
+            frame.paramSavesBig[i] = globalVector_[slots[i]];
+            globalVector_[slots[i]] = args[i];
+        }
+    }
+}
+
+void VM::restoreParams(CallFrame& frame) {
+    size_t n = frame.paramSaveCount;
+    if (n == 0) {
+        return;
+    }
+    const auto& slots = *frame.paramSlotsPtr;
+    if (n <= 4) {
+        for (size_t i = 0; i < n; i++) {
+            globalVector_[slots[i]] = frame.paramSavesSmall[i];
+        }
+    } else {
+        for (size_t i = 0; i < n; i++) {
+            globalVector_[slots[i]] = frame.paramSavesBig[i];
+        }
+    }
+    frame.paramSaveCount = 0;
 }
 
 // ---- global slot fast-path helpers -------------------------------------
@@ -1230,15 +1322,13 @@ size_t VM::getOrCreateSlot(const std::string& name) {
 }
 
 void VM::dropGlobal(const std::string& name) {
+    // The slot itself is retained (value voided) so pre-bound parameter
+    // slots and the constant->slot caches stay valid for the whole run.
     auto it = globalSlots_.find(name);
     if (it != globalSlots_.end()) {
         globalVector_[it->second] = Value();
-        globalSlots_.erase(it);
     }
     globals.erase(name);
-    // Slots may be recycled later by getOrCreateSlot; cached constant->slot
-    // bindings become stale, so invalidate every function's cache.
-    globalConstCache_.clear();
 }
 
 bool VM::setGlobalSync(const std::string& name, const Value& v) {
@@ -1462,17 +1552,11 @@ bool VM::callFunction(const std::string& name, int argCount) {
     }
 
     // Save and bind parameters as global variables (mirrors OP_CALL)
-    for (size_t i = 0; i < func.parameters.size(); i++) {
-        auto gIt = globals.find(func.parameters[i].name);
-        if (gIt != globals.end()) {
-            frame.savedGlobals[func.parameters[i].name] = gIt->second;
-        } else {
-            frame.newGlobals.push_back(func.parameters[i].name);
-        }
-        size_t slot = getOrCreateSlot(func.parameters[i].name);
-        globalVector_[slot] = frame.locals[i];
-        globals[func.parameters[i].name] = frame.locals[i];
+    std::vector<Value> args(argCount);
+    for (size_t i = 0; i < func.parameters.size() && i < static_cast<size_t>(argCount); i++) {
+        args[i] = frame.locals[i];
     }
+    bindParams(frame, func, args);
 
     // Constructor calls: the 'this' object (locals[0]) must be pushed back
     // onto the caller stack when the constructor frame returns.
@@ -1593,15 +1677,7 @@ void VM::runLoop() {
             // Restore globals shadowed by this frame's parameters, and
             // remove parameters that did not exist before the call (P1-1)
             if (!frames.empty()) {
-                CallFrame& curFrame = frames.back();
-                for (const auto& [name, val] : curFrame.savedGlobals) {
-                    size_t slot = getOrCreateSlot(name);
-                    globalVector_[slot] = val;
-                    globals[name] = val;
-                }
-                for (const auto& name : curFrame.newGlobals) {
-                    dropGlobal(name);
-                }
+                restoreParams(frames.back());
             }
             CallFrame poppedFrame = frames.back();
             frames.pop_back();
@@ -1815,6 +1891,96 @@ void VM::runLoop() {
             push(Value(result ? 1 : 0));
             break;
         }
+        case OpCode::OP_ADD_IMM: {
+            int64_t imm = static_cast<int8_t>(chunk.readByte(cf.ip));
+            cf.ip++;
+            Value a = pop();
+            if (a.getType() == Value::Type::Int) {
+                push(Value(static_cast<int>(a.asInt() + imm)));
+            } else if (a.getType() == Value::Type::Double) {
+                push(Value(a.asDouble() + static_cast<double>(imm)));
+            } else {
+                runtimeErr("Type mismatch in addition");
+            }
+            break;
+        }
+        case OpCode::OP_SUB_IMM: {
+            int64_t imm = static_cast<int8_t>(chunk.readByte(cf.ip));
+            cf.ip++;
+            Value a = pop();
+            if (a.getType() == Value::Type::Int) {
+                push(Value(static_cast<int>(a.asInt() - imm)));
+            } else if (a.getType() == Value::Type::Double) {
+                push(Value(a.asDouble() - static_cast<double>(imm)));
+            } else {
+                runtimeErr("Type mismatch in subtraction");
+            }
+            break;
+        }
+        case OpCode::OP_MUL_IMM: {
+            int64_t imm = static_cast<int8_t>(chunk.readByte(cf.ip));
+            cf.ip++;
+            Value a = pop();
+            if (a.getType() == Value::Type::Int) {
+                push(Value(static_cast<int>(a.asInt() * imm)));
+            } else if (a.getType() == Value::Type::Double) {
+                push(Value(a.asDouble() * static_cast<double>(imm)));
+            } else {
+                runtimeErr("Type mismatch in multiplication");
+            }
+            break;
+        }
+        case OpCode::OP_DIV_IMM: {
+            int64_t imm = static_cast<int8_t>(chunk.readByte(cf.ip));
+            cf.ip++;
+            Value a = pop();
+            if (imm == 0) { runtimeErr("Division by zero"); break; }
+            if (a.getType() == Value::Type::Int) {
+                push(Value(static_cast<int>(a.asInt() / imm)));
+            } else if (a.getType() == Value::Type::Double) {
+                push(Value(a.asDouble() / static_cast<double>(imm)));
+            } else {
+                runtimeErr("Type mismatch in division");
+            }
+            break;
+        }
+        case OpCode::OP_MOD_IMM: {
+            int64_t imm = static_cast<int8_t>(chunk.readByte(cf.ip));
+            cf.ip++;
+            Value a = pop();
+            if (imm == 0) { runtimeErr("Modulo by zero"); break; }
+            if (a.getType() == Value::Type::Int) {
+                push(Value(static_cast<int>(a.asInt() % imm)));
+            } else if (a.getType() == Value::Type::Double) {
+                push(Value(std::fmod(a.asDouble(), static_cast<double>(imm))));
+            } else {
+                runtimeErr("Type mismatch in modulo");
+            }
+            break;
+        }
+        case OpCode::OP_LT_IMM:
+        case OpCode::OP_GT_IMM:
+        case OpCode::OP_GE_IMM:
+        case OpCode::OP_LE_IMM:
+        case OpCode::OP_EQ_IMM:
+        case OpCode::OP_NE_IMM: {
+            double imm = static_cast<double>(static_cast<int8_t>(chunk.readByte(cf.ip)));
+            cf.ip++;
+            Value a = pop();
+            double al = (a.getType() == Value::Type::Int) ? static_cast<double>(a.asInt()) : a.asDouble();
+            bool result = false;
+            switch (static_cast<OpCode>(instruction)) {
+            case OpCode::OP_LT_IMM: result = (al < imm); break;
+            case OpCode::OP_GT_IMM: result = (al > imm); break;
+            case OpCode::OP_GE_IMM: result = (al >= imm); break;
+            case OpCode::OP_LE_IMM: result = (al <= imm); break;
+            case OpCode::OP_EQ_IMM: result = (al == imm); break;
+            case OpCode::OP_NE_IMM: result = (al != imm); break;
+            default: break;
+            }
+            push(Value(result ? 1 : 0));
+            break;
+        }
         case OpCode::OP_PRINT: {
             std::cout << pop().toString();
             break;
@@ -1979,19 +2145,12 @@ void VM::runLoop() {
                 newFrame.function = &func;
                 newFrame.ip = 0;
                 newFrame.locals.resize(func.localCount);
+                for (size_t i = 0; i < args.size() && i < func.localCount; i++) {
+                    newFrame.locals[i] = args[i];
+                }
 
                 // Save and set parameters as global variables
-                for (size_t i = 0; i < func.parameters.size(); i++) {
-                    auto it = globals.find(func.parameters[i].name);
-                    if (it != globals.end()) {
-                        newFrame.savedGlobals[func.parameters[i].name] = it->second;
-                    } else {
-                        newFrame.newGlobals.push_back(func.parameters[i].name);
-                    }
-                    size_t slot = getOrCreateSlot(func.parameters[i].name);
-                    globalVector_[slot] = args[i];
-                    globals[func.parameters[i].name] = args[i];
-                }
+                bindParams(newFrame, func, args);
             } else {
                 push(fnVal);
                 if (!callSystemFunction(fnName, argCount)) {
@@ -2488,23 +2647,18 @@ if (coro.dead) {
     }
     flushGlobals();
 
-    // Bind this coroutine's parameter globals for the segment (shadowing the
-    // current values, restored when the segment suspends or finishes). Every
-    // other global stays shared across the whole VM by design.
-    struct ParamShadow { std::string name; bool existed; Value old; };
-    std::vector<ParamShadow> paramShadow;
+    // Bind this coroutine's parameter globals for the segment (saved in the
+    // frame and restored when the segment suspends or finishes). Every other
+    // global stays shared across the whole VM by design.
+    std::vector<Value> cargs;
     if (!coro.frames.empty()) {
         const CompiledFunction& fn = *coro.frames.back().function;
+        cargs.resize(fn.parameters.size());
         for (size_t i = 0; i < fn.parameters.size() &&
              i < coro.frames.back().locals.size(); i++) {
-auto gIt = globals.find(fn.parameters[i].name);
-            paramShadow.push_back({ fn.parameters[i].name,
-                gIt != globals.end(),
-                gIt != globals.end() ? gIt->second : Value() });
-            size_t slot = getOrCreateSlot(fn.parameters[i].name);
-            globalVector_[slot] = coro.frames.back().locals[i];
-            globals[fn.parameters[i].name] = coro.frames.back().locals[i];
+            cargs[i] = coro.frames.back().locals[i];
         }
+        bindParams(coro.frames.back(), fn, cargs);
     }
 
     // Swap the coroutine context in and run until it yields or finishes
@@ -2522,14 +2676,8 @@ auto gIt = globals.find(fn.parameters[i].name);
     activeCoro_ = -1;
 
 // Restore the parameter globals shadowed for this segment
-    for (const auto& sh : paramShadow) {
-        if (sh.existed) {
-            size_t slot = getOrCreateSlot(sh.name);
-            globalVector_[slot] = sh.old;
-            globals[sh.name] = sh.old;
-        } else {
-            dropGlobal(sh.name);
-        }
+    if (!coro.frames.empty()) {
+        restoreParams(coro.frames.back());
     }
     flushGlobals();
 
@@ -2613,6 +2761,17 @@ const char* opcodeName(uint8_t byte) {
     case OpCode::OP_OBJ_FIELD_SET: return "OP_OBJ_FIELD_SET";
     case OpCode::OP_OBJ_CALL: return "OP_OBJ_CALL";
     case OpCode::OP_YIELD: return "OP_YIELD";
+    case OpCode::OP_ADD_IMM: return "OP_ADD_IMM";
+    case OpCode::OP_SUB_IMM: return "OP_SUB_IMM";
+    case OpCode::OP_MUL_IMM: return "OP_MUL_IMM";
+    case OpCode::OP_DIV_IMM: return "OP_DIV_IMM";
+    case OpCode::OP_MOD_IMM: return "OP_MOD_IMM";
+    case OpCode::OP_LT_IMM: return "OP_LT_IMM";
+    case OpCode::OP_GT_IMM: return "OP_GT_IMM";
+    case OpCode::OP_GE_IMM: return "OP_GE_IMM";
+    case OpCode::OP_LE_IMM: return "OP_LE_IMM";
+    case OpCode::OP_EQ_IMM: return "OP_EQ_IMM";
+    case OpCode::OP_NE_IMM: return "OP_NE_IMM";
     case OpCode::OP_HALT: return "OP_HALT";
     default: return "OP_UNKNOWN";
     }
@@ -2684,6 +2843,17 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
             case OpCode::OP_CALL:
             case OpCode::OP_ARRAY:
             case OpCode::OP_DICT:
+            case OpCode::OP_ADD_IMM:
+            case OpCode::OP_SUB_IMM:
+            case OpCode::OP_MUL_IMM:
+            case OpCode::OP_DIV_IMM:
+            case OpCode::OP_MOD_IMM:
+            case OpCode::OP_LT_IMM:
+            case OpCode::OP_GT_IMM:
+            case OpCode::OP_GE_IMM:
+            case OpCode::OP_LE_IMM:
+            case OpCode::OP_EQ_IMM:
+            case OpCode::OP_NE_IMM:
                 ip += 1;
                 break;
             case OpCode::OP_OBJ_FIELD_GET:
@@ -2781,6 +2951,22 @@ void disassembleProgram(const CompiledProgram& prog, std::ostream& out) {
                 uint8_t n = chunk.readByte(ip);
                 ip += 1;
                 out << "OP_ARRAY  " << static_cast<int>(n) << " elem(s)";
+                break;
+            }
+            case OpCode::OP_ADD_IMM:
+            case OpCode::OP_SUB_IMM:
+            case OpCode::OP_MUL_IMM:
+            case OpCode::OP_DIV_IMM:
+            case OpCode::OP_MOD_IMM:
+            case OpCode::OP_LT_IMM:
+            case OpCode::OP_GT_IMM:
+            case OpCode::OP_GE_IMM:
+            case OpCode::OP_LE_IMM:
+            case OpCode::OP_EQ_IMM:
+            case OpCode::OP_NE_IMM: {
+                int8_t imm = static_cast<int8_t>(chunk.readByte(ip));
+                ip += 1;
+                out << opcodeName(static_cast<uint8_t>(op)) << "  " << static_cast<int>(imm);
                 break;
             }
             case OpCode::OP_OBJ_FIELD_GET:

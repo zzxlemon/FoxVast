@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <cmath>
 #include <windows.h>
+#include <winuser.h>
+
+#define GLFW_EXPOSE_NATIVE_WIN32
+#include <glfw3native.h>
 
 #define STB_TRUETYPE_IMPLEMENTATION
 #include <stb_truetype.h>
@@ -22,6 +26,73 @@
 //===============================
 
 std::vector<FGWindow> FG::windows;
+
+// Global hotkey plumbing: HWND -> windows[] index, and a subclass window proc
+// that converts WM_HOTKEY into a synthetic key press for the script.
+static std::map<HWND, int> g_hwndIndex;
+
+static LRESULT CALLBACK fgHotkeyWndProc(HWND hwnd, UINT msg,
+                                        WPARAM wParam, LPARAM lParam) {
+    auto it = g_hwndIndex.find(hwnd);
+    if (msg == WM_HOTKEY) {
+        if (it != g_hwndIndex.end()) {
+            FGWindow& fgw = FG::windows[it->second];
+            auto hk = fgw.hotkeys.find(static_cast<int>(wParam));
+            if (hk != fgw.hotkeys.end()) {
+                fgw.pressedKeys.insert(hk->second);
+            }
+        }
+        return 0; // handled
+    }
+    if (it != g_hwndIndex.end()) {
+        FGWindow& fgw = FG::windows[it->second];
+        if (fgw.prevWndProc) {
+            return CallWindowProc(fgw.prevWndProc, hwnd, msg, wParam, lParam);
+        }
+    }
+    return DefWindowProc(hwnd, msg, wParam, lParam);
+}
+
+// Map a script key name to its Win32 virtual-key code (mirrors keyNameToGlfw).
+// VK codes are plain ASCII for letters/digits; named constants are inlined
+// numerically to stay independent of winuser.h macro availability.
+static int keyNameToVk(const std::string& name) {
+    if (name.size() == 1) {
+        char c = name[0];
+        if (c >= 'a' && c <= 'z') return static_cast<int>('A') + (c - 'a');
+        if (c >= 'A' && c <= 'Z') return static_cast<int>(c);
+        if (c >= '0' && c <= '9') return static_cast<int>('0') + (c - '0');
+        switch (c) {
+        case ' ': return 0x20; // VK_SPACE
+        case '=': case '+': return 0xBB; // VK_OEM_PLUS
+        case '-': case '_': return 0xBD; // VK_OEM_MINUS
+        case '.': return 0xBE; // VK_OEM_PERIOD
+        case ',': return 0xBC; // VK_OEM_COMMA
+        case '/': return 0xBF; // VK_OEM_2
+        case ';': return 0xBA; // VK_OEM_1
+        default: return static_cast<int>(c); // fallback ASCII
+        }
+    }
+    static const std::map<std::string, int> special = {
+        {"space", 0x20}, {"enter", 0x0D}, {"escape", 0x1B},
+        {"tab", 0x09}, {"backspace", 0x08},
+        {"up", 0x26}, {"down", 0x28}, {"left", 0x25}, {"right", 0x27},
+        {"home", 0x24}, {"end", 0x23}, {"pageup", 0x21}, {"pagedown", 0x22},
+        {"insert", 0x2D}, {"delete", 0x2E},
+        {"shift", 0xA0}, {"ctrl", 0xA2}, {"alt", 0xA4},
+    };
+    auto it = special.find(name);
+    if (it != special.end()) return it->second;
+    if (name.size() == 2 && (name[0] == 'f' || name[0] == 'F')) {
+        int n = name[1] - '0';
+        if (n >= 1 && n <= 9) return 0x70 + (n - 1); // VK_F1..
+    }
+    if (name.size() == 3 && (name[0] == 'f' || name[0] == 'F')) {
+        int n = (name[1] - '0') * 10 + (name[2] - '0');
+        if (n >= 10 && n <= 12) return 0x70 + (n - 1); // VK_F1..
+    }
+    throw std::runtime_error("register_hotkeys: unknown key '" + name + "'");
+}
 
 static const char* VERTEX_SHADER_SRC = R"(
 #version 330 core
@@ -422,6 +493,7 @@ Value FG::create_window(const std::vector<Value>& args) {
     fgw.lastFrameTime = glfwGetTime();
     windows.push_back(fgw);
     glfwSetWindowUserPointer(window, &windows.back());
+    g_hwndIndex[glfwGetWin32Window(window)] = static_cast<int>(windows.size()) - 1;
     FGWindow& cur = windows.back();
     int fbW = 0, fbH = 0;
     glfwGetFramebufferSize(window, &fbW, &fbH);
@@ -434,6 +506,16 @@ Value FG::create_window(const std::vector<Value>& args) {
 
 Value FG::close(const std::vector<Value>& args) {
     for (auto& fgw : windows) {
+        HWND hwnd = glfwGetWin32Window(fgw.window);
+        for (const auto& [id, key] : fgw.hotkeys) {
+            UnregisterHotKey(hwnd, id);
+        }
+        fgw.hotkeys.clear();
+        if (fgw.prevWndProc) {
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(fgw.prevWndProc));
+            fgw.prevWndProc = nullptr;
+        }
+        g_hwndIndex.erase(hwnd);
         glDeleteVertexArrays(1, &fgw.VAO);
         glDeleteBuffers(1, &fgw.VBO);
         glDeleteProgram(fgw.shaderProgram);
@@ -863,6 +945,84 @@ Value FG::simulate_click(const std::vector<Value>& args) {
     int times = args.size() == 2 ? args[1].asInt() : 1;
     if (times < 1) return Value();
     windows[idx].fakeLeftClicks += times;
+    return Value();
+}
+
+// simulate_real_click: window, [times=1] -> sends a REAL left-button click
+// at the current OS cursor position via Win32 SendInput. Unlike
+// simulate_click, this presses the mouse button at the OS level, so the
+// click lands in whatever window is under the cursor (games, other apps,
+// the desktop). Returns the number of clicks requested.
+Value FG::simulate_real_click(const std::vector<Value>& args) {
+    if (args.size() < 1 || args.size() > 2) {
+        throw std::runtime_error("simulate_real_click: need 1-2 args (window, [times=1])");
+    }
+    int idx = args[0].asInt();
+    if (idx < 0 || idx >= static_cast<int>(windows.size())) {
+        throw std::runtime_error("simulate_real_click: invalid window index");
+    }
+    int times = args.size() == 2 ? args[1].asInt() : 1;
+    if (times < 1) return Value();
+
+    INPUT clicks[2];
+    ZeroMemory(clicks, sizeof(clicks));
+    clicks[0].type = INPUT_MOUSE;
+    clicks[0].mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+    clicks[1].type = INPUT_MOUSE;
+    clicks[1].mi.dwFlags = MOUSEEVENTF_LEFTUP;
+    for (int i = 0; i < times; i++) {
+        SendInput(2, clicks, sizeof(INPUT));
+    }
+    return Value(times);
+}
+
+// register_hotkeys: window, key1 [, key2, ...] -> register Win32 global
+// hotkeys via RegisterHotKey. The window's message pump converts each WM_HOTKEY
+// into a synthetic key press, so key_down/key_pressed work even when the
+// window has lost focus (e.g. while an auto-clicker is clicking elsewhere).
+// Returns the number of keys successfully registered.
+Value FG::register_hotkeys(const std::vector<Value>& args) {
+    if (args.size() < 2) {
+        throw std::runtime_error("register_hotkeys: need window + at least one key name");
+    }
+    int idx = args[0].asInt();
+    if (idx < 0 || idx >= static_cast<int>(windows.size())) {
+        throw std::runtime_error("register_hotkeys: invalid window index");
+    }
+    FGWindow& fgw = windows[idx];
+    HWND hwnd = glfwGetWin32Window(fgw.window);
+    if (!fgw.prevWndProc) {
+        fgw.prevWndProc = reinterpret_cast<WNDPROC>(
+            SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(fgHotkeyWndProc)));
+    }
+    int registered = 0;
+    for (size_t i = 1; i < args.size(); i++) {
+        int vk = keyNameToVk(args[i].asString());
+        int glfwKey = keyNameToGlfw(args[i].asString());
+        int id = fgw.hotkeyNextId++;
+        if (RegisterHotKey(hwnd, id, 0, static_cast<UINT>(vk))) {
+            fgw.hotkeys[id] = glfwKey;
+            registered++;
+        }
+    }
+    return Value(registered);
+}
+
+// unregister_hotkeys: window -> release all previously registered hotkeys.
+Value FG::unregister_hotkeys(const std::vector<Value>& args) {
+    if (args.size() != 1) {
+        throw std::runtime_error("unregister_hotkeys: need 1 arg (window)");
+    }
+    int idx = args[0].asInt();
+    if (idx < 0 || idx >= static_cast<int>(windows.size())) {
+        throw std::runtime_error("unregister_hotkeys: invalid window index");
+    }
+    FGWindow& fgw = windows[idx];
+    HWND hwnd = glfwGetWin32Window(fgw.window);
+    for (const auto& [id, key] : fgw.hotkeys) {
+        UnregisterHotKey(hwnd, id);
+    }
+    fgw.hotkeys.clear();
     return Value();
 }
 

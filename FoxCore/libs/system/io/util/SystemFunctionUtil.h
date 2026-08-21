@@ -26,4 +26,5 @@ public:
     Value DoubleChangeString(const std::vector<Value>& args);
     Value DoubleChangeInt(const std::vector<Value>& args);
     Value IntChangeDouble(const std::vector<Value>& args);
+    Value TypeOf(const std::vector<Value>& args);
 };

@@ -24,8 +24,8 @@ static void print_help(){
     std::cout << "  -far <archive.far>      Run main.fc from .far archive" << std::endl;
     std::cout << "  -version                Show version info" << std::endl;
     std::cout << "  OutInfo=true            Enable verbose output(Deprecated)" << std::endl;
-    std::cout << "  pack=true               Encrypt .fx -> .fz file" << std::endl;
-    std::cout << "  pack=false              Decrypt .fz -> .fx file" << std::endl;
+    std::cout << "  pack=true               Encrypt .fox -> .fz file" << std::endl;
+    std::cout << "  pack=false              Decrypt .fz -> .fox file" << std::endl;
 }
 
 static void CreateFile(const std::string& source_code) {

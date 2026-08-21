@@ -2,13 +2,16 @@ import fox.gl.fg -> fg
 import fox.std.util -> util
 
 # Auto Clicker: presses the left mouse button repeatedly at the current
-# cursor position while ON. Space or the Toggle button switches it, + / -
-# speed it up / slow down, Q quits.
+# cursor position while ON (REAL OS-level clicks via Win32 SendInput).
+# Space or the Toggle button switches it, + / - speed it up / slow down,
+# Q quits. All hotkeys are registered as GLOBAL Win32 hotkeys, so they
+# keep working even when the clicker steals focus from this window.
 
 func main() -> void {
     font = "NotoSansSC-VariableFont_wght.ttf"
     win = fg.create_window("Auto Clicker - Q quit | SPACE toggle | +/- speed", 420, 320)
     fg.set_scale(win, 420, 320)
+    fg.register_hotkeys(win, "space", "q", "=", "-")
 
     on = 0
     interval = 90.0
@@ -17,7 +20,7 @@ func main() -> void {
 
     while (1) {
         if (fg.window_should_close(win) == 1) { break }
-        if (fg.key_down(win, "q") == 1) { break }
+        if (fg.key_pressed(win, "q") == 1) { break }
         if (fg.key_pressed(win, "space") == 1) { if (on == 0) { on = 1 } else { on = 0 } }
         if (fg.key_pressed(win, "=") == 1) { interval = interval - 20.0; if (interval < 20.0) { interval = 20.0 } }
         if (fg.key_pressed(win, "-") == 1) { interval = interval + 20.0; if (interval > 500.0) { interval = 500.0 } }
@@ -30,7 +33,7 @@ func main() -> void {
             now = fg.time() * 1000.0
             if (now - lastClick >= interval) {
                 lastClick = now
-                fg.simulate_click(win, 1)
+                fg.simulate_real_click(win, 1)
                 clicks = clicks + 1
             }
         }

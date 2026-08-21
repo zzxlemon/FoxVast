@@ -12,7 +12,7 @@
 #include <vector>
 
 // ============================================================
-//  fox.std.math  ！ sin, cos, tan
+//  fox.std.math  ?? sin, cos, tan
 // ============================================================
 #ifdef FOX_LIB_MATH
 #include "../../libs/system/math/SystemFunctionsMath.h"
@@ -50,7 +50,7 @@ inline void register_random(LibraryManager& mgr) {
 #endif
 
 // ============================================================
-//  fox.sys.io.fs  ！ file I/O
+//  fox.sys.io.fs  ?? file I/O
 // ============================================================
 #ifdef FOX_LIB_FILE
 #include "../../libs/system/fs/SystemFunctionsFile.h"
@@ -81,7 +81,7 @@ inline void register_file(LibraryManager& mgr) {
 #endif
 
 // ============================================================
-//  fox.std.util  ！ length, type conversions
+//  fox.std.util  ?? length, type conversions
 // ============================================================
 #ifdef FOX_LIB_UTIL
 #include "../../libs/system/io/util/SystemFunctionUtil.h"
@@ -91,6 +91,10 @@ inline void register_util(LibraryManager& mgr) {
     mgr.registerSystemFunction("util", "length", [](const std::vector<Value>& args) -> Value {
         Util util;
         return util.length(args);
+    });
+    mgr.registerSystemFunction("util", "typeof", [](const std::vector<Value>& args) -> Value {
+        Util util;
+        return util.TypeOf(args);
     });
     mgr.registerSystemFunction("util", "IntChangeString", [](const std::vector<Value>& args) -> Value {
         Util util;
@@ -207,7 +211,7 @@ inline void register_socket(LibraryManager& mgr) {
 #endif
 
 // ============================================================
-//  fox.gl.fg  ！ OpenGL / GLFW graphics
+//  fox.gl.fg  ?? OpenGL / GLFW graphics
 // ============================================================
 #ifdef FOX_LIB_GRAPHICS
 #include "../../libs/graphics/SystemFunctionsGraphics.h"
@@ -345,6 +349,18 @@ inline void register_graphics(LibraryManager& mgr) {
     mgr.registerSystemFunction("gl_fg", "simulate_click", [](const std::vector<Value>& args) -> Value {
         FG fg;
         return fg.simulate_click(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "simulate_real_click", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.simulate_real_click(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "register_hotkeys", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.register_hotkeys(args);
+    });
+    mgr.registerSystemFunction("gl_fg", "unregister_hotkeys", [](const std::vector<Value>& args) -> Value {
+        FG fg;
+        return fg.unregister_hotkeys(args);
     });
 }
 

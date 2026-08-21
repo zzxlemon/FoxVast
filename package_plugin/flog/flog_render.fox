@@ -45,12 +45,12 @@ func flog_render(c <- dict, l <- int, msg <- string) -> string {
     line = c["format"]
     line = util.str_replace(line, "{time}", time.format(c["time_fmt"]))
     line = util.str_replace(line, "{level_num}", util.IntChangeString(l))
-    line = util.str_replace(line, "{level}", flog_level_name(l))
+    line = util.str_replace(line, "{level}", flog.flog_level_name(l))
     line = util.str_replace(line, "{name}", c["name"])
     line = util.str_replace(line, "{nl}", "\n")
     line = util.str_replace(line, "{esc_q}", "\"")
     if (c["color"] == 1) {
-        line = util.str_replace(line, "{color}", "\e[" + util.IntChangeString(_flog_color_code(c, l)) + "m")
+        line = util.str_replace(line, "{color}", "\e[" + util.IntChangeString(flog._flog_color_code(c, l)) + "m")
         line = util.str_replace(line, "{reset}", "\e[0m")
     } else {
         line = util.str_replace(line, "{color}", "")
@@ -66,7 +66,7 @@ func flog_render_plain(c <- dict, l <- int, msg <- string) -> string {
     line = c["format"]
     line = util.str_replace(line, "{time}", time.format(c["time_fmt"]))
     line = util.str_replace(line, "{level_num}", util.IntChangeString(l))
-    line = util.str_replace(line, "{level}", flog_level_name(l))
+    line = util.str_replace(line, "{level}", flog.flog_level_name(l))
     line = util.str_replace(line, "{name}", c["name"])
     line = util.str_replace(line, "{nl}", "\n")
     line = util.str_replace(line, "{esc_q}", "\"")

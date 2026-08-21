@@ -180,77 +180,168 @@ void Gc::collect() {
 }
 
 // ============================================================
-// Value implementation
+// Value implementation (union-backed: 48-byte payload, one live
+// member per value selected by `type`)
 // ============================================================
 
-Value::Value() : type(Type::Void), intVal(0), doubleVal(0.0), strVal(""), arrVal(), bytesVal(), dictVal() {}
-Value::Value(int v) : type(Type::Int), intVal(v), doubleVal(0.0), strVal(""), arrVal(), bytesVal(), dictVal() {}
-Value::Value(double v) : type(Type::Double), intVal(0), doubleVal(v), strVal(""), arrVal(), bytesVal(), dictVal() {}
-Value::Value(const std::string& v) : type(Type::String), intVal(0), doubleVal(0.0), strVal(v), arrVal(), bytesVal(), dictVal() {}
-Value::Value(const char* v) : type(Type::String), intVal(0), doubleVal(0.0), strVal(v), arrVal(), bytesVal(), dictVal() {}
-Value::Value(const std::vector<Value>& v) : type(Type::Array), intVal(0), doubleVal(0.0), strVal(""), arrVal(v), bytesVal(), dictVal() {}
-Value::Value(const std::vector<uint8_t>& bytes) : type(Type::Bytes), intVal(0), doubleVal(0.0), strVal(""), arrVal(), bytesVal(bytes), dictVal() {}
+Value::Value() : st_(), type(Type::Void) {}
+
+Value::Value(int v) : st_(), type(Type::Int) { st_.i = v; }
+
+Value::Value(double v) : st_(), type(Type::Double) { st_.d = v; }
+
+Value::Value(const std::string& v) : st_(), type(Type::String) {
+    new (&st_.s) std::string(v);
+}
+
+Value::Value(const char* v) : st_(), type(Type::String) {
+    new (&st_.s) std::string(v);
+}
+
+Value::Value(const std::vector<Value>& v) : st_(), type(Type::Array) {
+    new (&st_.arr) std::vector<Value>(v);
+}
+
+Value::Value(const std::vector<uint8_t>& bytes) : st_(), type(Type::Bytes) {
+    new (&st_.bytes) std::vector<uint8_t>(bytes);
+}
+
 Value::Value(const std::unordered_map<std::string, GcHandle>& dict)
-    : type(Type::Dict), intVal(0), doubleVal(0.0), strVal(""), arrVal(), bytesVal(), dictVal(dict) {}
+    : st_(), type(Type::Dict) {
+    st_.dict = new std::unordered_map<std::string, GcHandle>(dict);
+}
+
+Value::Value(const Value& other)
+    : st_(), type(other.type), objDictVal(other.objDictVal), coroId(other.coroId) {
+    copyStorage(other);
+}
+
+Value::Value(Value&& other) noexcept
+    : st_(), type(other.type), objDictVal(other.objDictVal), coroId(other.coroId) {
+    moveStorage(std::move(other));
+    other.type = Type::Void;
+}
+
+Value& Value::operator=(const Value& other) {
+    if (this == &other) return *this;
+    destroyStorage();
+    type = other.type;
+    objDictVal = other.objDictVal;
+    coroId = other.coroId;
+    copyStorage(other);
+    return *this;
+}
+
+Value& Value::operator=(Value&& other) noexcept {
+    if (this == &other) return *this;
+    destroyStorage();
+    type = other.type;
+    objDictVal = other.objDictVal;
+    coroId = other.coroId;
+    moveStorage(std::move(other));
+    other.type = Type::Void;
+    return *this;
+}
+
+Value::~Value() {
+    destroyStorage();
+}
+
+void Value::destroyStorage() noexcept {
+    switch (type) {
+    case Type::String: st_.s.~basic_string(); break;
+    case Type::Array: st_.arr.~vector(); break;
+    case Type::Bytes: st_.bytes.~vector(); break;
+    case Type::Dict: delete st_.dict; st_.dict = nullptr; break;
+    case Type::Object: st_.className.~basic_string(); break;
+    default: break;
+    }
+}
+
+void Value::copyStorage(const Value& other) {
+    switch (type) {
+    case Type::Int: st_.i = other.st_.i; break;
+    case Type::Double: st_.d = other.st_.d; break;
+    case Type::String: new (&st_.s) std::string(other.st_.s); break;
+    case Type::Array: new (&st_.arr) std::vector<Value>(other.st_.arr); break;
+    case Type::Bytes: new (&st_.bytes) std::vector<uint8_t>(other.st_.bytes); break;
+    case Type::Dict: st_.dict = new std::unordered_map<std::string, GcHandle>(*other.st_.dict); break;
+    case Type::Object: new (&st_.className) std::string(other.st_.className); break;
+    default: break;
+    }
+}
+
+void Value::moveStorage(Value&& other) noexcept {
+    switch (type) {
+    case Type::Int: st_.i = other.st_.i; break;
+    case Type::Double: st_.d = other.st_.d; break;
+    case Type::String: new (&st_.s) std::string(std::move(other.st_.s)); break;
+    case Type::Array: new (&st_.arr) std::vector<Value>(std::move(other.st_.arr)); break;
+    case Type::Bytes: new (&st_.bytes) std::vector<uint8_t>(std::move(other.st_.bytes)); break;
+    case Type::Dict: st_.dict = other.st_.dict; other.st_.dict = nullptr; break;
+    case Type::Object: new (&st_.className) std::string(std::move(other.st_.className)); break;
+    default: break;
+    }
+}
 
 std::vector<Value>& Value::asArrayRef() {
     if (type != Type::Array) throw std::runtime_error("Value is not an array type");
-    return arrVal;
+    return st_.arr;
 }
 
 Value::Type Value::getType() const { return type; }
 
 int Value::asInt() const {
     if (type != Type::Int) throw std::runtime_error("Value is not an integer type");
-    return intVal;
+    return st_.i;
 }
 
 double Value::asDouble() const {
     if (type != Type::Double) throw std::runtime_error("Value is not a double type");
-    return doubleVal;
+    return st_.d;
 }
 
 const std::string& Value::asString() const {
     if (type != Type::String) throw std::runtime_error("Value is not a string type");
-    return strVal;
+    return st_.s;
 }
 
 const std::vector<Value>& Value::asArray() const {
     if (type != Type::Array) throw std::runtime_error("Value is not an array type");
-    return arrVal;
+    return st_.arr;
 }
 
 const std::vector<uint8_t>& Value::asBytes() const {
     if (type != Type::Bytes) throw std::runtime_error("Value is not a bytes type");
-    return bytesVal;
+    return st_.bytes;
 }
 
 std::vector<uint8_t>& Value::asBytesRef() {
     if (type != Type::Bytes) throw std::runtime_error("Value is not a bytes type");
-    return bytesVal;
+    return st_.bytes;
 }
 
 const std::unordered_map<std::string, GcHandle>& Value::asDict() const {
     if (type != Type::Dict) throw std::runtime_error("Value is not a dict type");
-    return dictVal;
+    return *st_.dict;
 }
 
 std::unordered_map<std::string, GcHandle>& Value::asDictRef() {
     if (type != Type::Dict) throw std::runtime_error("Value is not a dict type");
-    return dictVal;
+    return *st_.dict;
 }
 
 Value Value::makeObject(const std::string& className) {
     Value v;
     v.type = Type::Object;
-    v.objectClassName = className;
+    new (&v.st_.className) std::string(className);
     v.objDictVal = Gc::instance().alloc(Value(std::unordered_map<std::string, GcHandle>()));
     return v;
 }
 
 const std::string& Value::asObjectClass() const {
     if (type != Type::Object) throw std::runtime_error("Value is not an object type");
-    return objectClassName;
+    return st_.className;
 }
 
 GcHandle Value::asObjectDictHandle() const {
@@ -275,10 +366,10 @@ std::unordered_map<std::string, GcHandle>& Value::asObjectDictRef() {
 void Value::traceGC() const {
     switch (type) {
     case Type::Array:
-        for (const auto& elem : arrVal) elem.traceGC();
+        for (const auto& elem : st_.arr) elem.traceGC();
         break;
     case Type::Dict:
-        for (const auto& [key, h] : dictVal) Gc::instance().mark(h);
+        for (const auto& [key, h] : *st_.dict) Gc::instance().mark(h);
         break;
     case Type::Object:
         if (objDictVal != kNoGcHandle) Gc::instance().mark(objDictVal);
@@ -294,7 +385,7 @@ int Value::getByteSize() const {
     case Type::Double: return DOUBLE_BYTE_SIZE;
     case Type::String: return STRING_BYTE_SIZE;
     case Type::Array: return STRING_BYTE_SIZE;
-    case Type::Bytes: return static_cast<int>(bytesVal.size());
+    case Type::Bytes: return static_cast<int>(st_.bytes.size());
     case Type::Dict: return STRING_BYTE_SIZE;
     case Type::Object: return STRING_BYTE_SIZE;
     case Type::Coroutine: return STRING_BYTE_SIZE;
@@ -305,13 +396,13 @@ int Value::getByteSize() const {
 
 std::string Value::toString() const {
     switch (type) {
-    case Type::Int: return std::to_string(intVal);
-    case Type::Double: return std::to_string(doubleVal);
-    case Type::String: return strVal;
+    case Type::Int: return std::to_string(st_.i);
+    case Type::Double: return std::to_string(st_.d);
+    case Type::String: return st_.s;
     case Type::Array: return "[array]";
     case Type::Bytes: return "[bytes]";
     case Type::Dict: return "[dict]";
-    case Type::Object: return "[class " + objectClassName + "]";
+    case Type::Object: return "[class " + st_.className + "]";
     case Type::Coroutine: return "[coroutine " + std::to_string(coroId) + "]";
     case Type::Void: return "";
     default: return "<?>";

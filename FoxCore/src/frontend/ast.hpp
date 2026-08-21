@@ -373,7 +373,7 @@ public:
 
 // Keep old struct names as aliases for backward-compat during transition
 // (they are no longer used internally, BytecodeCompiler gets updated separately)
-// Parsing intermediates �� store raw source lines, converted to Stmt nodes later
+// Parsing intermediates ?????? store raw source lines, converted to Stmt nodes later
 struct IfStatement {
     std::string condition;
     std::vector<std::string> body;

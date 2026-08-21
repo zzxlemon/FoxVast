@@ -315,6 +315,11 @@ Token Lexer::nextToken() {
             return makeToken(TOKEN_ARROW, "->", tokenLine, tokenCol);
         }
         else {
+            if (pos + 1 < source.size() && source[pos + 1] == '='){
+                pos += 2;
+                col += 2;
+                return makeToken(TOKEN_MINUS_EQ, "-=", tokenLine, tokenCol);
+            }
             pos++;
             col++;
             return makeToken(TOKEN_MINUS, "-", tokenLine, tokenCol);
@@ -389,10 +394,42 @@ Token Lexer::nextToken() {
     }
 
     switch (c) {
-    case '+': pos++; col++; return makeToken(TOKEN_PLUS, "+", tokenLine, tokenCol);
-    case '*': pos++; col++; return makeToken(TOKEN_MUL, "*", tokenLine, tokenCol);
-    case '/': pos++; col++; return makeToken(TOKEN_DIV, "/", tokenLine, tokenCol);
-    case '%': pos++; col++; return makeToken(TOKEN_MOD, "%", tokenLine, tokenCol);
+    case '+': 
+        if (pos + 1 < source.size() && source[pos + 1] == '='){
+            pos += 2;
+            col += 2;
+            return makeToken(TOKEN_PLUS_EQ, "+=", tokenLine, tokenCol);
+        }
+        pos++; 
+        col++; 
+        return makeToken(TOKEN_PLUS, "+", tokenLine, tokenCol);
+    case '*': 
+        if (pos + 1 < source.size() && source[pos + 1] == '='){
+            pos += 2; 
+            col += 2;
+            return makeToken(TOKEN_MUL_EQ, "*=", tokenLine, tokenCol);
+        }
+        pos++; 
+        col++; 
+        return makeToken(TOKEN_MUL, "*", tokenLine, tokenCol);
+    case '/': 
+        if (pos + 1 < source.size() && source[pos + 1] == '='){
+            pos += 2;
+            col += 2;
+            return makeToken(TOKEN_DIV_EQ, "/=", tokenLine, tokenCol); 
+        }
+        pos++; 
+        col++; 
+        return makeToken(TOKEN_DIV, "/", tokenLine, tokenCol);
+    case '%': 
+        if (pos + 1 < source.size() && source[pos + 1] == '='){
+            pos += 2;
+            col += 2;
+            return makeToken(TOKEN_MOD_EQ, "%=", tokenLine, tokenCol);
+        }
+        pos++; 
+        col++; 
+        return makeToken(TOKEN_MOD, "%", tokenLine, tokenCol);
     case '(': pos++; col++; return makeToken(TOKEN_LPAREN, "(", tokenLine, tokenCol);
     case ')': pos++; col++; return makeToken(TOKEN_RPAREN, ")", tokenLine, tokenCol);
     case '[': pos++; col++; return makeToken(TOKEN_LBRACKET, "[", tokenLine, tokenCol);

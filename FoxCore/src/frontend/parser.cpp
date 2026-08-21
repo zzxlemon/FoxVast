@@ -5,8 +5,10 @@
 #include <iostream>
 #include <algorithm>
 
-std::vector<std::string> imported_source_files;
+std::vector<std::tuple<std::string, std::string, std::string>> imported_source_files;
 std::string import_base_file;
+std::string import_prefix;
+std::string import_alias;
 std::unordered_map<std::string, ClassDef> g_classRegistry;
 
 namespace {
@@ -15,6 +17,13 @@ std::string dirOf(const std::string& path) {
     if (sep == std::string::npos) return ".";
     if (sep == 0) return path.substr(0, 1);
     return path.substr(0, sep);
+}
+std::string fileStemOf(const std::string& path) {
+    size_t slash = path.find_last_of("/\\");
+    size_t start = (slash == std::string::npos) ? 0 : slash + 1;
+    size_t dot = path.rfind('.');
+    size_t end = (dot != std::string::npos && dot > start) ? dot : path.size();
+    return path.substr(start, end - start);
 }
 }
 
@@ -956,6 +965,25 @@ void Parser::parseLine(const std::string& line, StmtHandler& handler) {
             }
             eat(lineLexer, currentToken, TOKEN_RPAREN);
             handler.onCall(identName, std::move(args));
+        } else if (nextToken.type == TOKEN_PLUS_EQ || nextToken.type == TOKEN_MINUS_EQ ||
+            nextToken.type == TOKEN_MUL_EQ || nextToken.type == TOKEN_DIV_EQ ||
+            nextToken.type == TOKEN_MOD_EQ) {
+            TokenT opToken = nextToken.type;
+            currentToken = nextToken;
+            eat(lineLexer, currentToken, opToken);
+            auto right = parseExpr(lineLexer, currentToken);
+            TokenT binaryOp = TOKEN_PLUS;
+            switch (opToken) {
+            case TOKEN_PLUS_EQ: binaryOp = TOKEN_PLUS; break;
+            case TOKEN_MINUS_EQ: binaryOp = TOKEN_MINUS; break;
+            case TOKEN_MUL_EQ: binaryOp = TOKEN_MUL; break;
+            case TOKEN_DIV_EQ: binaryOp = TOKEN_DIV; break;
+            case TOKEN_MOD_EQ: binaryOp = TOKEN_MOD; break;
+            default: break;
+            }
+            auto left = std::make_unique<IdentifierExpr>(identName);
+            auto combined = std::make_unique<BinaryExpr>(std::move(left), binaryOp, std::move(right));
+            handler.onAssign(identName, std::move(combined));
         } else if (nextToken.type == TOKEN_EQUAL) {
             currentToken = nextToken;
             eat(lineLexer, currentToken, TOKEN_EQUAL);
@@ -1092,7 +1120,7 @@ namespace {
 }
 
 // ============================================================
-// CompilingHandler �� builds Stmt nodes without executing
+// CompilingHandler ?? builds Stmt nodes without executing
 // ============================================================
 namespace {
     class CompilingHandler : public StmtHandler {
@@ -1172,7 +1200,7 @@ namespace {
 
 std::unique_ptr<Stmt> Parser::parseLineToStmt(const std::string& line) {
     if (line.empty()) return nullptr;
-    // Skip type declarations (int/double/string var = expr) �� not expressible as Stmts
+    // Skip type declarations (int/double/string var = expr) ?? not expressible as Stmts
     std::string trimmed = line;
     size_t start = trimmed.find_first_not_of(" \t");
     if (start != std::string::npos) trimmed = trimmed.substr(start);
@@ -1632,16 +1660,39 @@ void Parser::parseImportStatement(Lexer& lexer, Token& currentToken,
         if (currentToken.type == TOKEN_STRING) {
             std::string importPath = currentToken.value;
             eat(lexer, currentToken, TOKEN_STRING);
+            std::string ns = fileStemOf(importPath);
+            std::string alias;
+            if (currentToken.type == TOKEN_ARROW) {
+                eat(lexer, currentToken, TOKEN_ARROW);
+                skipWhitespace(lexer, currentToken);
+                if (currentToken.type != TOKEN_IDENTIFIER) {
+                    throw std::runtime_error(makeParseError(currentToken,
+                        "Expected an alias name after '->' in !import"));
+                }
+                alias = currentToken.value;
+                eat(lexer, currentToken, TOKEN_IDENTIFIER);
+            }
             std::string fullPath = resolveImportPath(importPath);
             if (!fileExists(fullPath)) {
                 throw std::runtime_error(makeParseError(currentToken,
                     "Cannot find imported plugin file: " + importPath));
             }
-            imported_source_files.push_back(fullPath);
+            imported_source_files.push_back({fullPath, ns, alias});
             return;
         }
         std::string pluginName = currentToken.value;
         eat(lexer, currentToken, TOKEN_IDENTIFIER);
+        std::string alias;
+        if (currentToken.type == TOKEN_ARROW) {
+            eat(lexer, currentToken, TOKEN_ARROW);
+            skipWhitespace(lexer, currentToken);
+            if (currentToken.type != TOKEN_IDENTIFIER) {
+                throw std::runtime_error(makeParseError(currentToken,
+                    "Expected an alias name after '->' in !import"));
+            }
+            alias = currentToken.value;
+            eat(lexer, currentToken, TOKEN_IDENTIFIER);
+        }
         std::vector<std::string> candidates;
         if (!import_base_file.empty()) {
             candidates.push_back(dirOf(import_base_file) + "/" + pluginName + ".fox");
@@ -1650,7 +1701,7 @@ void Parser::parseImportStatement(Lexer& lexer, Token& currentToken,
         candidates.push_back(pluginName + ".fox");
         for (const auto& candidate : candidates) {
             if (fileExists(candidate)) {
-                imported_source_files.push_back(candidate);
+                imported_source_files.push_back({candidate, pluginName, alias});
                 return;
             }
         }
@@ -1671,7 +1722,7 @@ void Parser::parseImportStatement(Lexer& lexer, Token& currentToken,
                 "Cannot find imported file: " + importPath +
                 " (searched relative to the importing file, then the working directory)"));
         }
-        imported_source_files.push_back(fullPath);
+        imported_source_files.push_back({fullPath, import_prefix, import_alias});
         return;
     }
 

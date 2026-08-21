@@ -20,11 +20,41 @@ void Interpreter::parseCode(const std::string& code, const std::string& filename
     try {
         std::unordered_map<std::string, std::string> funcOrigins; // func name -> source file
 
-        auto parseInto = [&](const std::string& src, const std::string& label) {
+        auto parseInto = [&](const std::string& src, const std::string& label,
+            const std::string& ns, const std::string& alias) {
             std::unordered_map<std::string, Value> fileVars;
             std::unordered_map<std::string, Function> fileFuncs;
             Parser parser(src, fileVars, fileFuncs);
+            import_prefix = ns;
+        import_alias = alias;
             parser.parseAllFunctions();
+            import_prefix.clear();
+        import_alias.clear();
+            // Namespace the functions of imported files: "namespace.name".
+            // They can only be called with the prefix (libname.func(...)),
+            // mirroring the system-library call convention. An optional alias
+            // registers a second copy under "alias.name".
+            if (!ns.empty()) {
+                std::unordered_map<std::string, Function> renamed;
+                for (auto& [funcName, func] : fileFuncs) {
+                    func.name = ns + "." + funcName;
+                    renamed[ns + "." + funcName] = std::move(func);
+                }
+                fileFuncs = std::move(renamed);
+                if (!alias.empty() && alias != ns) {
+                    std::unordered_map<std::string, Function> aliases;
+                    for (const auto& [funcName, func] : fileFuncs) {
+                        if (funcName.size() > ns.size()
+                            && funcName.compare(0, ns.size() + 1, ns + ".") == 0) {
+                            std::string bare = funcName.substr(ns.size() + 1);
+                            Function copy = func;
+                            copy.name = alias + "." + bare;
+                            aliases[alias + "." + bare] = std::move(copy);
+                        }
+                    }
+                    fileFuncs.insert(aliases.begin(), aliases.end());
+                }
+            }
             for (const auto& [funcName, func] : fileFuncs) {
                 if (funcOrigins.find(funcName) != funcOrigins.end()) {
                     throw std::runtime_error("Duplicate function '" + funcName + "' defined in '"
@@ -40,20 +70,22 @@ void Interpreter::parseCode(const std::string& code, const std::string& filename
         // 'visited' prevents cycles and duplicate processing.
         imported_source_files.clear();
         import_base_file = filename;
-        parseInto(code, filename.empty() ? "<main>" : filename);
+        parseInto(code, filename.empty() ? "<main>" : filename, "", "");
 
         std::unordered_set<std::string> visited;
         for (size_t idx = 0; idx < imported_source_files.size(); idx++) {
             // Copy: parsing appends to imported_source_files (nested imports),
             // which may reallocate the vector.
-            std::string path = imported_source_files[idx];
+            std::string path = std::get<0>(imported_source_files[idx]);
+            std::string ns = std::get<1>(imported_source_files[idx]);
+            std::string alias = std::get<2>(imported_source_files[idx]);
             if (!visited.insert(path).second) continue;
             std::string src = read_file(path);
             if (src.empty()) {
                 throw std::runtime_error("Cannot read imported file: " + path);
             }
             import_base_file = path;
-            parseInto(src, path);
+            parseInto(src, path, ns, alias);
         }
         import_base_file.clear();
 

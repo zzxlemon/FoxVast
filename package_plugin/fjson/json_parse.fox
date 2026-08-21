@@ -117,50 +117,50 @@ func _lit(t_lt <- string, i_lt <- int) -> dict {
     error("fjson: bad literal")
 }
 func _val(t_v <- string, i_v <- int) -> dict {
-    i_v = _skip_ws(t_v, i_v)
+    i_v = fjson._skip_ws(t_v, i_v)
     cv = util.str_substring(t_v, i_v, i_v + 1)
-    if (cv == "{") { ret _obj(t_v, i_v, 1, {"k": []}, {}) }
-    if (cv == "[") { ret _arr(t_v, i_v, 1, {"k": []}) }
-    if (cv == "\"") { ret _string(t_v, i_v) }
-    if (cv == "t") { ret _lit(t_v, i_v) }
-    if (cv == "f") { ret _lit(t_v, i_v) }
-    if (cv == "n") { ret _lit(t_v, i_v) }
-    if (cv == "-") { ret _number(t_v, i_v) }
-    if (cv == "0") { ret _number(t_v, i_v) }
-    if (cv == "1") { ret _number(t_v, i_v) }
-    if (cv == "2") { ret _number(t_v, i_v) }
-    if (cv == "3") { ret _number(t_v, i_v) }
-    if (cv == "4") { ret _number(t_v, i_v) }
-    if (cv == "5") { ret _number(t_v, i_v) }
-    if (cv == "6") { ret _number(t_v, i_v) }
-    if (cv == "7") { ret _number(t_v, i_v) }
-    if (cv == "8") { ret _number(t_v, i_v) }
-    if (cv == "9") { ret _number(t_v, i_v) }
+    if (cv == "{") { ret fjson._obj(t_v, i_v, 1, {"k": []}, {}) }
+    if (cv == "[") { ret fjson._arr(t_v, i_v, 1, {"k": []}) }
+    if (cv == "\"") { ret fjson._string(t_v, i_v) }
+    if (cv == "t") { ret fjson._lit(t_v, i_v) }
+    if (cv == "f") { ret fjson._lit(t_v, i_v) }
+    if (cv == "n") { ret fjson._lit(t_v, i_v) }
+    if (cv == "-") { ret fjson._number(t_v, i_v) }
+    if (cv == "0") { ret fjson._number(t_v, i_v) }
+    if (cv == "1") { ret fjson._number(t_v, i_v) }
+    if (cv == "2") { ret fjson._number(t_v, i_v) }
+    if (cv == "3") { ret fjson._number(t_v, i_v) }
+    if (cv == "4") { ret fjson._number(t_v, i_v) }
+    if (cv == "5") { ret fjson._number(t_v, i_v) }
+    if (cv == "6") { ret fjson._number(t_v, i_v) }
+    if (cv == "7") { ret fjson._number(t_v, i_v) }
+    if (cv == "8") { ret fjson._number(t_v, i_v) }
+    if (cv == "9") { ret fjson._number(t_v, i_v) }
     error("fjson: unexpected character")
 }
 func _obj(t_o <- string, i_o <- int, sb_o <- int, ks_o <- dict, vl_o <- dict) -> dict {
     jo = i_o
     if (sb_o == 1) { jo = jo + 1 }
-    jo = _skip_ws(t_o, jo)
+    jo = fjson._skip_ws(t_o, jo)
     if (util.str_substring(t_o, jo, jo + 1) == "}") {
         ret {"v": {"t": "obj", "v": {"keys": ks_o["k"], "vals": vl_o}}, "pos": jo + 1}
     }
     if (util.str_substring(t_o, jo, jo + 1) != "\"") { error("fjson: object key must be a string") }
-    krs = _string(t_o, jo)
+    krs = fjson._string(t_o, jo)
     ko = krs["v"]["v"]
     ke = ks_o["k"]
     ke = util.arr_append(ke, ko)
     ks_o = {"k": ke}
-    jo = _skip_ws(t_o, krs["pos"])
+    jo = fjson._skip_ws(t_o, krs["pos"])
     if (util.str_substring(t_o, jo, jo + 1) != ":") { error("fjson: missing colon") }
-    vrs = _val(t_o, jo + 1)
+    vrs = fjson._val(t_o, jo + 1)
     nkn = util.arr_length(ks_o["k"])
     ko = ks_o["k"][nkn - 1]
     vl_o[ko] = vrs["v"]
-    jo = _skip_ws(t_o, vrs["pos"])
+    jo = fjson._skip_ws(t_o, vrs["pos"])
     co = util.str_substring(t_o, jo, jo + 1)
     if (co == ",") {
-        ret _obj(t_o, jo + 1, 0, ks_o, vl_o)
+        ret fjson._obj(t_o, jo + 1, 0, ks_o, vl_o)
     }
     if (co == "}") {
         ret {"v": {"t": "obj", "v": {"keys": ks_o["k"], "vals": vl_o}}, "pos": jo + 1}
@@ -170,18 +170,18 @@ func _obj(t_o <- string, i_o <- int, sb_o <- int, ks_o <- dict, vl_o <- dict) ->
 func _arr(t_a <- string, i_a <- int, sb_a <- int, it_a <- dict) -> dict {
     ja = i_a
     if (sb_a == 1) { ja = ja + 1 }
-    ja = _skip_ws(t_a, ja)
+    ja = fjson._skip_ws(t_a, ja)
     if (util.str_substring(t_a, ja, ja + 1) == "]") {
         ret {"v": {"t": "arr", "v": it_a["k"]}, "pos": ja + 1}
     }
-    vra = _val(t_a, ja)
+    vra = fjson._val(t_a, ja)
     its = it_a["k"]
     its = util.arr_append(its, vra["v"])
     it_a = {"k": its}
-    ja = _skip_ws(t_a, vra["pos"])
+    ja = fjson._skip_ws(t_a, vra["pos"])
     ca = util.str_substring(t_a, ja, ja + 1)
     if (ca == ",") {
-        ret _arr(t_a, ja + 1, 0, it_a)
+        ret fjson._arr(t_a, ja + 1, 0, it_a)
     }
     if (ca == "]") {
         ret {"v": {"t": "arr", "v": it_a["k"]}, "pos": ja + 1}
@@ -189,8 +189,8 @@ func _arr(t_a <- string, i_a <- int, sb_a <- int, it_a <- dict) -> dict {
     error("fjson: bad array syntax")
 }
 func parse(t_p <- string) -> dict {
-    rsp = _val(t_p, 0)
-    pso = _skip_ws(t_p, rsp["pos"])
+    rsp = fjson._val(t_p, 0)
+    pso = fjson._skip_ws(t_p, rsp["pos"])
     if (pso != util.str_length(t_p)) { error("fjson: trailing content after JSON value") }
     ret rsp["v"]
 }

@@ -3,6 +3,7 @@
 #include "../../src/interpreter/interpreter.hpp"
 #include <glad/glad.h>
 #include <glfw3.h>
+#include <windows.h>
 #include <string>
 #include <iostream>
 #include <vector>
@@ -76,10 +77,17 @@ double offsetY = 0.0;
 // set_scale_anchor can override either axis.
 double anchorX = 0.5;
 double anchorY = 0.0;
+// Global hotkeys (Win32 RegisterHotKey): work even when the window does not
+// have keyboard focus. WM_HOTKEY events are intercepted by a per-window
+// subclass proc and injected into pressedKeys as a normal press.
+WNDPROC prevWndProc = nullptr;
+std::map<int, int> hotkeys;   // RegisterHotKey id -> GLFW key code
+int hotkeyNextId = 1;
 };
 
 class FG {
 public:
+    static std::vector<FGWindow> windows;
     Value create_window(const std::vector<Value>& args);
     Value close(const std::vector<Value>& args);
     Value window_should_close(const std::vector<Value>& args);
@@ -113,8 +121,10 @@ public:
     Value button(const std::vector<Value>& args);
     Value text_input(const std::vector<Value>& args);
     Value simulate_click(const std::vector<Value>& args);
+    Value simulate_real_click(const std::vector<Value>& args);
+    Value register_hotkeys(const std::vector<Value>& args);
+    Value unregister_hotkeys(const std::vector<Value>& args);
 private:
-    static std::vector<FGWindow> windows;
     static GLuint compileShader(GLenum type, const char* source);
     static GLuint createShaderProgram();
     static GLuint createTextShaderProgram();

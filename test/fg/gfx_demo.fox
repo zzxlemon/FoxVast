@@ -1,7 +1,3 @@
-# gfx_demo.fox - fox.gl.fg 图形库演示
-# 运行:fox -f gfx_demo.fox(需 fox.graphics.dll 与字体,见 draw_text 搜索路径)
-# 操作:方向键移动方块,空格/ESC,P 打印按键事件,
-#       滚轮缩放圆,按住左键画圆点,窗口可拖拽缩放,600 帧后自动退出
 import fox.gl.fg -> fg
 import fox.std.util -> util
 

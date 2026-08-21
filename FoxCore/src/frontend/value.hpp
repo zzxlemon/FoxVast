@@ -18,6 +18,13 @@ public:
     Value(const std::vector<uint8_t>& bytes);
     Value(const std::unordered_map<std::string, GcHandle>& dict);
 
+    // Union-backed storage needs real copy/move/dtor semantics.
+    Value(const Value& other);
+    Value(Value&& other) noexcept;
+    Value& operator=(const Value& other);
+    Value& operator=(Value&& other) noexcept;
+    ~Value();
+
     // Marker returned by a bare "ret" (void return). Executors treat it as
     // "exit the current function" while still reporting no value. Never
     // serialized; exists only at runtime.
@@ -68,27 +75,38 @@ public:
 
     bool asBool() const {
         switch (type) {
-        case Type::Int: return intVal != 0;
-        case Type::Double: return doubleVal != 0.0;
-        case Type::Array: return !arrVal.empty();
-        case Type::Bytes: return !bytesVal.empty();
-        case Type::Dict: return !dictVal.empty();
+        case Type::Int: return st_.i != 0;
+        case Type::Double: return st_.d != 0.0;
+        case Type::Array: return !st_.arr.empty();
+        case Type::Bytes: return !st_.bytes.empty();
+        case Type::Dict: return !st_.dict->empty();
         case Type::Object: return true;
         default: throw std::runtime_error("Only int/double/array/bytes/dict/types supported as condition");
         }
     }
 
 private:
+    // Only one payload member is live at a time, selected by `type`.
+    // dictVal lives on the heap (single pointer) so the whole Value stays
+    // small (48 bytes); dict copies stay deep copies.
+    union Storage {
+        int i;
+        double d;
+        std::string s;
+        std::vector<Value> arr;
+        std::vector<uint8_t> bytes;
+        std::unordered_map<std::string, GcHandle>* dict;
+        std::string className;
+        Storage() {}
+        ~Storage() {}
+    } st_;
     Type type;
-    int intVal;
-    double doubleVal;
-    std::string strVal;
-    std::vector<Value> arrVal;
-    std::vector<uint8_t> bytesVal;
-    std::unordered_map<std::string, GcHandle> dictVal;
-    std::string objectClassName = "";
-    GcHandle objDictVal = kNoGcHandle; // handle to a Dict-typed slot
+    GcHandle objDictVal = kNoGcHandle; // Object: member-table handle
     int coroId = -1;                   // Coroutine: VM registry index
+
+    void destroyStorage() noexcept;
+    void copyStorage(const Value& other);
+    void moveStorage(Value&& other) noexcept;
 };
 
 bool valuesEqual(const Value& a, const Value& b);

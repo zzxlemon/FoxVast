@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <unordered_map>
 #include <unordered_set>
+#include <unordered_set>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -133,6 +134,19 @@ enum class OpCode : uint8_t {
     OP_OBJ_FIELD_SET   = 0x32,
     OP_OBJ_CALL        = 0x33,
     OP_YIELD           = 0x34,
+    // Super-instructions: binary op with a small int literal operand folded
+    // into the opcode (compiler emits these for RHS constants in [-128,127]).
+    OP_ADD_IMM         = 0x35,
+    OP_SUB_IMM         = 0x36,
+    OP_MUL_IMM         = 0x37,
+    OP_DIV_IMM         = 0x38,
+    OP_MOD_IMM         = 0x39,
+    OP_LT_IMM          = 0x3A,
+    OP_GT_IMM          = 0x3B,
+    OP_GE_IMM          = 0x3C,
+    OP_LE_IMM          = 0x3D,
+    OP_EQ_IMM          = 0x3E,
+    OP_NE_IMM          = 0x3F,
     OP_HALT            = 0xFF,
 };
 
@@ -242,6 +256,12 @@ public:
     // standalone and dependencies resolve across loaded programs at runtime.
     static bool s_expandImports;
 
+    // Names of script functions in the program being compiled (including
+    // namespaced "libname.func" entries). Used by CallExpr compilation to
+    // tell namespaced script calls (which are plain calls) apart from
+    // genuine object-method calls (name.method on a variable).
+    static std::unordered_set<std::string> s_userFuncNames;
+
     CompiledProgram compile(const std::string& source, const std::string& filename = "");
     Value::Type compileExpr(CompiledFunction& cf, Expr* expr);
 
@@ -250,7 +270,6 @@ public:
 private:
     CompiledProgram program;
     std::unordered_map<std::string, Value::Type> varTypes;
-    std::unordered_set<std::string> userFuncNames;
 
     static std::string typeStr(Value::Type t);
     static void typeError(const std::string& msg);
@@ -280,6 +299,13 @@ private:
         std::vector<Value> locals;
         std::unordered_map<std::string, Value> savedGlobals;
         std::vector<std::string> newGlobals;
+        // Fast-path parameter save/restore: values the parameter slots held
+        // before this call (recursion-safe, hash-free). Small-array buffer
+        // keeps the common <=4-parameter call allocation-free.
+        Value paramSavesSmall[4];
+        std::vector<Value> paramSavesBig;
+        size_t paramSaveCount = 0;
+        const std::vector<size_t>* paramSlotsPtr = nullptr;
         size_t ip;
         size_t instrStart = 0; // offset of the instruction being executed
         int newAllocBytes = 0; // per-function new() budget (P3-5)
@@ -307,6 +333,11 @@ private:
     bool setGlobalSync(const std::string& name, const Value& v);
     void flushGlobals();
     size_t slotForConst(const CompiledFunction* fn, size_t nameIdx);
+    // Pre-bound parameter slots per function (built lazily on first call).
+    std::unordered_map<const CompiledFunction*, std::vector<size_t>> paramSlots_;
+    void bindParams(CallFrame& frame, const CompiledFunction& func,
+                    const std::vector<Value>& args);
+    void restoreParams(CallFrame& frame);
     std::vector<CallFrame> frames;
     struct TryHandler {
         size_t stackDepth;
@@ -377,4 +408,5 @@ private:
     bool callSystemFunction(const std::string& name, int argCount);
 
     Value executeSystemCall(const std::string& funcName, const std::vector<Value>& args);
+
 };
