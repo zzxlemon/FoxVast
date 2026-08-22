@@ -1,9 +1,0 @@
-func main() -> void {
-    cyc = {}
-    print("made")
-    cyc["self"] = cyc
-    print("written")
-    v = cyc["self"]
-    print("read back")
-    exit(0)
-}

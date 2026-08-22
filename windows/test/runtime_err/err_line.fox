@@ -1,9 +1,0 @@
-func boom() -> int {
-    ret 10 / 0
-}
-
-func main() {
-    print("before")
-    boom()
-    print("after")
-}
